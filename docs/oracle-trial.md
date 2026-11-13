@@ -10,9 +10,7 @@ Set the following runtime environment in Dokploy:
 
 ```dotenv
 MCM_HTTP__PUBLIC_URL=https://chunkyard.fractal-tess.xyz
-MCM_AUTH__ENABLED=true
 MCM_DOCKER__HOST_DATA_DIR=/var/lib/docker/volumes/chunkyard-data/_data
-MCM_DOCKER__PUBLISH_IP=100.91.0.4
 ```
 
 The image already binds `0.0.0.0:8420`, stores data at `/data`, and serves its bundled UI. Configure the following mounts before the first deployment:
@@ -24,13 +22,13 @@ The image already binds `0.0.0.0:8420`, stores data at `/data`, and serves its b
 
 The host-visible volume path above assumes the verified `/var/lib/docker` engine data root and local volume driver. Check the named volume's actual mountpoint before starting a server. This explicit path translation is required because server containers are siblings of the manager, not nested containers.
 
-Game ports bind only Oracle's NetBird address (`oracle.netbird.cloud`, currently `100.91.0.4`). They are reachable from permitted mesh peers using their selected server ports; public internet game access is not configured. The web UI uses Dokploy's HTTPS proxy. Keep the Docker socket private; do not publish Docker TCP management or Minecraft RCON ports.
+The first-install trial keeps the default game-port bind, `127.0.0.1`. To allow players on the mesh later, set `MCM_DOCKER__PUBLISH_IP=100.91.0.4` in Dokploy and redeploy before creating game containers; permitted peers can then connect to `oracle.netbird.cloud:<game-port>`. Public internet game access is not configured. The web UI uses Dokploy's HTTPS proxy. Keep the Docker socket private; do not publish Docker TCP management or Minecraft RCON ports.
 
-For the manager itself, use a 1 GiB memory limit and one CPU initially. The Dokploy API expects `memoryLimit: "1073741824"` (bytes) and `cpuLimit: "1000000000"` (nanocpus). Set `updateConfigSwarm.Order` to `stop-first`; Dokploy defaults to `start-first`, which would overlap two managers on the same data directory. These limits do not cover sibling Minecraft containers: each server has its own heap, memory overhead, CPU and PID limits.
+The first-install trial leaves optional CPU and memory tuning unset. If you later want a 1 GiB/one-CPU manager limit, configure it in Dokploy. The Dokploy API expects `memoryLimit: "1073741824"` (bytes) and `cpuLimit: "1000000000"` (nanocpus). Set `updateConfigSwarm.Order` to `stop-first`; Dokploy defaults to `start-first`, which would overlap two managers on the same data directory. These limits do not cover sibling Minecraft containers: each server has its own heap, memory overhead, CPU and PID limits.
 
 ## First run
 
-Open `https://chunkyard.fractal-tess.xyz`. Read `/data/setup-token` through the manager's Dokploy terminal and complete owner setup. The token is removed after successful setup. Do not put it in Git, the deployment environment, or public logs.
+Open `https://chunkyard.fractal-tess.xyz`. In the manager's Dokploy terminal, run `cat /data/setup-token`. Verify that token in step one, then create the owner email/password account in step two. The token is removed after successful setup. Do not put it in Git, the deployment environment, or public logs.
 
 Start with one small server, then a second after checking memory and CPU headroom. A 2 GiB Java heap also needs at least 512 MiB of container overhead. Leave capacity for the OS, Dokploy and existing applications. An Oracle deployment is not a guarantee that every modpack fits its resources or supports ARM64.
 

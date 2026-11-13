@@ -29,6 +29,10 @@ export const getSetupStatus = (o: Opts = {}) => request<SetupStatus>('/api/v1/se
 
 export const getMe = (o: Opts = {}) => request<Me>('/api/v1/auth/me', o);
 
+/** Checks the first-run setup token without consuming it or creating an account (204). */
+export const verifySetupToken = (body: { setupToken: string }, o: Opts = {}) =>
+	request<void>('/api/v1/setup/verify-token', { ...o, method: 'POST', body });
+
 export const setupOwner = (
 	body: { setupToken: string; email: string; password: string },
 	o: Opts = {}

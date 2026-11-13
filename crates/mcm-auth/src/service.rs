@@ -41,12 +41,9 @@ impl AuthService {
     pub async fn setup_required(&self) -> Result<bool, AuthError> {
         Ok(self.repo.setup_required().await?)
     }
-    pub async fn setup(
-        &self,
-        token: &str,
-        email: &str,
-        password: String,
-    ) -> Result<IssuedSession, AuthError> {
+    /// Check the bootstrap token without creating a user/session or consuming it.
+    /// Account creation always performs this check again.
+    pub async fn verify_setup_token(&self, token: &str) -> Result<(), AuthError> {
         if !self.setup_required().await? {
             return Err(AuthError::AlreadySetup);
         }
@@ -57,6 +54,15 @@ impl AuthService {
         {
             return Err(AuthError::InvalidSetupToken);
         }
+        Ok(())
+    }
+    pub async fn setup(
+        &self,
+        token: &str,
+        email: &str,
+        password: String,
+    ) -> Result<IssuedSession, AuthError> {
+        self.verify_setup_token(token).await?;
         let email = email.trim().to_ascii_lowercase();
         if email.len() > 254 || email.parse::<email_address::EmailAddress>().is_err() {
             return Err(AuthError::Email);

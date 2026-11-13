@@ -80,11 +80,30 @@ async function test(enabled) {
     await page.goto(`${base}/servers`);
     if (enabled) {
       await page
-        .getByRole("heading", { name: "Create the owner account", exact: true })
+        .getByRole("heading", { name: "Verify the setup token", exact: true })
         .waitFor();
+      assert.equal(await page.getByLabel("Email", { exact: true }).count(), 0);
+      await page
+        .getByLabel("Setup token", { exact: true })
+        .fill("wrong".padEnd(43, "x"));
+      const rejected = page.waitForResponse(
+        (response) =>
+          response.url().endsWith("/api/v1/setup/verify-token") &&
+          response.request().method() === "POST",
+      );
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      assert.equal((await rejected).status(), 401);
+      await page
+        .getByRole("heading", { name: "Verify the setup token", exact: true })
+        .waitFor();
+      assert.equal(await page.getByLabel("Email", { exact: true }).count(), 0);
       await page
         .getByLabel("Setup token", { exact: true })
         .fill(await readFile(resolve(directory, "setup-token"), "utf8"));
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      await page
+        .getByRole("heading", { name: "Create the owner account", exact: true })
+        .waitFor();
       await page.getByLabel("Email", { exact: true }).fill("owner@example.com");
       const password = randomBytes(32).toString("base64url");
       await page.getByLabel("Password", { exact: true }).fill(password);

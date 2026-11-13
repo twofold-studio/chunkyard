@@ -16,7 +16,7 @@ For VPN access, set `MCM_HTTP__LISTEN=0.0.0.0:8420` and `MCM_HTTP__PUBLIC_URL` t
 
 New setup/login requests use `email`, and user responses expose `email` instead of `username`. Emails are normalized for login. There is no email-delivery, verification, or password-reset-email service.
 
-Read the initial token locally from `<data-dir>/setup-token`. Send it to `POST /api/v1/setup` with `{setupToken, email, password}`. A successful setup creates the owner, removes the token file, and sets the session cookie. Setup can only succeed once. Passwords use salted Argon2id with a bundled common-password blocklist. Hashing runs in a blocking worker pool limited to four concurrent operations.
+Read the initial token locally from `<data-dir>/setup-token`. The setup UI first sends it to `POST /api/v1/setup/verify-token` with `{setupToken}`. A valid token returns 204 without creating an account, issuing a session, or consuming the token. Step two sends the original token to `POST /api/v1/setup` with `{setupToken, email, password}`; that final request checks it again. Existing clients may still submit the final request directly. A successful setup creates the owner, removes the token file, and sets the session cookie. Setup can only succeed once. Passwords use salted Argon2id with a bundled common-password blocklist. Hashing runs in a blocking worker pool limited to four concurrent operations.
 
 Every mutation requires `X-MCM-CSRF: 1` and an `Origin` matching the backend origin (a matching `Referer` is also supported). Requests must use the configured public host. Cookie requests use `credentials: 'same-origin'`; there is no CORS allowance. Configure `http.public_url` when using a reverse proxy and preserve its Host header. Forwarded IP headers are currently ignored; login throttling uses the direct TCP peer.
 
@@ -26,6 +26,7 @@ Sessions use a 32-byte random token; only SHA-256 is stored. Cookies are HttpOnl
 |---|---|---|
 | GET | `/healthz` | `{status: "ok"}` or 503 `{status: "db_unavailable"}` |
 | GET | `/api/v1/setup/status` | `{required: boolean, authEnabled: boolean}` |
+| POST | `/api/v1/setup/verify-token` | 204 if the bootstrap token is valid; body `{setupToken}`; no state change |
 | POST | `/api/v1/setup` | 201 owner/session metadata and session cookie |
 | POST | `/api/v1/auth/login` | `{kind: "session", me}` and session cookie; body `{email, password}` |
 | GET | `/api/v1/auth/me` | Current owner/session metadata |
@@ -37,7 +38,7 @@ Sessions use a 32-byte random token; only SHA-256 is stored. Cookies are HttpOnl
 | GET | `/api/v1/jobs?limit=50&cursor=...` | `{items: Job[], nextCursor: string | null}`; max limit 200 |
 | GET | `/api/v1/jobs/{id}` | `Job` |
 
-When authentication is enabled, setup, login, health, and setup status are public. The remaining endpoints require the owner session. Before setup, protected endpoints return 503 `setup_required`. Errors use `application/problem+json`, with stable `code` and sanitized `detail`. JSON bodies are limited to 1 MiB. API responses include no-store, a restrictive CSP, security headers, and a generated request ID. Static UI pages have a separate page CSP and assets have cache policies; see [frontend hosting](frontend.md). Unknown `/api` routes return JSON problem responses even when UI hosting is enabled.
+When authentication is enabled, setup, token verification, login, health, and setup status are public. The remaining endpoints require the owner session. Before setup, protected endpoints return 503 `setup_required`. Errors use `application/problem+json`, with stable `code` and sanitized `detail`. JSON bodies are limited to 1 MiB. API responses include no-store, a restrictive CSP, security headers, and a generated request ID. Static UI pages have a separate page CSP and assets have cache policies; see [frontend hosting](frontend.md). Unknown `/api` routes return JSON problem responses even when UI hosting is enabled.
 
 `JavaRuntime` is the current core model: `{id, vendor, major, fullVersion, os, arch, path, managed, sha256}`. OS can be `linux`, `alpine-linux`, or `windows`. Planned fields such as `usedBy` and `installedAt` are not present yet. `java.allow_system_java = false` hides system runtimes and disables discovery.
 

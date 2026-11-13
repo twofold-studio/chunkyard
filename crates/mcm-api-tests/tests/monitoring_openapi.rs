@@ -33,6 +33,7 @@ async fn schema_is_protected_and_references_only_local_resolvable_schemas() -> R
                 "/healthz",
                 "/api/v1/setup/status",
                 "/api/v1/setup",
+                "/api/v1/setup/verify-token",
                 "/api/v1/auth/login",
             ]
             .contains(&path.as_str());

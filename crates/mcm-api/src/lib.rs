@@ -57,6 +57,7 @@ pub fn routes(state: AppState) -> Router {
         .route("/healthz", get(auth::health))
         .route("/api/v1/setup/status", get(auth::setup_status))
         .route("/api/v1/setup", post(auth::setup))
+        .route("/api/v1/setup/verify-token", post(auth::verify_setup_token))
         .route("/api/v1/auth/login", post(auth::login))
         .route("/api", axum::routing::any(error::not_found))
         .route("/api/", axum::routing::any(error::not_found))

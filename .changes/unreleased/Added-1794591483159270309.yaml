@@ -1,0 +1,3 @@
+kind: Added
+body: 'REST API: POST /api/v1/setup/verify-token validates the bootstrap token without creating an owner, issuing a session, or consuming the token. Final POST /api/v1/setup still revalidates it; origin/CSRF protection and authentication-mode checks apply to both steps.'
+time: 2026-11-13T19:38:03.159270309+02:00

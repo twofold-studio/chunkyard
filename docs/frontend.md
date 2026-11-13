@@ -4,7 +4,7 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 
 ## What it does
 
-- **Authentication.** Reads `/api/v1/setup/status`. First-run owner setup (setup token, email, password) and email/password sign-in when authentication is enabled; sign-out from the sidebar. When the backend runs with `MCM_AUTH__ENABLED=false`, setup and login are skipped and the sidebar shows "Authentication disabled"; no user is shown or invented. An expired session on any request returns the browser to sign-in.
+- **Authentication.** Reads `/api/v1/setup/status`. First-run setup in two steps (verify the setup token, then create the owner with email and password) and email/password sign-in when authentication is enabled; sign-out from the sidebar. When the backend runs with `MCM_AUTH__ENABLED=false`, setup and login are skipped and the sidebar shows "Authentication disabled"; no user is shown or invented. An expired session on any request returns the browser to sign-in.
 - **Servers.** List with container status, refreshed every 10 s while the tab is visible. Create form for Docker servers (name, port, image, heap, CPUs, JAR path, EULA) with the backend's validation limits. Detail page with start, stop, restart and force kill (kill asks for confirmation), EULA accept/revoke while stopped, read-only configuration, the managed directory with a copy button, console snapshot and command entry.
 - **Java runtimes.** Inventory, system discovery, and Temurin install from `/api/v1/java/available` with job polling.
 - **API reference.** A searchable, locally rendered view of the live OpenAPI document, including request/response schemas and examples; no request execution.

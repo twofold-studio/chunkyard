@@ -31,6 +31,21 @@ pub(crate) async fn setup_status(State(state): State<AppState>) -> Result<Json<V
         json!({"required": state.auth_enabled && state.auth.setup_required().await?, "authEnabled": state.auth_enabled}),
     ))
 }
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct VerifySetupTokenRequest {
+    setup_token: String,
+}
+pub(crate) async fn verify_setup_token(
+    State(state): State<AppState>,
+    ApiJson(body): ApiJson<VerifySetupTokenRequest>,
+) -> Result<StatusCode, ApiError> {
+    if !state.auth_enabled {
+        return Err(auth_disabled());
+    }
+    state.auth.verify_setup_token(&body.setup_token).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
 pub(crate) async fn setup(
     State(state): State<AppState>,
     ApiJson(body): ApiJson<SetupRequest>,

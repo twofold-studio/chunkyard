@@ -1324,6 +1324,66 @@
           }
         }
       }
+    },
+    "/api/v1/setup/verify-token": {
+      "post": {
+        "operationId": "post_api_v1_setup_verify_token",
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Verify the setup token",
+        "responses": {
+          "204": {
+            "description": "Token accepted; no account or session created."
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "Checks the token without creating a user, setting a cookie, or consuming the token. POST /api/v1/setup must supply and revalidate it again to create the owner. Returns 409 when setup is already complete or authentication is disabled.",
+        "parameters": [
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifySetupTokenRequest"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2243,6 +2303,19 @@
           "pids"
         ],
         "description": "On-demand Docker snapshot. Stopped or paused containers return status and null measurements. Working-set memory subtracts inactive file cache; it is not JVM heap. Network and block I/O are cumulative counters, not rates or filesystem size. No TPS, player count, or game readiness claim."
+      },
+      "VerifySetupTokenRequest": {
+        "type": "object",
+        "properties": {
+          "setupToken": {
+            "type": "string",
+            "description": "Bootstrap token read from the private local setup-token file."
+          }
+        },
+        "required": [
+          "setupToken"
+        ],
+        "additionalProperties": false
       }
     }
   }

@@ -29,11 +29,13 @@ Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fr
 - REST API: GET /api/v1/servers/{id}/metrics samples Docker CPU, memory, uptime, PID, network and block-I/O counters on demand, with bounded concurrency and timeouts. Stopped or unavailable measurements are never presented as zero usage; container status does not imply Minecraft readiness.
 - REST API: GET /api/v1/openapi.json serves an OpenAPI 3.1.1 contract for the implemented routes, request/response schemas, cookie authentication and CSRF requirements, protected by the current authentication mode.
 - Web UI: show a compact Resources panel on the server page from GET /api/v1/servers/{id}/metrics: CPU (relative to one core, may exceed 100%), memory working set against its limit, uptime, PIDs and cumulative network/disk I/O. It samples every 5 seconds only while running and the tab is visible, takes one snapshot when stopped, shows a dash for unavailable values instead of zero, and reports a busy sampler or missing Docker inline with a retry.
+- REST API: POST /api/v1/setup/verify-token validates the bootstrap token without creating an owner, issuing a session, or consuming the token. Final POST /api/v1/setup still revalidates it; origin/CSRF protection and authentication-mode checks apply to both steps.
 
 ### Changed
 
 - Development: document the verified-milestone commit/push workflow and exclude local environment files and app databases from version control.
 - Rename the project to Chunkyard in the web UI, CLI description, and documentation, with a new transparent voxel logo and a README illustrated with real app screenshots. The mcm executable, MCM_* environment variables, Cargo crate names, REST routes, and stored data remain compatible.
+- Web UI: first-run setup is now two steps. The setup token is verified with POST /api/v1/setup/verify-token before the owner email and password fields appear, and the final POST /api/v1/setup re-sends the verified token, which is held only in page memory.
 
 ### Security
 
