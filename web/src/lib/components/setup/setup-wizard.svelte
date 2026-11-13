@@ -26,8 +26,13 @@
 	const MIN_PASSWORD = 10;
 	const MAX_PASSWORD = 256;
 	const STEPS = ['Setup token', 'Owner account'] as const;
-	const TOKEN_HINT =
-		'Read the current token again on the manager host, e.g. docker exec <container> cat /data/setup-token.';
+	const TOKEN_HINT = 'Read the current token again as shown below the field.';
+	/** Where operators can read the setup token; each shown in its own selectable block. */
+	const TOKEN_SOURCES = [
+		{ label: 'Docker host', value: 'docker exec <container> cat /data/setup-token' },
+		{ label: 'Inside a container terminal (e.g. Dokploy)', value: 'cat /data/setup-token' },
+		{ label: 'Without Docker, read the file', value: '<data-dir>/setup-token' }
+	] as const;
 
 	let step = $state<0 | 1>(0);
 	let tokenInput = $state('');
@@ -164,16 +169,27 @@
 						class="font-mono"
 						autocomplete="off"
 						spellcheck={false}
+						aria-describedby="token-help"
 						aria-invalid={code === 'setup.invalid_token' ? true : undefined}
 						disabled={busy}
 						required
 					/>
-					<Field.Description>
-						Docker: <code class="font-mono"
-							>docker exec &lt;container&gt; cat /data/setup-token</code
-						>. Otherwise read <code class="font-mono">&lt;data-dir&gt;/setup-token</code> on the manager
-						host.
-					</Field.Description>
+					<div id="token-help" class="flex flex-col gap-3 text-sm text-muted-foreground">
+						<p>Where to find the token:</p>
+						<dl class="flex flex-col gap-3">
+							{#each TOKEN_SOURCES as source (source.label)}
+								<div class="flex flex-col gap-1.5">
+									<dt class="text-xs font-medium text-foreground">{source.label}</dt>
+									<dd>
+										<code
+											class="block rounded-md border border-border bg-muted/40 px-2.5 py-1.5 font-mono text-xs break-words whitespace-pre-wrap text-foreground select-all"
+											>{source.value}</code
+										>
+									</dd>
+								</div>
+							{/each}
+						</dl>
+					</div>
 				</Field.Field>
 			</Field.Group>
 			{@render failure()}

@@ -1,0 +1,3 @@
+kind: Changed
+body: 'Web UI: the setup page lists where to read the setup token (Docker host, a container terminal such as Dokploy, or the data-directory file) as labelled monospace blocks, and shows a subtle animated copper "Threads" background ported from React Bits. The background is decorative only, pauses when hidden or with reduced motion, and falls back to a static pattern without WebGL2.'
+time: 2026-11-13T20:11:19.879694897+02:00

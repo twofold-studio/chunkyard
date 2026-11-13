@@ -1,0 +1,3 @@
+kind: Fixed
+body: 'Web UI: keep the setup/sign-in version badge below the form in normal flow so long forms and narrow screens cannot overlap it.'
+time: 2026-11-13T20:14:23.07174605+02:00

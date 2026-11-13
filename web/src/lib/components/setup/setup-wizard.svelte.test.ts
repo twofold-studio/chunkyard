@@ -89,7 +89,6 @@ describe('SetupWizard', () => {
 		setup();
 		await expect.element(step1Heading()).toBeVisible();
 		await expect.element(tokenField()).toBeVisible();
-		await expect.element(page.getByText('cat /data/setup-token', { exact: false })).toBeVisible();
 		await expect.element(page.getByLabelText('Email', { exact: true })).not.toBeInTheDocument();
 		await expect.element(page.getByLabelText('Password', { exact: true })).not.toBeInTheDocument();
 		await expect
@@ -101,6 +100,24 @@ describe('SetupWizard', () => {
 		await expect.element(progress).toBeVisible();
 		const current = document.querySelector('[aria-current="step"]');
 		expect(current?.textContent).toMatch(/Setup token.*step 1 of 2, current/s);
+	});
+
+	it('lists labelled token sources as separate monospace blocks', async () => {
+		setup();
+		await expect.element(tokenField()).toHaveAttribute('aria-describedby', 'token-help');
+		const help = document.getElementById('token-help');
+		const entries = [...(help?.querySelectorAll('dl > div') ?? [])].map((entry) => [
+			entry.querySelector('dt')?.textContent?.trim(),
+			entry.querySelector('dd code')?.textContent
+		]);
+		expect(entries).toEqual([
+			['Docker host', 'docker exec <container> cat /data/setup-token'],
+			['Inside a container terminal (e.g. Dokploy)', 'cat /data/setup-token'],
+			['Without Docker, read the file', '<data-dir>/setup-token']
+		]);
+		await expect
+			.element(page.getByText('docker exec <container> cat /data/setup-token', { exact: true }))
+			.toBeVisible();
 	});
 
 	it('verifies the token with the backend before showing account fields', async () => {

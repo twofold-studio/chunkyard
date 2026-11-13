@@ -39,6 +39,11 @@ Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fr
 - Development: document the verified-milestone commit/push workflow and exclude local environment files and app databases from version control.
 - Rename the project to Chunkyard in the web UI, CLI description, and documentation, with a new transparent voxel logo and a README illustrated with real app screenshots. The mcm executable, Cargo crate names, REST routes, and stored data remain compatible.
 - Web UI: first-run setup is now two steps. The setup token is verified with POST /api/v1/setup/verify-token before the owner email and password fields appear, and the final POST /api/v1/setup re-sends the verified token, which is held only in page memory.
+- Web UI: the setup page lists where to read the setup token (Docker host, a container terminal such as Dokploy, or the data-directory file) as labelled monospace blocks, and shows a subtle animated copper "Threads" background ported from React Bits. The background is decorative only, pauses when hidden or with reduced motion, and falls back to a static pattern without WebGL2.
+
+### Fixed
+
+- Web UI: keep the setup/sign-in version badge below the form in normal flow so long forms and narrow screens cannot overlap it.
 
 ### Security
 
