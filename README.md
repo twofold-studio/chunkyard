@@ -17,7 +17,7 @@
 
 Chunkyard is a self-hosted Minecraft Java Edition server manager for one owner. A Rust service and Svelte web UI let you manage Docker server instances from one address, with persistent storage and no separate Node service to run.
 
-- **Control** servers with start, stop, restart, and force kill. Read recent console output and send commands.
+- **Control** servers with start, stop, restart, and force kill. Read recent console output, send commands, and watch CPU, memory, and uptime.
 - **Choose** a Docker image's Java version for each server, and discover or install host Java runtimes separately.
 - **Keep** a simple owner login, or disable authentication explicitly for a trusted local environment.
 
@@ -37,6 +37,6 @@ For a source checkout, see [production UI hosting](docs/frontend.md#production-h
 
 ## Documentation
 
-[Web UI](docs/frontend.md) · [Docker runtime and deployment](docs/docker.md) · [REST API](docs/http-api.md) · [Backend development](docs/backend.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+[Web UI](docs/frontend.md) · [Docker runtime and deployment](docs/docker.md) · [REST API](docs/http-api.md) · [Monitoring](docs/monitoring.md) · [Oracle trial](docs/oracle-trial.md) · [Backend development](docs/backend.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
 The [phase specifications](specs/README.md) describe the broader roadmap. The usage guides document what is implemented today.

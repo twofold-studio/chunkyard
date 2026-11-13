@@ -26,7 +26,7 @@ The host-visible volume path above assumes the verified `/var/lib/docker` engine
 
 Game ports bind only Oracle's NetBird address (`oracle.netbird.cloud`, currently `100.91.0.4`). They are reachable from permitted mesh peers using their selected server ports; public internet game access is not configured. The web UI uses Dokploy's HTTPS proxy. Keep the Docker socket private; do not publish Docker TCP management or Minecraft RCON ports.
 
-For the manager itself, use a 1 GiB memory limit and one CPU initially. These limits do not cover sibling Minecraft containers: each server has its own heap, memory overhead, CPU and PID limits.
+For the manager itself, use a 1 GiB memory limit and one CPU initially. The Dokploy API expects `memoryLimit: "1073741824"` (bytes) and `cpuLimit: "1000000000"` (nanocpus). Set `updateConfigSwarm.Order` to `stop-first`; Dokploy defaults to `start-first`, which would overlap two managers on the same data directory. These limits do not cover sibling Minecraft containers: each server has its own heap, memory overhead, CPU and PID limits.
 
 ## First run
 
