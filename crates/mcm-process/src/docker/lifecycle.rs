@@ -8,6 +8,9 @@ use mcm_core::server::*;
 use std::{path::PathBuf, time::Duration};
 #[async_trait]
 impl ServerRuntime for DockerRuntime {
+    async fn network(&self, server: &Server) -> Result<NetworkSettings, ServerError> {
+        Ok(self.network_of(server, self.inspect(server).await?))
+    }
     async fn remove(&self, server: &Server) -> Result<(), ServerError> {
         let Some(container) = self.inspect(server).await? else {
             return Ok(());
@@ -60,16 +63,20 @@ impl ServerRuntime for DockerRuntime {
         directory: PathBuf,
     ) -> Result<RuntimeStatus, ServerError> {
         let client = self.client()?;
-        let existing = self.inspect(server).await?;
-        if let Some(container) = &existing {
-            if container
+        let mut existing = self.inspect(server).await?;
+        if let Some(container) = &existing
+            && container
                 .state
                 .as_ref()
                 .is_some_and(|s| s.running == Some(true) || s.paused == Some(true))
-            {
-                return Err(ServerError::AlreadyRunning);
-            }
-        } else {
+        {
+            return Err(ServerError::AlreadyRunning);
+        }
+        if existing.is_some() && self.network_of(server, existing.clone()).restart_required {
+            self.remove(server).await?;
+            existing = None;
+        }
+        if existing.is_none() {
             if !self.capability().await.available {
                 return Err(ServerError::DockerUnavailable);
             }

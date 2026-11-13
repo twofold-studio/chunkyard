@@ -36,6 +36,8 @@ Sessions use a 32-byte random token; only SHA-256 is stored. Cookies are HttpOnl
 | GET | `/api/v1/software/paper/versions/{version}/builds` | `{items: [{id, stable}]}`; stable build IDs are strings, newest first |
 | POST | `/api/v1/servers/{id}/install` | 202 `{job}`; no body; installs the persisted software selection |
 | DELETE | `/api/v1/servers/{id}?deleteFiles=false` | 202 `{job}`; stopped instance only; retains files by default |
+| GET | `/api/v1/servers/{id}/network` | `{port,publishIp,effectivePublishIp,boundPublishIp,boundPort,restartRequired,status}` |
+| PATCH | `/api/v1/servers/{id}/network` | 200 `{server}`; body `{port,publishIp}`; stopped only, null bind uses manager default |
 | GET | `/api/v1/java/runtimes` | `{items: JavaRuntime[]}` |
 | POST | `/api/v1/java/runtimes/discover` | `{items: JavaRuntime[]}` |
 | GET | `/api/v1/java/available` | `{lts: number[], all: number[], mostRecentLts: number}` |

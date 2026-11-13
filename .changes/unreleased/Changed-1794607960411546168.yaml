@@ -1,0 +1,3 @@
+kind: Changed
+body: 'Networking: game ports now bind to 0.0.0.0 by default, retaining CHUNKYARD_DOCKER__PUBLISH_IP for host-only or VPN-interface overrides. Existing owned stopped containers with outdated bindings are recreated on their next explicit start/restart while preserving server files.'
+time: 2026-11-14T00:12:40.411546168+02:00

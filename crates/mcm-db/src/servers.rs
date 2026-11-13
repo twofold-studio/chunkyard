@@ -18,6 +18,18 @@ impl SqliteServerRepo {
 }
 #[async_trait]
 impl ServerRepo for SqliteServerRepo {
+    async fn set_network(
+        &self,
+        id: &str,
+        port: u16,
+        publish_ip: Option<std::net::IpAddr>,
+    ) -> Result<(), RepositoryError> {
+        let ip = serde_json::to_string(&publish_ip).map_err(storage)?;
+        sqlx::query("UPDATE servers SET port=?, document=json_set(document,'$.port',?,'$.publishIp',json(?)) WHERE id=?")
+            .bind(i64::from(port)).bind(i64::from(port)).bind(ip).bind(id)
+            .execute(&self.pool).await.map_err(storage)?;
+        Ok(())
+    }
     async fn delete(&self, id: &str) -> Result<(), RepositoryError> {
         sqlx::query("DELETE FROM servers WHERE id=?")
             .bind(id)

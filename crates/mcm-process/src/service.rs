@@ -121,6 +121,32 @@ impl ServerManager {
 }
 #[async_trait]
 impl ServerService for ServerManager {
+    async fn network(&self, id: &str) -> Result<NetworkSettings, ServerError> {
+        self.runtime.network(&self.record(id).await?).await
+    }
+    async fn set_network(
+        &self,
+        id: &str,
+        request: NetworkUpdate,
+    ) -> Result<ServerView, ServerError> {
+        if request.port == 0 {
+            return Err(ServerError::Invalid("port must be between 1 and 65535"));
+        }
+        let server = self.record(id).await?;
+        let lock = self.lock(&server.id)?;
+        let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
+        let mut server = self.record(id).await?;
+        if self.runtime.status(&server).await?.state != ServerState::Stopped {
+            return Err(ServerError::AlreadyRunning);
+        }
+        self.runtime.remove(&server).await?;
+        self.repo
+            .set_network(&server.id, request.port, request.publish_ip)
+            .await?;
+        server.port = request.port;
+        server.publish_ip = request.publish_ip;
+        self.view(server).await
+    }
     async fn delete(&self, id: &str, delete_files: bool) -> Result<DeletedServer, ServerError> {
         let server = self.record(id).await?;
         let lock = self.lock(&server.id)?;
@@ -291,6 +317,7 @@ impl ServerService for ServerManager {
             auto_java,
             software: request.software,
             launch: None,
+            publish_ip: None,
         };
         tokio::fs::create_dir_all(&self.root)
             .await

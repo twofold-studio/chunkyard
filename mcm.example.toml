@@ -20,7 +20,7 @@ enabled = true
 [docker]
 enabled = true
 runtime_image = "eclipse-temurin:21-jre"
-publish_ip = "127.0.0.1"
+publish_ip = "0.0.0.0"
 stop_timeout_s = 60
 # user = "1000:1000"
 # When mcm runs in Docker, set this to the host path mounted as its data_dir.

@@ -42,6 +42,23 @@ pub(crate) async fn get(
 ) -> Result<Json<Value>, ApiError> {
     Ok(Json(json!(state.servers.get(&id).await?)))
 }
+
+pub(crate) async fn network(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(json!(state.servers.network(&id).await?)))
+}
+
+pub(crate) async fn set_network(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    ApiJson(body): ApiJson<mcm_core::server::NetworkUpdate>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(
+        json!({"server":state.servers.set_network(&id,body).await?}),
+    ))
+}
 pub(crate) async fn metrics(
     State(state): State<AppState>,
     Path(id): Path<String>,

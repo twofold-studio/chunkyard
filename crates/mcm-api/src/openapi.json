@@ -47,6 +47,102 @@
     }
   ],
   "paths": {
+    "/api/v1/servers/{id}/network": {
+      "get": {
+        "operationId": "get_server_network",
+        "tags": ["Servers"],
+        "summary": "Read configured and current game-port binding",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Configured/default and current binding, plus restartRequired.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NetworkSettings" }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/Problem" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patch_server_network",
+        "tags": ["Servers"],
+        "summary": "Change a stopped instance's network settings",
+        "description": "Preserves files and removes only the owned stopped container; next start creates the new binding. Null publishIp uses CHUNKYARD_DOCKER__PUBLISH_IP (default0.0.0.0). Running instances must be stopped first. Shared ports remain allowed, with runtime start exclusion.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "enum": ["1"] }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "schema": { "type": "string", "format": "uri" },
+            "description": "Must match public origin, or use a same-origin Referer."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                  "publishIp": {
+                    "type": ["string", "null"],
+                    "description": "IPv4/IPv6 bind address or null for manager default."
+                  }
+                },
+                "required": ["port"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved network settings",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ServerResponse" }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/Problem" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "operationId": "get_healthz",
@@ -1609,6 +1705,27 @@
       }
     },
     "schemas": {
+      "NetworkSettings": {
+        "type": "object",
+        "properties": {
+          "port": { "type": "integer" },
+          "publishIp": { "type": ["string", "null"] },
+          "effectivePublishIp": { "type": "string" },
+          "boundPublishIp": { "type": ["string", "null"] },
+          "boundPort": { "type": ["integer", "null"] },
+          "restartRequired": { "type": "boolean" },
+          "status": { "$ref": "#/components/schemas/RuntimeStatus" }
+        },
+        "required": [
+          "port",
+          "publishIp",
+          "effectivePublishIp",
+          "boundPublishIp",
+          "boundPort",
+          "restartRequired",
+          "status"
+        ]
+      },
       "Problem": {
         "type": "object",
         "properties": {
@@ -1873,6 +1990,10 @@
           "autoJava": {
             "type": "boolean",
             "description": "Manager selects the matching Docker JVM image when no dockerImage was supplied for a managed install."
+          },
+          "publishIp": {
+            "type": ["string", "null"],
+            "description": "Optional instance bind-address override; null uses the manager default."
           }
         },
         "required": [
@@ -1890,7 +2011,8 @@
           "status",
           "software",
           "launch",
-          "autoJava"
+          "autoJava",
+          "publishIp"
         ]
       },
       "CreateServer": {

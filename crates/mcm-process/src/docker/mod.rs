@@ -5,7 +5,9 @@ mod lifecycle;
 mod metrics;
 use crate::DockerConfig;
 use bollard::{Docker, errors::Error, models::ContainerInspectResponse};
-use mcm_core::server::{DockerInfo, RuntimeStatus, Server, ServerError, ServerState};
+use mcm_core::server::{
+    DockerInfo, NetworkSettings, RuntimeStatus, Server, ServerError, ServerState,
+};
 use std::time::Duration;
 
 pub struct DockerRuntime {
@@ -16,6 +18,39 @@ pub struct DockerRuntime {
     stats_slots: tokio::sync::Semaphore,
 }
 impl DockerRuntime {
+    fn network_of(
+        &self,
+        server: &Server,
+        container: Option<ContainerInspectResponse>,
+    ) -> NetworkSettings {
+        let binding = container
+            .as_ref()
+            .and_then(|c| c.host_config.as_ref())
+            .and_then(|c| c.port_bindings.as_ref())
+            .and_then(|ports| ports.get("25565/tcp"))
+            .and_then(Option::as_ref)
+            .and_then(|bindings| bindings.first());
+        let bound_publish_ip = binding.and_then(|b| b.host_ip.clone());
+        let bound_port = binding
+            .and_then(|b| b.host_port.as_deref())
+            .and_then(|p| p.parse().ok());
+        let effective_publish_ip = server.publish_ip.unwrap_or(self.config.publish_ip);
+        let restart_required = container.is_some()
+            && (bound_port != Some(server.port)
+                || bound_publish_ip
+                    .as_deref()
+                    .and_then(|ip| ip.parse::<std::net::IpAddr>().ok())
+                    != Some(effective_publish_ip));
+        NetworkSettings {
+            port: server.port,
+            publish_ip: server.publish_ip,
+            effective_publish_ip,
+            bound_publish_ip,
+            bound_port,
+            restart_required,
+            status: Self::status_of(container),
+        }
+    }
     pub fn new(config: DockerConfig, instance: String) -> Self {
         let client = if config.enabled {
             Docker::connect_with_defaults().ok()

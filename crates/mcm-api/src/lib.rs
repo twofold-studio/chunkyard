@@ -27,6 +27,10 @@ pub fn secure_router(router: Router, state: AppState) -> Router {
 /// API routes without global middleware, for composition with a static SPA fallback.
 pub fn routes(state: AppState) -> Router {
     let protected = Router::new()
+        .route(
+            "/api/v1/servers/{id}/network",
+            get(servers::network).patch(servers::set_network),
+        )
         .route("/api/v1/software", get(software::catalog))
         .route("/api/v1/software/{kind}/versions", get(software::versions))
         .route(

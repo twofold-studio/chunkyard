@@ -2,7 +2,7 @@
 use crate::repository::RepositoryError;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{net::IpAddr, path::PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,6 +23,27 @@ pub struct Server {
     pub launch: Option<crate::software::Launch>,
     #[serde(default)]
     pub auto_java: bool,
+    #[serde(default)]
+    pub publish_ip: Option<IpAddr>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkSettings {
+    pub port: u16,
+    pub publish_ip: Option<IpAddr>,
+    pub effective_publish_ip: IpAddr,
+    pub bound_publish_ip: Option<String>,
+    pub bound_port: Option<u16>,
+    pub restart_required: bool,
+    pub status: RuntimeStatus,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NetworkUpdate {
+    pub port: u16,
+    pub publish_ip: Option<IpAddr>,
 }
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -182,6 +203,12 @@ pub enum ServerError {
 }
 #[async_trait]
 pub trait ServerRepo: Send + Sync {
+    async fn set_network(
+        &self,
+        id: &str,
+        port: u16,
+        publish_ip: Option<IpAddr>,
+    ) -> Result<(), RepositoryError>;
     async fn delete(&self, id: &str) -> Result<(), RepositoryError>;
     async fn insert(&self, server: &Server) -> Result<(), ServerError>;
     async fn set_eula(&self, id: &str, accepted: bool) -> Result<(), RepositoryError>;
@@ -198,6 +225,17 @@ pub trait ServerRepo: Send + Sync {
 /// the single managed directory belonging to the persisted server.
 #[async_trait]
 pub trait ServerRuntime: Send + Sync {
+    async fn network(&self, server: &Server) -> Result<NetworkSettings, ServerError> {
+        Ok(NetworkSettings {
+            port: server.port,
+            publish_ip: server.publish_ip,
+            effective_publish_ip: server.publish_ip.unwrap_or([0, 0, 0, 0].into()),
+            bound_publish_ip: None,
+            bound_port: None,
+            restart_required: false,
+            status: self.status(server).await?,
+        })
+    }
     /// Remove only this manager's stopped container; never force removal.
     async fn remove(&self, server: &Server) -> Result<(), ServerError>;
     async fn info(&self) -> DockerInfo;
@@ -215,6 +253,12 @@ pub trait ServerRuntime: Send + Sync {
 }
 #[async_trait]
 pub trait ServerService: Send + Sync {
+    async fn network(&self, id: &str) -> Result<NetworkSettings, ServerError>;
+    async fn set_network(
+        &self,
+        id: &str,
+        request: NetworkUpdate,
+    ) -> Result<ServerView, ServerError>;
     async fn delete(&self, id: &str, delete_files: bool) -> Result<DeletedServer, ServerError>;
     async fn install(&self, id: &str) -> Result<ServerView, ServerError>;
     async fn create(&self, request: CreateServer) -> Result<ServerView, ServerError>;

@@ -18,7 +18,7 @@ impl Default for DockerConfig {
         Self {
             enabled: true,
             runtime_image: "eclipse-temurin:21-jre".into(),
-            publish_ip: [127, 0, 0, 1].into(),
+            publish_ip: [0, 0, 0, 0].into(),
             stop_timeout_s: 60,
             user: None,
             host_data_dir: None,

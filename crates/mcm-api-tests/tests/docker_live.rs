@@ -21,6 +21,7 @@ async fn real_docker_start_console_restart_adoption_stop_and_kill() -> Result {
         ..Default::default()
     };
     config.auth.enabled = false;
+    config.docker.publish_ip = [127, 0, 0, 1].into();
     config.docker.runtime_image = std::env::var("CHUNKYARD_TEST_DOCKER_IMAGE")
         .unwrap_or_else(|_| "mcm-manager-test-runtime:local".into());
     config.docker.stop_timeout_s = 3;
@@ -146,12 +147,21 @@ async fn real_docker_start_console_restart_adoption_stop_and_kill() -> Result {
     );
     backend.shutdown().await;
     drop(backend);
+    config.docker.publish_ip = [0, 0, 0, 0].into();
     let reopened = build_state(&config).await?;
     assert_eq!(
         reopened.state.servers.get(&id).await?.status.state,
         ServerState::Running
     );
+    let old_id = reopened.state.servers.get(&id).await?.status.container_id;
+    let old_network = reopened.state.servers.network(&id).await?;
+    assert_eq!(old_network.bound_publish_ip.as_deref(), Some("127.0.0.1"));
+    assert!(old_network.restart_required);
     reopened.state.servers.restart(&id).await?;
+    let refreshed = reopened.state.servers.network(&id).await?;
+    assert_eq!(refreshed.bound_publish_ip.as_deref(), Some("0.0.0.0"));
+    assert!(!refreshed.restart_required);
+    assert_ne!(refreshed.status.container_id, old_id);
     assert_eq!(
         reopened.state.servers.get(&id).await?.status.state,
         ServerState::Running

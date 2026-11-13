@@ -71,7 +71,12 @@ impl DockerRuntime {
                 port_bindings: Some(HashMap::from([(
                     "25565/tcp".into(),
                     Some(vec![PortBinding {
-                        host_ip: Some(self.config.publish_ip.to_string()),
+                        host_ip: Some(
+                            server
+                                .publish_ip
+                                .unwrap_or(self.config.publish_ip)
+                                .to_string(),
+                        ),
                         host_port: Some(server.port.to_string()),
                     }]),
                 )])),
@@ -118,6 +123,7 @@ mod tests {
             software: None,
             launch: None,
             auto_java: false,
+            publish_ip: None,
         }
     }
     #[test]
@@ -151,7 +157,7 @@ mod tests {
             host["PortBindings"].as_object().map(serde_json::Map::len),
             Some(1)
         );
-        assert_eq!(host["PortBindings"]["25565/tcp"][0]["HostIp"], "127.0.0.1");
+        assert_eq!(host["PortBindings"]["25565/tcp"][0]["HostIp"], "0.0.0.0");
         assert_eq!(value["Entrypoint"], serde_json::json!(["java"]));
         assert_eq!(value["Cmd"][3], "a directory/server.jar");
         Ok(())
