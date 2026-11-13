@@ -36,6 +36,13 @@ impl Config {
                 "MCM_DOCKER__HOST_DATA_DIR" => config.docker.host_data_dir = Some(value.into()),
                 "MCM_DATA_DIR" => config.data_dir = value.into(),
                 "MCM_HTTP__LISTEN" => config.http.listen = value.parse().map_err(|_| invalid())?,
+                "MCM_HTTP__UI_DIR" => {
+                    config.http.ui_dir = if value.is_empty() {
+                        None
+                    } else {
+                        Some(value.into())
+                    }
+                }
                 "MCM_HTTP__PUBLIC_URL" => config.http.public_url = Some(value),
                 "MCM_HTTP__ALLOW_INSECURE_HTTP" => {
                     config.http.allow_insecure_http = value.parse().map_err(|_| invalid())?

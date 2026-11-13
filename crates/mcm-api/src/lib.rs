@@ -13,6 +13,16 @@ use axum::{
 pub use state::AppState;
 
 pub fn router(state: AppState) -> Router {
+    secure_router(routes(state.clone()), state)
+}
+
+/// Apply the same Host/Origin/CSRF checks to both API and static page routes.
+pub fn secure_router(router: Router, state: AppState) -> Router {
+    router.layer(middleware::from_fn_with_state(state, security::secure))
+}
+
+/// API routes without global middleware, for composition with a static SPA fallback.
+pub fn routes(state: AppState) -> Router {
     let protected = Router::new()
         .route("/api/v1/servers", get(servers::list).post(servers::create))
         .route("/api/v1/servers/{id}", get(servers::get))
@@ -45,12 +55,11 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/setup/status", get(auth::setup_status))
         .route("/api/v1/setup", post(auth::setup))
         .route("/api/v1/auth/login", post(auth::login))
+        .route("/api", axum::routing::any(error::not_found))
+        .route("/api/", axum::routing::any(error::not_found))
+        .route("/api/{*path}", axum::routing::any(error::not_found))
         .fallback(error::not_found)
         .method_not_allowed_fallback(error::method_not_allowed)
         .layer(axum::extract::DefaultBodyLimit::max(1024 * 1024))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            security::secure,
-        ))
         .with_state(state)
 }

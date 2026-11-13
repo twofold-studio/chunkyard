@@ -5,6 +5,7 @@ produced by `bash scripts/smoke-docker.sh --java`. Cleans up its containers.
 """
 import json
 import os
+import re
 from pathlib import Path
 import socket
 import subprocess
@@ -67,6 +68,14 @@ def main():
                    "-e", "MCM_HTTP__ALLOW_INSECURE_HTTP=true",
                    "-e", f"MCM_DOCKER__HOST_DATA_DIR={directory}", "mcm-manager:local")
             ready()
+            with client.open(base + "/servers", timeout=15) as response:
+                assert response.headers.get_content_type() == "text/html"
+                assert "script-src 'self'" in response.headers["Content-Security-Policy"]
+                html = response.read().decode()
+            asset_path = re.search(r'/_app/immutable/[^"\s]+\.css', html).group(0)
+            with client.open(base + asset_path, timeout=15) as response:
+                assert response.headers.get_content_type() == "text/css"
+                assert "immutable" in response.headers["Cache-Control"]
             assert request("/api/v1/system/isolation")["docker"]["available"]
             with socket.socket() as listener:
                 listener.bind(("127.0.0.1", 0))
@@ -86,7 +95,7 @@ def main():
             ready()
             assert request("/api/v1/servers/" + server_id)["status"]["state"] == "running"
             assert action(server_id, "stop")["status"]["state"] == "stopped"
-            print("PASS: non-root Dockerized manager, socket access, sibling JVM bind mount, restart adoption, and graceful stop")
+            print("PASS: bundled UI/assets, non-root Dockerized manager, socket access, sibling JVM bind mount, restart adoption, and graceful stop")
         finally:
             for container in [server_name, name]:
                 if container:

@@ -23,15 +23,19 @@ impl TestApp {
         Self::with_options(true, false).await
     }
     pub async fn with_options(discover: bool, fail_install: bool) -> Result<Self, Box<dyn Error>> {
-        Self::with_settings(discover, fail_install, true).await
+        Self::with_settings(discover, fail_install, true, false).await
     }
     pub async fn with_auth(enabled: bool) -> Result<Self, Box<dyn Error>> {
-        Self::with_settings(true, false, enabled).await
+        Self::with_settings(true, false, enabled, false).await
+    }
+    pub async fn with_ui() -> Result<Self, Box<dyn Error>> {
+        Self::with_settings(true, false, false, true).await
     }
     async fn with_settings(
         discover: bool,
         fail_install: bool,
         auth_enabled: bool,
+        ui: bool,
     ) -> Result<Self, Box<dyn Error>> {
         let directory = tempfile::tempdir()?;
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
@@ -52,8 +56,23 @@ impl TestApp {
             Arc::new(runtime::FakeRuntime::default()),
         ));
         let base = format!("http://{address}");
-        let app = mcm_api::router(backend.state.clone())
-            .into_make_service_with_connect_info::<std::net::SocketAddr>();
+        let router = if ui {
+            let assets = directory.path().join("ui");
+            std::fs::create_dir_all(assets.join("_app/immutable"))?;
+            std::fs::write(
+                assets.join("200.html"),
+                "<!doctype html><html><body><script>window.test=1;</script></body></html>",
+            )?;
+            std::fs::write(
+                assets.join("_app/immutable/test.ABC.js"),
+                "export const test=1;",
+            )?;
+            std::fs::write(assets.join("robots.txt"), "User-agent: *")?;
+            mcm_server::ui::router(backend.state.clone(), Some(&assets)).await?
+        } else {
+            mcm_api::router(backend.state.clone())
+        };
+        let app = router.into_make_service_with_connect_info::<std::net::SocketAddr>();
         let (stop, receiver) = oneshot::channel();
         let server = tokio::spawn(async move {
             axum::serve(listener, app)

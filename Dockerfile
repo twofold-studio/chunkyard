@@ -1,3 +1,11 @@
+FROM node:24-bookworm-slim AS web-build
+WORKDIR /web
+RUN npm install --global pnpm@12.9.0
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
+RUN --mount=type=cache,target=/pnpm/store pnpm install --frozen-lockfile --store-dir /pnpm/store
+COPY web ./
+RUN pnpm build
+
 FROM rust:1.88-bookworm AS build
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
@@ -8,7 +16,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,targe
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build /mcm /usr/local/bin/mcm
-ENV MCM_HTTP__LISTEN=0.0.0.0:8420 MCM_DATA_DIR=/data
+COPY --from=web-build /web/build /opt/mcm/web
+ENV MCM_HTTP__LISTEN=0.0.0.0:8420 MCM_DATA_DIR=/data MCM_HTTP__UI_DIR=/opt/mcm/web
 VOLUME ["/data"]
 EXPOSE 8420
 ENTRYPOINT ["mcm"]

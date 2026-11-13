@@ -89,3 +89,21 @@ fn docker_environment_settings_are_validated_before_startup()
     }
     Ok(())
 }
+
+#[test]
+fn ui_build_directory_can_be_selected_or_disabled_by_environment()
+-> Result<(), Box<dyn std::error::Error>> {
+    assert_eq!(
+        Config::default().http.ui_dir.as_deref(),
+        Some(std::path::Path::new("web/build"))
+    );
+    let config =
+        Config::load_with_env(None, [("MCM_HTTP__UI_DIR".into(), "installed/web".into())])?;
+    assert_eq!(
+        config.http.ui_dir.as_deref(),
+        Some(std::path::Path::new("installed/web"))
+    );
+    let config = Config::load_with_env(None, [("MCM_HTTP__UI_DIR".into(), String::new())])?;
+    assert!(config.http.ui_dir.is_none());
+    Ok(())
+}

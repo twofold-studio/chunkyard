@@ -1,7 +1,12 @@
 .git
 /target
-/web
 /data
 *.db
 *.db-wal
 *.db-shm
+
+/web/node_modules
+/web/.svelte-kit
+/web/build
+/web/.env
+/web/.env.*

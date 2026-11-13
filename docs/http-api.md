@@ -1,6 +1,6 @@
 # Current backend HTTP API
 
-Start with `cargo run -p mcm-server -- serve`, or run `mcm` without a subcommand. The default address is `http://127.0.0.1:8420`. This serves JSON only. The frontend is implemented separately in `web/`; see [frontend usage](frontend.md) for development and hosting instructions.
+Start with `cargo run -p mcm-server -- serve`, or run `mcm` without a subcommand. The default address is `http://127.0.0.1:8420`. It serves the built UI from `web/build/` alongside the JSON API when available; see [frontend usage](frontend.md) for build and hosting instructions. Set `MCM_HTTP__UI_DIR=` for API-only operation.
 
 `mcm config check` prints effective configuration. Sources, in order: defaults, `--config`/`MCM_CONFIG` (or `/etc/mcm/mcm.toml` when present), environment, and CLI `--data-dir`/`serve --listen`. Unknown config keys fail validation. See `mcm.example.toml`.
 
@@ -37,7 +37,7 @@ Sessions use a 32-byte random token; only SHA-256 is stored. Cookies are HttpOnl
 | GET | `/api/v1/jobs?limit=50&cursor=...` | `{items: Job[], nextCursor: string | null}`; max limit 200 |
 | GET | `/api/v1/jobs/{id}` | `Job` |
 
-When authentication is enabled, setup, login, health, and setup status are public. The remaining endpoints require the owner session. Before setup, protected endpoints return 503 `setup_required`. Errors use `application/problem+json`, with stable `code` and sanitized `detail`. JSON bodies are limited to 1 MiB. All responses include no-store, security headers, and a generated request ID. The CSP currently applies to API responses only; SPA CSP/embedding remain pending backend integration.
+When authentication is enabled, setup, login, health, and setup status are public. The remaining endpoints require the owner session. Before setup, protected endpoints return 503 `setup_required`. Errors use `application/problem+json`, with stable `code` and sanitized `detail`. JSON bodies are limited to 1 MiB. API responses include no-store, a restrictive CSP, security headers, and a generated request ID. Static UI pages have a separate page CSP and assets have cache policies; see [frontend hosting](frontend.md). Unknown `/api` routes return JSON problem responses even when UI hosting is enabled.
 
 `JavaRuntime` is the current core model: `{id, vendor, major, fullVersion, os, arch, path, managed, sha256}`. OS can be `linux`, `alpine-linux`, or `windows`. Planned fields such as `usedBy` and `installedAt` are not present yet. `java.allow_system_java = false` hides system runtimes and disables discovery.
 

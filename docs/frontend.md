@@ -23,8 +23,29 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 
 There is no UI for deleting servers, editing resources after creation, file management, installers or modpacks, metrics/graphs, multiple users or roles, 2FA, or API tokens, because the backend does not provide them yet.
 
+## Production hosting
+
+Build the SPA, then start the Rust service from the repository root:
+
+```sh
+pnpm --dir web install --frozen-lockfile
+pnpm --dir web build
+cargo run -p mcm-server -- serve
+```
+
+Open `http://127.0.0.1:8420`. Rust serves the UI and API on the same origin, including direct navigation and refreshes on `/servers` and `/java`. The Docker image builds and includes the UI automatically; no Node runtime or separate web server is needed at runtime.
+
+`http.ui_dir` defaults to `web/build`, relative to the working directory. Set `MCM_HTTP__UI_DIR=/absolute/path/to/build` for an installed binary, or set it to an empty string for API-only operation. A missing directory also starts in API-only mode; an existing directory without `200.html`, or containing symlinks, fails startup. Assets are loaded once with a 64 MiB bundle limit; restart after replacing the build. UI files are distributed alongside the binary, not embedded in it. Source maps and hidden files are excluded.
+
+HTML uses `no-store` and a page CSP with hashes for the build's inline bootstrap scripts. JavaScript `eval()` and inline event handlers are blocked; same-origin scripts, API calls and fonts are allowed. Inline styles support Svelte components. Hashed `/_app/immutable/` assets have a one-year immutable cache policy; other assets revalidate using ETags. API responses retain their restrictive CSP and `no-store`. Host/origin/CSRF checks apply across both UI and API routes. Unknown `/api` routes return JSON errors, and missing assets return 404 instead of the SPA.
+
+For a reverse proxy, preserve the original `Host` and set `MCM_HTTP__PUBLIC_URL` to the external origin. Vite remains available for development as described in `web/README.md`.
+
 ## Integration limits
 
-- The Rust backend does not serve the SPA yet. `pnpm build` writes a static bundle to `web/build/` (fallback `200.html`), but the backend API responses carry `default-src 'none'` CSP and no static file route exists. For now, run the Vite dev server with its proxy, or put both behind one reverse proxy that serves `web/build/` (falling back to `200.html`) and forwards `/api` and `/healthz` with the original `Host`, and set `MCM_HTTP__PUBLIC_URL` to that origin.
 - There is no live console stream (no WebSocket) and no job cancellation.
 - `/api/v1/servers` returns at most 100 servers; there is no pagination UI.
+
+## Hosting verification
+
+After building the UI and `cargo build -p mcm-server --locked`, run `node scripts/smoke-ui.mjs`. It uses Playwright Chromium to check the real Rust service in both auth modes, owner setup, session persistence, navigation, refreshes and CSP violations. Install Chromium with `pnpm --dir web exec playwright install chromium`, or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an installed Chrome executable. The test uses temporary data and disables Docker operations. CI runs it after frontend validation, component/unit tests and the production build.

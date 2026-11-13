@@ -20,14 +20,9 @@ pub(crate) async fn secure(
     };
     let headers = response.headers_mut();
     for (name, value) in [
-        ("cache-control", "no-store"),
         ("x-content-type-options", "nosniff"),
         ("x-frame-options", "DENY"),
         ("referrer-policy", "no-referrer"),
-        (
-            "content-security-policy",
-            "default-src 'none'; frame-ancestors 'none'",
-        ),
         (
             "permissions-policy",
             "camera=(), microphone=(), geolocation=()",
@@ -35,6 +30,16 @@ pub(crate) async fn secure(
     ] {
         headers.insert(name, HeaderValue::from_static(value));
     }
+    // Static handlers provide their page policy/cache rules; API handlers retain
+    // the restrictive defaults. All routes still share the request checks above.
+    headers
+        .entry("cache-control")
+        .or_insert(HeaderValue::from_static("no-store"));
+    headers
+        .entry("content-security-policy")
+        .or_insert(HeaderValue::from_static(
+            "default-src 'none'; frame-ancestors 'none'",
+        ));
     if state.secure_cookie {
         headers.insert(
             "strict-transport-security",

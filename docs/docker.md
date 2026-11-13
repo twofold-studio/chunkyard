@@ -52,7 +52,7 @@ Manager shutdown leaves Docker servers running. A stable `instance-id` file plus
 
 # Run the manager in Docker
 
-Build the backend-only image:
+Build the image, which includes both the Rust service and the production UI:
 
 ```sh
 docker build -t mcm-manager:local .
@@ -71,7 +71,7 @@ docker run --rm --name mcm-manager \
   mcm-manager:local
 ```
 
-Authentication remains enabled by default; the setup token is in `/srv/mcm/setup-token`. Socket access grants control over the engine, so only the owner should reach this service. The image runs as root by default; custom UID/GID deployments need matching data ownership and socket permissions. Host path translation is explicit, not automatically detected or probed. A remote engine requires the host-visible data path and the same data available at both ends.
+Open `http://127.0.0.1:8420` for the UI. Authentication remains enabled by default; the setup token is in `/srv/mcm/setup-token`. The bundled UI is served from `/opt/mcm/web`; `MCM_HTTP__UI_DIR=` disables static hosting. Socket access grants control over the engine, so only the owner should reach this service. The image runs as root by default; custom UID/GID deployments need matching data ownership and socket permissions. Host path translation is explicit, not automatically detected or probed. A remote engine requires the host-visible data path and the same data available at both ends.
 
 # Verification
 

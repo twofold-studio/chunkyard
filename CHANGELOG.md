@@ -23,6 +23,8 @@ Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fr
 - Frontend: show a refreshable console snapshot (last 200 lines, replaced rather than appended, polled only while visible) and send console commands to running servers.
 - Frontend: list host Java runtimes, run system discovery, and install Temurin versions with job status; the page states that Docker servers use their image JVM.
 - Frontend: proxy /api and /healthz to the backend from a fixed http://localhost:5173 dev origin (set MCM_HTTP__PUBLIC_URL to match) and build a static SPA bundle. The backend does not serve the bundle yet.
+- Serve the built Svelte UI and REST API from one Rust HTTP origin, with deep-link fallback, hashed bootstrap CSP, asset caching, and MCM_HTTP__UI_DIR to select or disable the UI bundle. Unknown /api routes retain JSON problem responses.
+- Docker images now build and include the production UI, served alongside the API without a Node runtime. CI checks frontend validation and tests plus real-browser setup, session, deep-link, and CSP checks through Rust hosting.
 
 ### Changed
 

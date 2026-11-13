@@ -1,0 +1,3 @@
+kind: Added
+body: Serve the built Svelte UI and REST API from one Rust HTTP origin, with deep-link fallback, hashed bootstrap CSP, asset caching, and MCM_HTTP__UI_DIR to select or disable the UI bundle. Unknown /api routes retain JSON problem responses.
+time: 2026-11-13T18:45:34.276885897+02:00

@@ -30,6 +30,8 @@ pub struct HttpConfig {
     pub public_url: Option<String>,
     /// HTTP on a non-loopback interface requires this explicit opt-in.
     pub allow_insecure_http: bool,
+    /// Static SPA build directory; None keeps the service API-only.
+    pub ui_dir: Option<PathBuf>,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -49,6 +51,7 @@ impl Default for HttpConfig {
             listen: ([127, 0, 0, 1], 8420).into(),
             public_url: None,
             allow_insecure_http: false,
+            ui_dir: Some("web/build".into()),
         }
     }
 }

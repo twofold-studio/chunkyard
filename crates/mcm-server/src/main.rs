@@ -20,7 +20,7 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Command {
-    /// Serve the authenticated HTTP API (frontend is developed separately).
+    /// Serve the built web UI and authenticated HTTP API.
     Serve {
         #[arg(long)]
         listen: Option<std::net::SocketAddr>,
@@ -94,7 +94,8 @@ async fn main() -> Result<()> {
             tracing::info!(listen = %listener.local_addr()?, "backend listening");
             let result = axum::serve(
                 listener,
-                mcm_api::router(backend.state.clone())
+                mcm_server::ui::router(backend.state.clone(), config.http.ui_dir.as_deref())
+                    .await?
                     .into_make_service_with_connect_info::<std::net::SocketAddr>(),
             )
             .with_graceful_shutdown(shutdown_signal())
