@@ -29,7 +29,7 @@
 	}
 </script>
 
-<svelte:head><title>Sign in · Minecraft Manager</title></svelte:head>
+<svelte:head><title>Sign in · Chunkyard</title></svelte:head>
 
 <form {onsubmit} class="flex flex-col gap-6 rounded-lg border border-border bg-card p-6">
 	<div class="flex flex-col gap-1">

@@ -29,6 +29,7 @@ Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fr
 ### Changed
 
 - Development: document the verified-milestone commit/push workflow and exclude local environment files and app databases from version control.
+- Rename the project to Chunkyard in the web UI, CLI description, and documentation, with a new transparent voxel logo and a README illustrated with real app screenshots. The mcm executable, MCM_* environment variables, Cargo crate names, REST routes, and stored data remain compatible.
 
 ### Security
 

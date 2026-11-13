@@ -1,6 +1,5 @@
 <script lang="ts">
 	import './layout.css';
-	import favicon from '#lib/assets/favicon.svg';
 	import { Toaster } from '#lib/components/ui/sonner/index.js';
 	import type { LayoutProps } from './$types';
 
@@ -8,8 +7,8 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
-	<title>Minecraft Manager</title>
+	<link rel="icon" href="/logo.png" />
+	<title>Chunkyard</title>
 </svelte:head>
 
 {@render children()}

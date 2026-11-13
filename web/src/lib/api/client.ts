@@ -94,7 +94,7 @@ async function parseProblem(response: Response): Promise<ApiError> {
 		return new ApiError(
 			response.status,
 			BACKEND_UNAVAILABLE,
-			'The Minecraft Manager backend did not respond.'
+			'The Chunkyard backend did not respond.'
 		);
 	}
 	return new ApiError(
@@ -126,7 +126,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 		});
 	} catch (error) {
 		if (isAbortError(error)) throw error;
-		throw new ApiError(0, NETWORK_UNAVAILABLE, 'The Minecraft Manager backend is unreachable.');
+		throw new ApiError(0, NETWORK_UNAVAILABLE, 'The Chunkyard backend is unreachable.');
 	}
 
 	if (!response.ok) {

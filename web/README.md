@@ -1,4 +1,4 @@
-# Minecraft Manager web UI
+# Chunkyard web UI
 
 SvelteKit (Svelte 5, TypeScript) single-page app styled with Tailwind v4 and shadcn-svelte. It talks to the Rust backend only through the REST API described in [`docs/http-api.md`](../docs/http-api.md) and [`docs/docker.md`](../docs/docker.md). See [`docs/frontend.md`](../docs/frontend.md) for scope and integration limits.
 

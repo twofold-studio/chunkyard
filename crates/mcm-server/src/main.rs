@@ -9,7 +9,7 @@ use mcm_java::{Adoptium, AdoptiumApi, DiscoveryPaths, JavaManager};
 use std::{path::PathBuf, sync::Arc};
 
 #[derive(Parser)]
-#[command(name = "mcm", version, about = "Minecraft server manager backend")]
+#[command(name = "mcm", version, about = "Chunkyard — Minecraft server manager")]
 struct Cli {
     #[arg(long, global = true)]
     data_dir: Option<PathBuf>,

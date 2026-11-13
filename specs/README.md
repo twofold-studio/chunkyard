@@ -1,4 +1,4 @@
-# mcm — Minecraft server manager: specifications
+# Chunkyard — Minecraft server manager: specifications
 
 ## Vision
 
@@ -64,7 +64,7 @@ Each phase is independently shippable: after it, the product is releasable and t
 
 | Term | Meaning |
 |---|---|
-| **mcm** | The manager binary (and the product) |
+| **mcm** | The manager binary; the product is named Chunkyard |
 | **Server** | One managed Minecraft Java Edition server instance (directory + config + process) |
 | **Flavor** | Server software: vanilla, paper, purpur, fabric, quilt, forge, neoforge, velocity, bungeecord, waterfall, custom |
 | **Loader** | Mod loader (Forge, NeoForge, Fabric, Quilt) |

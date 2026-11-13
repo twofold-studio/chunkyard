@@ -1,5 +1,4 @@
 <script lang="ts">
-	import BoxIcon from '@lucide/svelte/icons/box';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import CoffeeIcon from '@lucide/svelte/icons/coffee';
 	import PanelLeftCloseIcon from '@lucide/svelte/icons/panel-left-close';
@@ -38,9 +37,9 @@
 			class="flex items-center gap-2.5 text-sm font-semibold text-foreground"
 		>
 			<span class="flex size-7 items-center justify-center rounded-md border border-border">
-				<BoxIcon class="size-4" aria-hidden="true" />
+				<img src="/logo.png" alt="" class="size-6 object-contain" />
 			</span>
-			Minecraft Manager
+			Chunkyard
 		</a>
 	</Sidebar.Header>
 

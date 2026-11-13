@@ -46,7 +46,7 @@
 	}
 </script>
 
-<svelte:head><title>Initial setup · Minecraft Manager</title></svelte:head>
+<svelte:head><title>Initial setup · Chunkyard</title></svelte:head>
 
 <form {onsubmit} class="flex flex-col gap-6 rounded-lg border border-border bg-card p-6" novalidate>
 	<div class="flex flex-col gap-1">
