@@ -7,7 +7,13 @@ import type {
 	CreateServerRequest,
 	CurseForgeFile,
 	CurseForgeSearch,
+	DirectoryListing,
+	FileContent,
+	FileEntry,
 	Isolation,
+	SavedFile,
+	ServerNetwork,
+	UpdateNetworkRequest,
 	Items,
 	JavaRuntime,
 	Job,
@@ -152,3 +158,74 @@ export const installJava = (major: number, o: Opts = {}) =>
 	});
 
 export const getJob = (id: string, o: Opts = {}) => request<Job>(`/api/v1/jobs/${enc(id)}`, o);
+
+// Server files -------------------------------------------------------------------
+// Paths are server-relative POSIX strings. Mutations require a stopped server.
+
+const filesUrl = (id: string, suffix = '', params: Record<string, string> = {}) => {
+	const query = new URLSearchParams(params).toString();
+	return `/api/v1/servers/${enc(id)}/files${suffix}${query ? `?${query}` : ''}`;
+};
+
+export const listFiles = (id: string, path: string, o: Opts = {}) =>
+	request<DirectoryListing>(filesUrl(id, '', { path }), o);
+
+export const readFile = (id: string, path: string, o: Opts = {}) =>
+	request<FileContent>(filesUrl(id, '/content', { path }), o);
+
+/**
+ * Saves UTF-8 text. `etag` must match the last read (409 `files.conflict` otherwise);
+ * `null` only creates a file that does not exist yet.
+ */
+export const writeFile = (
+	id: string,
+	path: string,
+	body: { content: string; etag: string | null },
+	o: Opts = {}
+) => request<SavedFile>(filesUrl(id, '/content', { path }), { ...o, method: 'PUT', body });
+
+/** Same-origin attachment URL for a single regular file; use with `<a download>`. */
+export const fileDownloadUrl = (id: string, path: string) => filesUrl(id, '/download', { path });
+
+/** Raw binary upload (201). Existing targets fail with 409 `files.exists` unless `overwrite`. */
+export const uploadFile = (id: string, path: string, file: Blob, overwrite = false, o: Opts = {}) =>
+	request<{ entry: FileEntry }>(
+		filesUrl(id, '/upload', { path, overwrite: overwrite ? 'true' : 'false' }),
+		{ ...o, method: 'POST', rawBody: file }
+	);
+
+export const makeDirectory = (id: string, path: string, o: Opts = {}) =>
+	request<{ entry: FileEntry }>(filesUrl(id, '/mkdir'), { ...o, method: 'POST', body: { path } });
+
+/** Moves or renames; never overwrites an existing destination. */
+export const moveFile = (id: string, from: string, to: string, o: Opts = {}) =>
+	request<{ entry: FileEntry }>(filesUrl(id, '/move'), {
+		...o,
+		method: 'POST',
+		body: { from, to }
+	});
+
+/** Copies a file or directory; never overwrites an existing destination. */
+export const copyFile = (id: string, from: string, to: string, o: Opts = {}) =>
+	request<{ entry: FileEntry }>(filesUrl(id, '/copy'), {
+		...o,
+		method: 'POST',
+		body: { from, to }
+	});
+
+/** Permanent deletion (204). Non-empty directories need `recursive`. */
+export const deleteFile = (id: string, path: string, recursive: boolean, o: Opts = {}) =>
+	request<void>(filesUrl(id, '/delete'), { ...o, method: 'POST', body: { path, recursive } });
+
+// Server network -----------------------------------------------------------------
+
+export const getServerNetwork = (id: string, o: Opts = {}) =>
+	request<ServerNetwork>(`/api/v1/servers/${enc(id)}/network`, o);
+
+/** Stopped servers only. A `null` bind address restores the manager default. */
+export const updateServerNetwork = (id: string, body: UpdateNetworkRequest, o: Opts = {}) =>
+	request<{ server: ServerView }>(`/api/v1/servers/${enc(id)}/network`, {
+		...o,
+		method: 'PATCH',
+		body
+	});

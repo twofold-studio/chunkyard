@@ -13,10 +13,14 @@ impl ServerManager {
         F: FnOnce(Sandbox, bool) -> Result<T, FileError> + Send + 'static,
     {
         let server = self.record(id).await?;
-        let guard = self
-            .lock(&server.id)?
-            .try_lock_owned()
-            .map_err(|_| ServerError::Busy)?;
+        let lock = self.lock(&server.id)?;
+        let guard = if write {
+            lock.try_lock_owned().map_err(|_| ServerError::Busy)?
+        } else {
+            // The browser may refresh the directory and open its editor together.
+            // Queue reads rather than treating these harmless requests as a conflict.
+            lock.lock_owned().await
+        };
         let server = self.record(id).await?;
         let can_write = match self.runtime.status(&server).await {
             Ok(status) => status.state == ServerState::Stopped,

@@ -50,6 +50,7 @@ async function test(enabled, showVersion = true) {
   processHandle.stderr.resume();
   const exited = new Promise((r) => processHandle.once("exit", r));
   let context;
+  let page;
   try {
     let ready = false;
     for (let i = 0; i < 200; i++) {
@@ -77,9 +78,20 @@ async function test(enabled, showVersion = true) {
         }),
       ),
     );
-    const page = await context.newPage();
+    page = await context.newPage();
     const errors = [];
-    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("pageerror", (error) => {
+      errors.push(error.message);
+      console.error("Page script error:", error.message);
+    });
+    page.on("response", (response) => {
+      if (response.status() >= 400 && response.url().includes("/files"))
+        console.error(
+          "File API response:",
+          response.status(),
+          new URL(response.url()).pathname,
+        );
+    });
     await page.goto(`${base}/servers`);
     if (enabled) {
       await page
@@ -132,6 +144,7 @@ async function test(enabled, showVersion = true) {
       );
     await page.goto(`${base}/servers/new`);
     await page.getByText("Vanilla", { exact: true }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
     if (liveInstall) {
       await page
         .getByRole("combobox", { name: "Minecraft version", exact: true })
@@ -139,9 +152,18 @@ async function test(enabled, showVersion = true) {
       await page.getByRole("option", { name: "1.21.4", exact: true }).click();
     }
     await page
+      .getByRole("combobox", { name: "Minecraft version", exact: true })
+      .filter({ hasText: "1.21.4" })
+      .waitFor();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await page
       .getByLabel("Server name", { exact: true })
       .fill("Managed UI smoke");
-    await page.getByLabel("Game port (optional)", { exact: true }).fill("25566");
+    await page
+      .getByLabel("Game port (optional)", { exact: true })
+      .fill("25566");
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
     assert.equal(await page.getByLabel("JAR path", { exact: true }).count(), 0);
     const creation = page.waitForResponse(
       (response) =>
@@ -234,11 +256,107 @@ async function test(enabled, showVersion = true) {
     await page.goto(`${base}/servers/${server.id}`);
     await page
       .getByRole("heading", { name: "Resources", exact: true })
+      .first()
       .waitFor();
     if (!liveInstall)
       await page
         .getByText("Docker unavailable; no measurements.", { exact: true })
         .waitFor();
+    if (liveInstall) {
+      // All data belongs to this temporary manager; no game is started or EULA accepted.
+      await page.getByRole("tab", { name: "Files", exact: true }).click();
+      await page.getByRole("button", { name: "File", exact: true }).click();
+      await page
+        .getByRole("dialog")
+        .getByLabel("File name", { exact: true })
+        .fill("smoke.txt");
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Create file", exact: true })
+        .click();
+      const editor = page.getByRole("textbox", {
+        name: "Contents of smoke.txt",
+        exact: true,
+      });
+      await editor.fill("motd=Production UI smoke\nonline-mode=true\n");
+      await page.getByRole("tab", { name: "Overview", exact: true }).click();
+      await page.getByRole("tab", { name: /^Files\b/ }).click();
+      assert.equal(
+        await editor.inputValue(),
+        "motd=Production UI smoke\nonline-mode=true\n",
+      );
+      const blockedNavigation = page.waitForEvent("dialog");
+      const leave = page
+        .getByRole("link", { name: "Java runtimes", exact: true })
+        .click();
+      const prompt = await blockedNavigation;
+      assert.equal(prompt.type(), "confirm");
+      await prompt.dismiss();
+      await leave;
+      assert.equal(new URL(page.url()).pathname, `/servers/${server.id}`);
+      const saved = page.waitForResponse(
+        (response) =>
+          response.url().includes("/files/content?") &&
+          response.request().method() === "PUT",
+      );
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      assert.equal((await saved).status(), 200);
+      assert.equal(
+        await readFile(resolve(server.directory, "smoke.txt"), "utf8"),
+        "motd=Production UI smoke\nonline-mode=true\n",
+      );
+      const downloaded = page.waitForEvent("download");
+      await page.getByRole("link", { name: "Download", exact: true }).click();
+      assert.equal(
+        await readFile(await (await downloaded).path(), "utf8"),
+        "motd=Production UI smoke\nonline-mode=true\n",
+      );
+      await page.getByRole("button", { name: "Files", exact: true }).click();
+      const uploaded = page.waitForResponse(
+        (response) =>
+          response.url().includes("/files/upload?") &&
+          response.request().method() === "POST",
+      );
+      await page
+        .getByLabel("Choose files to upload", { exact: true })
+        .setInputFiles({
+          name: "notes.txt",
+          mimeType: "text/plain",
+          buffer: Buffer.from("uploaded through the real UI"),
+        });
+      assert.equal((await uploaded).status(), 201);
+      assert.equal(
+        await readFile(resolve(server.directory, "notes.txt"), "utf8"),
+        "uploaded through the real UI",
+      );
+      await page.getByRole("tab", { name: "Settings", exact: true }).click();
+      await page.getByLabel("Host port", { exact: true }).fill("25568");
+      await page.getByLabel("Bind address", { exact: true }).fill("127.0.0.1");
+      const network = page.waitForResponse(
+        (response) =>
+          response.url().endsWith("/network") &&
+          response.request().method() === "PATCH",
+      );
+      await page
+        .getByRole("button", { name: "Save network", exact: true })
+        .click();
+      assert.equal((await network).status(), 200);
+      const configured = await page.evaluate(
+        async (id) => (await fetch(`/api/v1/servers/${id}/network`)).json(),
+        server.id,
+      );
+      assert.equal(configured.port, 25568);
+      assert.equal(configured.publishIp, "127.0.0.1");
+      await page
+        .getByRole("button", { name: "Edit server.properties", exact: true })
+        .click();
+      await page
+        .getByRole("textbox", {
+          name: "Contents of server.properties",
+          exact: true,
+        })
+        .waitFor();
+    }
     await page
       .getByRole("link", { name: "Java runtimes", exact: true })
       .click();
@@ -325,6 +443,12 @@ async function test(enabled, showVersion = true) {
     console.log(
       `PASS: same-origin static UI, ${enabled ? "owner setup/session" : "auth bypass"}, deep-link refresh, and CSP`,
     );
+  } catch (error) {
+    console.error(
+      "UI alerts:",
+      await page?.getByRole("alert").allTextContents(),
+    );
+    throw error;
   } finally {
     await context?.close();
     processHandle.kill("SIGTERM");

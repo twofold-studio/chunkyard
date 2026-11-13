@@ -1,13 +1,10 @@
 <script lang="ts">
 	import ContainerIcon from '@lucide/svelte/icons/container';
-	import NetworkIcon from '@lucide/svelte/icons/network';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import FolderIcon from '@lucide/svelte/icons/folder';
-	import ScaleIcon from '@lucide/svelte/icons/scale';
 	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import BlocksIcon from '@lucide/svelte/icons/blocks';
-	import * as Field from '#lib/components/ui/field/index.js';
-	import { Switch } from '#lib/components/ui/switch/index.js';
+	import NetworkIcon from '@lucide/svelte/icons/network';
 	import {
 		CopyText,
 		SettingsPanel,
@@ -20,13 +17,11 @@
 
 	interface Props {
 		server: ServerView;
-		busy: boolean;
-		onRequestEula: () => void;
-		onRevokeEula: () => void;
+		/** Jump to Settings → Network. */
+		onEditNetwork?: () => void;
 	}
 
-	let { server, busy, onRequestEula, onRevokeEula }: Props = $props();
-	const stopped = $derived(server.status.state === 'stopped');
+	let { server, onEditNetwork }: Props = $props();
 	const software = $derived(server.software ? describeSoftware(server.software) : null);
 	const launch = $derived(server.launch ?? null);
 </script>
@@ -82,10 +77,29 @@
 	{/if}
 
 	<SettingsSection
+		title="Network"
+		description="Host port published for the game. Change it, or the bind address, in Settings."
+		icon={NetworkIcon}
+	>
+		<div class="flex flex-wrap items-end gap-4">
+			{@render value('Game port', String(server.port))}
+			{#if onEditNetwork}
+				<button
+					type="button"
+					class="text-sm underline underline-offset-4 hover:text-foreground"
+					onclick={onEditNetwork}
+				>
+					Network settings
+				</button>
+			{/if}
+		</div>
+	</SettingsSection>
+
+	<SettingsSection
 		title="Directory"
 		description={software
-			? 'Managed directory on the manager host, mounted at /data in the container.'
-			: 'Managed directory on the manager host, mounted at /data in the container. Copy the server JAR here.'}
+			? 'Managed directory on the manager host, mounted at /data in the container. Browse it in Files.'
+			: 'Managed directory on the manager host, mounted at /data in the container. Upload the server JAR in Files or copy it here.'}
 		icon={FolderIcon}
 	>
 		<CopyText value={server.directory} label="Copy directory path" />
@@ -103,14 +117,6 @@
 		{/if}
 	</SettingsSection>
 
-	<SettingsSection
-		title="Network"
-		description="Host port published for container port 25565/TCP on CHUNKYARD_DOCKER__PUBLISH_IP (loopback by default). Other servers may share this port, but only one of them can run at a time."
-		icon={NetworkIcon}
-	>
-		{@render value('Game port', String(server.port))}
-	</SettingsSection>
-
 	<SettingsSection title="Resources" description="Java heap bounds and CPU limit." icon={CpuIcon}>
 		<div class="grid gap-4 sm:grid-cols-3">
 			{@render value('Min heap', formatMemory(server.memoryMinMb))}
@@ -118,27 +124,5 @@
 			{@render value('CPU limit', formatCpus(server.cpus))}
 		</div>
 		<p class="text-xs text-muted-foreground">Resource settings cannot be edited yet.</p>
-	</SettingsSection>
-
-	<SettingsSection
-		title="Minecraft EULA"
-		description="Required before the server can start. Can only be changed while the server is stopped."
-		icon={ScaleIcon}
-	>
-		<Field.Field orientation="horizontal" data-disabled={!stopped || busy ? true : undefined}>
-			<Switch
-				id="eula-switch"
-				bind:checked={
-					() => server.acceptEula, (checked) => (checked ? onRequestEula() : onRevokeEula())
-				}
-				disabled={!stopped || busy}
-			/>
-			<Field.Label for="eula-switch" class="font-normal">
-				{server.acceptEula ? 'EULA accepted' : 'EULA not accepted'}
-			</Field.Label>
-		</Field.Field>
-		{#if !stopped}
-			<Field.Description>Stop the server to change EULA acceptance.</Field.Description>
-		{/if}
 	</SettingsSection>
 </SettingsPanel>

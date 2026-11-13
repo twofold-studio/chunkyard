@@ -4,6 +4,7 @@
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { AppSidebar, AppTopbar, BackendUnavailable } from '#lib/components/app/index.js';
+	import { Swap } from '#lib/components/motion/index.js';
 	import { describeError, logout, onAuthLost } from '#lib/api/index.js';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -63,9 +64,12 @@
 				{/snippet}
 			</AppTopbar>
 			<main
-				class="mx-auto flex w-full max-w-[72rem] flex-1 flex-col gap-8 px-4 py-8 sm:px-8 lg:px-16 lg:py-10"
+				class="mx-auto flex w-full max-w-[72rem] flex-1 flex-col px-4 py-8 sm:px-8 lg:px-16 lg:py-10"
 			>
-				{@render children()}
+				<!-- Route changes replay a short enter transition; query-only changes do not. -->
+				<Swap key={page.url.pathname} preset="rise" class="flex flex-col gap-8">
+					{@render children()}
+				</Swap>
 			</main>
 		</Sidebar.Inset>
 	</Sidebar.Provider>

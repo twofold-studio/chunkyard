@@ -124,6 +124,73 @@
 	--radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Motion tokens: mirror DURATION/EASE in src/lib/motion/index.ts. */
+:root {
+	--motion-fast: 120ms;
+	--motion-base: 200ms;
+	--motion-slow: 320ms;
+	--motion-ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+	--motion-ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer utilities {
+	/* Hover lift for interactive cards; transform-only so neighbours never move. */
+	.motion-lift {
+		transition:
+			transform var(--motion-base) var(--motion-ease-out),
+			border-color var(--motion-fast) var(--motion-ease-out),
+			background-color var(--motion-fast) var(--motion-ease-out),
+			box-shadow var(--motion-base) var(--motion-ease-out);
+	}
+	.motion-lift:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 6px 20px -12px oklch(0 0 0 / 0.6);
+	}
+	.motion-lift:active {
+		transform: translateY(0);
+	}
+	/* Tactile press feedback for buttons and tiles. */
+	.motion-press {
+		transition:
+			transform var(--motion-fast) var(--motion-ease-out),
+			border-color var(--motion-fast) var(--motion-ease-out),
+			background-color var(--motion-fast) var(--motion-ease-out),
+			color var(--motion-fast) var(--motion-ease-out);
+	}
+	.motion-press:active:not(:disabled) {
+		transform: scale(0.98);
+	}
+	/* One-shot attention pulse, e.g. a newly created or uploaded row. */
+	.motion-highlight {
+		animation: motion-highlight 1.2s var(--motion-ease-out) 1;
+	}
+}
+
+@keyframes motion-highlight {
+	from {
+		background-color: color-mix(in oklch, var(--success) 18%, transparent);
+	}
+	to {
+		background-color: transparent;
+	}
+}
+
+/* Reduced motion: no movement anywhere, including library (tw-animate) dialogs. */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+	.motion-lift:hover,
+	.motion-press:active:not(:disabled) {
+		transform: none;
+	}
+}
+
 @layer base {
 	* {
 		@apply border-border outline-ring/50;

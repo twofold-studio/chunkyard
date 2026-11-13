@@ -42,8 +42,11 @@ export function isAbortError(error: unknown): boolean {
 }
 
 export interface RequestOptions {
-	method?: 'GET' | 'POST' | 'DELETE';
+	method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+	/** JSON-encoded request body. */
 	body?: unknown;
+	/** Raw binary body sent as `application/octet-stream` (file uploads). Excludes `body`. */
+	rawBody?: Blob;
 	signal?: AbortSignal;
 	/** SvelteKit's `fetch` inside load functions; defaults to the global. */
 	fetch?: Fetch;
@@ -108,8 +111,11 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 	const method = options.method ?? 'GET';
 	const headers: Record<string, string> = { Accept: 'application/json' };
 	if (method !== 'GET') headers['X-MCM-CSRF'] = '1';
-	let body: string | undefined;
-	if (options.body !== undefined) {
+	let body: string | Blob | undefined;
+	if (options.rawBody !== undefined) {
+		headers['Content-Type'] = 'application/octet-stream';
+		body = options.rawBody;
+	} else if (options.body !== undefined) {
 		headers['Content-Type'] = 'application/json';
 		body = JSON.stringify(options.body);
 	}

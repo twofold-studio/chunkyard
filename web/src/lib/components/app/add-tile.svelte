@@ -15,7 +15,7 @@
 <a
 	{href}
 	class={cn(
-		'flex min-h-64 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border p-8 text-center transition-colors hover:border-ring hover:bg-accent/30 focus-visible:border-ring focus-visible:outline-none',
+		'motion-lift flex min-h-64 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border p-8 text-center hover:border-ring hover:bg-accent/30 focus-visible:border-ring focus-visible:outline-none',
 		className
 	)}
 >

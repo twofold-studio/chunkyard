@@ -30,7 +30,7 @@
 
 <a
 	href={resolve(`servers/${server.id}`)}
-	class="flex h-full flex-col gap-4 rounded-xl border border-border bg-card p-4 transition-colors hover:border-ring/60 hover:bg-accent/20 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none"
+	class="motion-lift flex h-full flex-col gap-4 rounded-xl border border-border bg-card p-4 hover:border-ring/60 hover:bg-accent/20 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none"
 	data-testid="server-card"
 >
 	<div class="flex min-w-0 items-start gap-3">

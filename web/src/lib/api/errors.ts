@@ -36,7 +36,7 @@ const KNOWN: Record<string, Omit<ErrorMessage, 'detail'> & { detail?: string }> 
 	},
 	'server.eula_required': {
 		title: 'EULA not accepted',
-		hint: 'Accept the Minecraft EULA in the server configuration while it is stopped.'
+		hint: 'Accept the Minecraft EULA in the server settings while it is stopped.'
 	},
 	'server.busy': {
 		title: 'Operation in progress',
@@ -80,6 +80,29 @@ const KNOWN: Record<string, Omit<ErrorMessage, 'detail'> & { detail?: string }> 
 		title: 'Version information disabled',
 		hint: 'The manager hides its version and changelog (CHUNKYARD_HTTP__SHOW_VERSION=false).'
 	},
+	'files.path_invalid': { title: 'Invalid path' },
+	'files.symlink': {
+		title: 'Symbolic link',
+		hint: 'Links are listed but never followed. Change them on the manager host.'
+	},
+	'files.protected': { title: 'Protected file' },
+	'files.not_found': { title: 'File not found', hint: 'Refresh the listing; it may have changed.' },
+	'files.exists': { title: 'Already exists' },
+	'files.conflict': {
+		title: 'File changed elsewhere',
+		hint: 'Reload the file to see the latest version before saving again.'
+	},
+	'files.not_empty': { title: 'Folder is not empty' },
+	'files.server_running': {
+		title: 'Server is running',
+		hint: 'Stop the server to change its files. Changes take effect on the next start.'
+	},
+	'files.too_large': { title: 'File too large' },
+	'files.binary': {
+		title: 'Not a text file',
+		hint: 'Only UTF-8 text can be edited here. Download the file instead.'
+	},
+	'files.io': { title: 'File operation failed' },
 	validation: { title: 'Invalid input' }
 };
 

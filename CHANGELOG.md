@@ -39,6 +39,7 @@ Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fr
 - REST API: DELETE /api/v1/servers/{id} queues stopped-instance deletion, removes only owned containers and retains server files by default; deleteFiles=true explicitly removes worlds and other managed files. Completed jobs report retained paths; deleted instances stop consuming automatic port assignments.
 - REST API: GET/PATCH /api/v1/servers/{id}/network expose current/effective game-port binding and stopped-instance port/address overrides; null publishIp restores the manager default. Saving preserves server data and refreshes only the owned stopped container.
 - REST API: add /api/v1/servers/{id}/files routes for bounded browsing, UTF-8 editing with stale-save checks, streaming uploads/downloads, mkdir, move, copy and confirmed recursive deletion. Mutations require a stopped instance and share its lifecycle lock; managed artifacts and EULA remain protected.
+- Web UI: staged new-server wizard (software, version/modpack, name & port, resources, review with EULA, install) with back/next validation and same-ID install retries; server pages gain Overview, Console, Files and Settings tabs; a file browser with breadcrumbs, sorting/filter, upload (raw bytes, explicit replace), download, text editor with etag conflict protection, new file/folder, rename/move/copy and confirmed permanent delete; Settings edits host port and bind address (e.g. 0.0.0.0 or a NetBird IP) and opens server.properties; shared reduced-motion-aware transitions across the app. Uses the /files and /network routes.
 
 ### Changed
 
@@ -52,6 +53,7 @@ Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fr
 ### Fixed
 
 - Web UI: keep the setup/sign-in version badge below the form in normal flow so long forms and narrow screens cannot overlap it.
+- REST API: concurrent GET /api/v1/servers/{id}/files reads queue behind instance operations, allowing folder refresh and editor loading together without spurious server.busy errors. The web editor also warns before in-app navigation discards unsaved text.
 
 ### Security
 

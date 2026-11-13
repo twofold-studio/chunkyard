@@ -174,6 +174,11 @@ export class ServerController {
 		}
 	}
 
+	/** Applies a record returned by another endpoint (e.g. network settings) for this server. */
+	apply(server: ServerView) {
+		if (server.id === this.server.id) this.server = server;
+	}
+
 	clearError() {
 		this.error = null;
 	}

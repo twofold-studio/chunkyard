@@ -344,6 +344,30 @@ async fn raw_uploads_bypass_json_limit_and_support_explicit_replacement() -> Res
 }
 
 #[tokio::test]
+async fn concurrent_listing_and_editor_reads_do_not_reject_each_other() -> Result {
+    let app = TestApp::with_auth(false).await?;
+    let (id, directory) = create(&app).await?;
+    std::fs::write(
+        directory.join("server.properties"),
+        "motd=concurrent reads\n",
+    )?;
+    let requests = (0..24).map(|index| {
+        let suffix = if index % 2 == 0 {
+            ""
+        } else {
+            "/content?path=server.properties"
+        };
+        app.client
+            .get(format!("{}/api/v1/servers/{id}/files{suffix}", app.base))
+            .send()
+    });
+    for response in futures_util::future::join_all(requests).await {
+        assert_eq!(response?.status(), 200);
+    }
+    app.close().await
+}
+
+#[tokio::test]
 async fn cancelled_upload_retains_lifecycle_lock_until_worker_finishes() -> Result {
     struct BlockingReader {
         entered: Option<tokio::sync::oneshot::Sender<()>>,

@@ -12,7 +12,15 @@
 	import ServerActions from '#lib/components/servers/server-actions.svelte';
 	import ServerConsole from '#lib/components/servers/server-console.svelte';
 	import ServerMetrics from '#lib/components/servers/server-metrics.svelte';
-	import ServerConfig from '#lib/components/servers/server-config.svelte';
+	import ServerOverview from '#lib/components/servers/server-overview.svelte';
+	import ServerSettings from '#lib/components/servers/server-settings.svelte';
+	import ServerFiles from '#lib/components/files/server-files.svelte';
+	import { Reveal } from '#lib/components/motion/index.js';
+	import { SERVER_PROPERTIES } from '#lib/files/paths.js';
+	import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
+	import TerminalIcon from '@lucide/svelte/icons/terminal';
+	import FolderTreeIcon from '@lucide/svelte/icons/folder-tree';
+	import SlidersIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import EulaDialog from '#lib/components/servers/eula-dialog.svelte';
 	import DeleteServerDialog from '#lib/components/servers/delete-server-dialog.svelte';
 	import ServerInstallPanel from '#lib/components/servers/server-install-panel.svelte';
@@ -26,7 +34,7 @@
 	import { ServerController } from '#lib/servers/server-controller.svelte.js';
 	import { poll } from '#lib/polling.js';
 	import { formatMemoryRange } from '#lib/format.js';
-	import { goto } from '$app/navigation';
+	import { beforeNavigate, goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import type { PageProps } from './$types';
@@ -48,7 +56,44 @@
 	const notInstalled = $derived(needsInstall(server));
 	const softwareSummary = $derived(software ? describeSoftware(software) : null);
 
-	let tab = $state('console');
+	const TABS = [
+		{ value: 'overview', label: 'Overview', icon: LayoutDashboardIcon },
+		{ value: 'console', label: 'Console', icon: TerminalIcon },
+		{ value: 'files', label: 'Files', icon: FolderTreeIcon },
+		{ value: 'settings', label: 'Settings', icon: SlidersIcon }
+	] as const;
+	type TabValue = (typeof TABS)[number]['value'];
+	const isTab = (value: string | null): value is TabValue => TABS.some((t) => t.value === value);
+
+	const initialTab = page.url.searchParams.get('tab');
+	let tab = $state<TabValue>(isTab(initialTab) ? initialTab : 'overview');
+	/** Files stays mounted after the first visit so editor changes survive tab switches. */
+	let filesVisited = $state(initialTab === 'files');
+	let filesDirty = $state(false);
+	let openRequest = $state<{ path: string; nonce: number } | null>(null);
+	let tabDirection = $state<1 | -1>(1);
+
+	beforeNavigate((navigation) => {
+		if (removed || !filesDirty || navigation.willUnload) return;
+		if (navigation.to?.url.pathname === page.url.pathname) return;
+		// Tab switches keep the editor mounted; leaving the instance discards it.
+		if (!window.confirm('Leave this server and discard unsaved file changes?')) navigation.cancel();
+	});
+
+	function selectTab(next: string) {
+		if (!isTab(next) || next === tab) return;
+		const from = TABS.findIndex((t) => t.value === tab);
+		const to = TABS.findIndex((t) => t.value === next);
+		tabDirection = to >= from ? 1 : -1;
+		tab = next;
+		if (next === 'files') filesVisited = true;
+	}
+
+	function editProperties() {
+		openRequest = { path: SERVER_PROPERTIES, nonce: (openRequest?.nonce ?? 0) + 1 };
+		selectTab('files');
+	}
+
 	let eulaOpen = $state(false);
 	let consoleKey = $state(0);
 	/** Delete job in flight; the record must not be refreshed meanwhile. */
@@ -175,7 +220,7 @@
 					: 'The software is installed. The server was not started.'}
 			</p>
 			{#if !server.acceptEula}
-				<p>Accept the Minecraft EULA in Configuration before the first start.</p>
+				<p>Accept the Minecraft EULA in Settings before the first start.</p>
 			{/if}
 		</Alert.Description>
 		<Button
@@ -194,12 +239,17 @@
 		<Alert.Title>Copy your server JAR before starting</Alert.Title>
 		<Alert.Description class="flex flex-col gap-2">
 			<p>
-				The manager does not download server software. On the manager host, place
-				<code class="font-mono">{server.jar}</code> at:
+				The manager does not download custom server software. Upload
+				<code class="font-mono">{server.jar}</code> in
+				<button
+					type="button"
+					class="underline underline-offset-4"
+					onclick={() => selectTab('files')}>Files</button
+				>, or place it on the manager host at:
 			</p>
 			<CopyText value={jarPath} label="Copy JAR path" />
 			{#if !server.acceptEula}
-				<p>Accept the Minecraft EULA in Configuration before the first start.</p>
+				<p>Accept the Minecraft EULA in Settings before the first start.</p>
 			{/if}
 		</Alert.Description>
 		<Button
@@ -242,7 +292,7 @@
 	{#if errorKind === 'server.jar_missing'}
 		<ErrorAlert
 			error={controller.error}
-			hint={`Copy ${server.jar} into the server directory on the manager host, then start again.`}
+			hint={`Upload ${server.jar} in Files (or copy it into the server directory on the manager host), then start again.`}
 		>
 			<div class="mt-2"><CopyText value={jarPath} label="Copy JAR path" /></div>
 		</ErrorAlert>
@@ -257,25 +307,61 @@
 	{/if}
 {/if}
 
-<ServerMetrics serverId={server.id} serverState={server.status.state} cpus={server.cpus} />
-
-<Tabs.Root bind:value={tab} class="gap-6">
-	<Tabs.List variant="line" class="w-full justify-start gap-4 rounded-none border-b border-border">
-		<Tabs.Trigger value="console" class="flex-none px-1">Console</Tabs.Trigger>
-		<Tabs.Trigger value="configuration" class="flex-none px-1">Configuration</Tabs.Trigger>
+<Tabs.Root bind:value={() => tab, selectTab} class="gap-6">
+	<Tabs.List
+		variant="line"
+		class="w-full justify-start gap-4 overflow-x-auto rounded-none border-b border-border"
+	>
+		{#each TABS as item (item.value)}
+			<Tabs.Trigger value={item.value} class="flex-none px-1">
+				<item.icon data-icon="inline-start" aria-hidden="true" />
+				{item.label}
+				{#if item.value === 'files' && filesDirty}
+					<span class="size-1.5 rounded-full bg-warning" aria-label="Unsaved changes"></span>
+				{/if}
+			</Tabs.Trigger>
+		{/each}
 	</Tabs.List>
-	<Tabs.Content value="console">
-		{#if tab === 'console'}
-			<ServerConsole serverId={server.id} {running} refreshKey={consoleKey} />
+	<Tabs.Content value="overview">
+		{#if tab === 'overview'}
+			<Reveal preset="step" direction={tabDirection} class="flex flex-col gap-6">
+				<ServerMetrics serverId={server.id} serverState={server.status.state} cpus={server.cpus} />
+				<ServerOverview {server} onEditNetwork={() => selectTab('settings')} />
+			</Reveal>
 		{/if}
 	</Tabs.Content>
-	<Tabs.Content value="configuration">
-		<ServerConfig
-			{server}
-			busy={controller.busy}
-			onRequestEula={() => (eulaOpen = true)}
-			onRevokeEula={() => setEula(false)}
-		/>
+	<Tabs.Content value="console">
+		{#if tab === 'console'}
+			<Reveal preset="step" direction={tabDirection}>
+				<ServerConsole serverId={server.id} {running} refreshKey={consoleKey} />
+			</Reveal>
+		{/if}
+	</Tabs.Content>
+	<Tabs.Content value="files">
+		{#if filesVisited}
+			{#key server.id}
+				<ServerFiles
+					serverId={server.id}
+					serverState={server.status.state}
+					{openRequest}
+					bind:dirty={filesDirty}
+				/>
+			{/key}
+		{/if}
+	</Tabs.Content>
+	<Tabs.Content value="settings">
+		{#if tab === 'settings'}
+			<Reveal preset="step" direction={tabDirection}>
+				<ServerSettings
+					{server}
+					busy={controller.busy || deleting || removed}
+					onRequestEula={() => (eulaOpen = true)}
+					onRevokeEula={() => setEula(false)}
+					onEditProperties={editProperties}
+					onServerUpdated={(updated) => controller.apply(updated)}
+				/>
+			</Reveal>
+		{/if}
 	</Tabs.Content>
 </Tabs.Root>
 

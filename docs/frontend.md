@@ -5,7 +5,7 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 ## What it does
 
 - **Authentication.** Reads `/api/v1/setup/status`. First-run setup in two steps (verify the setup token, then create the owner with email and password) and email/password sign-in when authentication is enabled; sign-out from the sidebar. When the backend runs with `CHUNKYARD_AUTH__ENABLED=false`, setup and login are skipped and the sidebar shows "Authentication disabled"; no user is shown or invented. An expired session on any request returns the browser to sign-in.
-- **Servers.** List with container status, refreshed every 10 s while the tab is visible. Create form for Vanilla/Paper with Minecraft version and optional Paper build selection, automatic verified installation, Java image selection, name, port, heap, CPUs and explicit EULA acceptance. Custom JAR/image fields remain an advanced choice. Detail page with start, stop, restart and force kill (kill asks for confirmation), EULA accept/revoke while stopped, read-only configuration, the managed directory with a copy button, console snapshot and command entry.
+- **Servers.** List with container status, refreshed every 10 s while the tab is visible. Staged Vanilla/Paper creation with version/build selection, automatic verified installation, Java image selection, name, port, heap, CPUs and explicit EULA acceptance. Custom JAR/image fields remain an advanced choice. Management tabs provide lifecycle controls, console, files, network settings and EULA acceptance while stopped.
 - **Java runtimes.** Inventory, system discovery, and Temurin install from `/api/v1/java/available` with job polling.
 - **API reference.** A searchable, locally rendered view of the live OpenAPI document, including request/response schemas and examples; no request execution.
 - **Resources.** A compact server-detail panel shows on-demand CPU, memory, uptime, PIDs and cumulative I/O; it polls every five seconds while running and visible, clears stale measurements on stop, and marks unknown values with a dash. See [monitoring](monitoring.md).
@@ -28,7 +28,7 @@ The server list uses compact responsive cards with software, installed/requested
 
 Stopped instances can be deleted from their detail page after confirmation. World and server files are retained on the manager host by default, with a copyable path. An explicit checkbox permanently deletes those files too. Deletion tracks only its job and returns to the list after success; it does not continue polling the removed server. An interrupted deletion may have partially completed, so errors do not promise that all requested files survived.
 
-There is no UI for editing resources after creation, file management, modpacks, historical metrics/graphs, multiple users or roles, 2FA, or API tokens, because the backend does not provide them yet. Vanilla/Paper installation is available in the creation UI.
+There is no UI for editing CPU/heap limits after creation, modpacks, historical metrics/graphs, multiple users or roles, 2FA, or API tokens. Vanilla/Paper installation, file management and network settings are implemented.
 
 ## Production hosting
 
@@ -59,7 +59,15 @@ After building the UI and `cargo build -p mcm-server --locked`, run `node script
 
 ## Vanilla/Paper creation
 
-The backend now exposes protected software catalogs, Minecraft release versions, stable Paper builds and a durable `server.install` job. The creation wizard consumes these APIs and tracks the installation job. The current backend supports Vanilla/Paper; Forge/Fabric/CurseForge are research for later. Use the contracts in [http-api.md](http-api.md) and the workflow in [docker.md](docker.md#managed-vanilla-and-paper-installation-rest-api). The form exposes software, Minecraft version, optional Paper build (default latest stable), server name, port, heap and CPUs. Docker image overrides are optional; custom JARs are advanced. The chosen release/build must remain pinned. After create, install against the returned ID, show indeterminate job state and retain that ID for retry. Start must stay unavailable while `software != null && launch == null`. Keep EULA acceptance explicit. World/gameplay options (game mode, difficulty, seed, max players, allowlist and view/simulation distance) belong to a later settings API, which is not implemented here.
+The creation wizard guides software, version/build, name/port, resources, review/EULA and installation. The current backend supports Vanilla/Paper; Forge/Fabric/CurseForge are research for later. Custom JAR skips the version/install stages. Back keeps entered values; review rows link back to their step. Docker image overrides are optional. Creation happens only after review, and failed installs retry against the same saved ID. Start remains unavailable until managed installation succeeds. EULA acceptance is always explicit. See [API contracts](http-api.md) and [installation details](docker.md#managed-vanilla-and-paper-installation-rest-api).
+
+## Instance management and motion
+
+Instance pages provide Overview, Console, Files and Settings tabs. Settings edits the published host port/address and opens `server.properties` in the shared file editor. Gameplay settings can be edited there as raw text; a structured gameplay form is not implemented. Files supports breadcrumbs, sorting/filtering, new files/folders, uploads, downloads, rename/move/copy and confirmed permanent deletion. Upload conflicts require explicit replacement. Text saves include the last-read etag and stop on conflicts. Changes require a stopped instance and apply on the next start. Limits and protected paths are described in [instance files](http-api.md#instance-files).
+
+The editor remains mounted across management tabs, with an unsaved marker. Closing it asks before discarding edits; leaving the page or browser also warns. Uploads run sequentially and cancel when leaving the instance page. Downloads are single files; folder ZIP, resumable uploads and syntax highlighting are not implemented.
+
+`web/src/lib/motion/index.ts` supplies shared durations, easings and fade/rise/pop/step/collapse transitions. `Reveal` and `Swap` compose these presets; `layout.css` provides matching hover/press/highlight utilities. Motion is brief and runs on entry. System reduced-motion preferences disable movement and dialog animations.
 
 For an opt-in production UI check using a real local Docker engine and an official Vanilla download (temporary data, no EULA acceptance or game startup), build the Rust binary/UI and run:
 
@@ -67,4 +75,4 @@ For an opt-in production UI check using a real local Docker engine and an offici
 CHUNKYARD_TEST_LIVE_INSTALL=1 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/run/current-system/sw/bin/google-chrome-stable node scripts/smoke-ui.mjs
 ```
 
-Without that flag, the smoke uses a fixed version-list fixture and disabled Docker to verify real create/install failure and same-record retry without upstream access. Leaving the creation page stops job tracking; installation continues on the backend, and the server detail page refreshes its saved installation state.
+With the flag, the smoke also exercises text editing, downloads, uploads, the unsaved-navigation guard and network settings against real APIs. Without it, a fixed version-list fixture and disabled Docker verify real create/install failure and same-record retry without upstream access. Leaving the creation page stops job tracking; installation continues on the backend, and the server detail page refreshes its saved installation state.

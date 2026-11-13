@@ -117,10 +117,22 @@ async function chooseVanilla() {
 		})
 	);
 	await page.getByText('Vanilla', { exact: true }).click();
+	await next();
 	await expect
 		.element(page.getByRole('combobox', { name: 'Minecraft version' }))
 		.toHaveTextContent('1.21.1');
+	await next();
 	await page.getByLabelText('Server name').fill('Survival');
+}
+
+const next = () => page.getByRole('button', { name: 'Next' }).click();
+
+/** From the name & port step, continue through resources to the review step. */
+async function toReview() {
+	await next();
+	await expect.element(page.getByLabelText('Min heap (MiB)')).toBeVisible();
+	await next();
+	await expect.element(page.getByRole('checkbox', { name: /I accept the/ })).toBeVisible();
 }
 
 describe('NewServerForm', () => {
@@ -132,7 +144,9 @@ describe('NewServerForm', () => {
 		await expect.element(page.getByRole('radio', { name: /Paper/ })).toBeEnabled();
 		// Fabric/Forge are not in this catalog, so they are not offered.
 		await expect.element(page.getByText('Fabric', { exact: true })).not.toBeInTheDocument();
-		await expect.element(page.getByRole('button', { name: /Create/ })).toBeDisabled();
+		// Nothing chosen yet: the wizard cannot continue and no create button exists.
+		await expect.element(page.getByRole('button', { name: 'Next' })).toBeDisabled();
+		await expect.element(page.getByRole('button', { name: /Create/ })).not.toBeInTheDocument();
 	});
 
 	it('creates a managed server, installs it, and never starts it', async () => {
@@ -151,6 +165,10 @@ describe('NewServerForm', () => {
 			ok(job('running')),
 			ok(job('succeeded', { progress: 1, result: { server: installed } }))
 		);
+		await toReview();
+		// Nothing is created before the review step is confirmed.
+		expect(posts('/api/v1/servers')).toHaveLength(0);
+		await expect.element(page.getByText('Automatic (first free from 25565)')).toBeVisible();
 		await page.getByRole('button', { name: 'Create and install' }).click();
 
 		await vi.waitFor(() => expect(oncreated).toHaveBeenCalledOnce());
@@ -182,7 +200,7 @@ describe('NewServerForm', () => {
 		const { oncreated } = setup();
 		await chooseVanilla();
 		await page.getByLabelText('Game port (optional)').fill('25565');
-		await expect.element(page.getByText(/only one of them can run at a time/)).toBeVisible();
+		await expect.element(page.getByText(/only one of them can run\s+at a time/)).toBeVisible();
 		reply('POST', '/api/v1/servers', ok({ server: managedServer({ id: 'srv-1' }) }, 201));
 		reply('POST', '/api/v1/servers/srv-1/install', ok({ job: job('queued') }, 202));
 		reply(
@@ -204,6 +222,7 @@ describe('NewServerForm', () => {
 				})
 			)
 		);
+		await toReview();
 		await page.getByRole('button', { name: 'Create and install' }).click();
 		await vi.waitFor(() => expect(oncreated).toHaveBeenCalledOnce());
 		const creates = posts('/api/v1/servers');
@@ -217,9 +236,65 @@ describe('NewServerForm', () => {
 		setup();
 		await chooseVanilla();
 		await page.getByLabelText('Game port (optional)').fill('0');
-		await page.getByRole('button', { name: 'Create and install' }).click();
+		await next();
 		await expect.element(page.getByText(/or leave it blank for automatic/)).toBeVisible();
+		// The wizard stays on the name & port step.
+		await expect.element(page.getByLabelText('Min heap (MiB)')).not.toBeInTheDocument();
 		expect(posts('/api/v1/servers')).toHaveLength(0);
+	});
+
+	it('moves back and forward without losing entered values', async () => {
+		reply('GET', '/api/v1/software', ok(CATALOG));
+		setup();
+		await chooseVanilla();
+		await page.getByLabelText('Game port (optional)').fill('25570');
+		await next();
+		await page.getByLabelText('Max heap (MiB)').fill('4096');
+		await page.getByRole('button', { name: 'Back' }).click();
+		await expect.element(page.getByLabelText('Server name')).toHaveValue('Survival');
+		await expect.element(page.getByLabelText('Game port (optional)')).toHaveValue(25570);
+		// The version picker remounts with the earlier choice preserved.
+		reply(
+			'GET',
+			'/api/v1/software/vanilla/versions',
+			ok({
+				items: [
+					{ id: '1.21.2', stable: true },
+					{ id: '1.21.1', stable: true }
+				]
+			})
+		);
+		await page.getByRole('button', { name: 'Back' }).click();
+		await expect
+			.element(page.getByRole('combobox', { name: 'Minecraft version' }))
+			.toHaveTextContent('1.21.1');
+		await next();
+		await toReview();
+		await expect.element(page.getByText('512 MiB – 4 GiB heap')).toBeVisible();
+		await expect.element(page.getByText('25570', { exact: true })).toBeVisible();
+		// Review "Edit" jumps straight back to the step that owns the value.
+		await page.getByRole('button', { name: 'Edit name' }).click();
+		await expect.element(page.getByLabelText('Server name')).toHaveValue('Survival');
+		expect(calls.some((c) => c.method !== 'GET')).toBe(false);
+	});
+
+	it('blocks continuing with an empty name and invalid heap bounds', async () => {
+		reply('GET', '/api/v1/software', ok(CATALOG));
+		setup();
+		await chooseVanilla();
+		await page.getByLabelText('Server name').fill('');
+		await next();
+		await expect.element(page.getByText(/Use 1–80 characters/)).toBeVisible();
+		await page.getByLabelText('Server name').fill('Survival');
+		await next();
+		await page.getByLabelText('Max heap (MiB)').fill('256');
+		await next();
+		await expect
+			.element(page.getByText('Maximum heap must be at least the minimum heap.'))
+			.toBeVisible();
+		await expect
+			.element(page.getByRole('checkbox', { name: /I accept the/ }))
+			.not.toBeInTheDocument();
 	});
 
 	it('clears the previous Paper build when the Minecraft version changes', async () => {
@@ -246,6 +321,7 @@ describe('NewServerForm', () => {
 		);
 		setup();
 		await page.getByText('Paper', { exact: true }).click();
+		await next();
 		const gameVersion = page.getByRole('combobox', { name: 'Minecraft version' });
 		const paperBuild = page.getByRole('combobox', { name: 'Paper build' });
 		await expect.element(gameVersion).toHaveTextContent('1.21.4');
@@ -287,6 +363,7 @@ describe('NewServerForm', () => {
 			),
 			ok(job('succeeded', { result: { server: managedServer({ launch: {} }) } }))
 		);
+		await toReview();
 		await page.getByRole('button', { name: 'Create and install' }).click();
 
 		await expect.element(page.getByText('Software provider unavailable')).toBeVisible();
@@ -308,8 +385,18 @@ describe('NewServerForm', () => {
 		});
 		const { oncreated } = setup();
 		await expect.element(page.getByText('Software provider unavailable')).toBeVisible();
-		await page.getByText('Custom JAR', { exact: false }).first().click();
+		await page.getByRole('radio', { name: /Custom JAR/ }).click({ force: true });
+		// Custom JARs skip the version stage and have no install stage.
+		await expect.element(page.getByText(/step 1 of 4/)).toBeInTheDocument();
+		expect(
+			document.querySelector('ol[aria-label="New server progress"]')?.textContent
+		).not.toContain('Install');
+		await next();
 		await page.getByLabelText('Server name').fill('Manual');
+		await next();
+		await expect.element(page.getByLabelText('JAR path')).toHaveValue('server.jar');
+		await next();
+		await expect.element(page.getByText('server.jar', { exact: true })).toBeVisible();
 
 		reply(
 			'POST',
@@ -335,6 +422,7 @@ describe('NewServerForm', () => {
 		);
 		setup();
 		await page.getByText('CurseForge modpack', { exact: true }).click();
+		await next();
 
 		reply(
 			'GET',
@@ -371,6 +459,7 @@ describe('NewServerForm', () => {
 		await expect
 			.element(page.getByRole('combobox', { name: 'Release' }))
 			.toHaveTextContent('ATM10 2.0');
+		await next();
 		await page.getByLabelText('Server name').fill('ATM');
 
 		reply(
@@ -387,6 +476,8 @@ describe('NewServerForm', () => {
 			status: 409,
 			body: { code: 'server.busy', detail: 'Busy.' }
 		});
+		await toReview();
+		await expect.element(page.getByText('All the Mods 10 (file 555)')).toBeVisible();
 		await page.getByRole('button', { name: 'Create and install' }).click();
 		await expect.element(page.getByText('Operation in progress')).toBeVisible();
 		expect(posts('/api/v1/servers')[0].body).toMatchObject({

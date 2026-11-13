@@ -20,7 +20,10 @@
 		{#if index > 0}
 			<li
 				aria-hidden="true"
-				class={cn('h-px flex-1', done || active ? 'bg-primary' : 'bg-border')}
+				class={cn(
+					'h-px flex-1 transition-colors duration-(--motion-slow)',
+					done || active ? 'bg-primary' : 'bg-border'
+				)}
 			></li>
 		{/if}
 		<li
@@ -30,7 +33,7 @@
 		>
 			<span
 				class={cn(
-					'flex size-5 shrink-0 items-center justify-center rounded-full border font-medium tabular-nums',
+					'flex size-5 shrink-0 items-center justify-center rounded-full border font-medium tabular-nums transition-colors duration-(--motion-base)',
 					done && 'border-primary bg-primary text-primary-foreground',
 					active && 'border-primary text-foreground',
 					!done && !active && 'border-border text-muted-foreground'

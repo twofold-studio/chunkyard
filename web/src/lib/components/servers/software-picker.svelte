@@ -100,7 +100,7 @@
 				{@const selected = value === choice.id}
 				<label
 					class={cn(
-						'relative flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-background p-3 transition-colors',
+						'motion-press relative flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-background p-3 transition-colors',
 						'hover:border-ring/60 hover:bg-accent/30',
 						'has-[:focus-visible]:border-ring has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50',
 						selected && 'border-primary bg-primary/5 hover:border-primary hover:bg-primary/5',

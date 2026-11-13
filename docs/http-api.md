@@ -66,7 +66,7 @@ The text editor supports UTF-8 without NUL bytes. `etag` is the SHA-256 of the t
 
 Listings stop after 5000 inspected entries and report `truncated`; non-UTF-8 names are skipped. Copies are limited to 512 MiB, 5000 entries and 32 nested levels; failed directory copies clean up their newly created destination. Moves/copies refuse existing destinations, links and special files. Nonempty directory deletion requires `recursive=true` and is permanent. Stop external tools from editing the same instance during changes: editor etags detect changes since reading but do not provide a transaction with arbitrary host-side writers.
 
-File errors use `files.path_invalid` (422), `files.symlink`/`files.protected` (403), `files.not_found` (404), `files.exists`/`files.conflict`/`files.not_empty`/`files.server_running` (409), `files.too_large` (413), `files.binary` (415), and `files.io` (500). An overlapping lifecycle/file operation returns `server.busy` (409).
+File errors use `files.path_invalid` (422), `files.symlink`/`files.protected` (403), `files.not_found` (404), `files.exists`/`files.conflict`/`files.not_empty`/`files.server_running` (409), `files.too_large` (413), `files.binary` (415), and `files.io` (500). Reads queue behind existing instance operations; conflicting mutations return `server.busy` (409).
 
 Edit `server.properties` through the same text API. Changes take effect on the next start; saving never starts a server or accepts the EULA. The launcher forces the internal game port to 25565: change the published host port through `/network`. Authentication settings such as `online-mode` are left to the owner; Chunkyard does not change them automatically.
 

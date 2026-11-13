@@ -273,3 +273,71 @@ export interface Changelog {
 	version: string;
 	markdown: string;
 }
+
+// Files ------------------------------------------------------------------------
+
+/** Kind of a directory entry. Symlinks are listed but never followed. */
+export type FileKind = 'file' | 'directory' | 'symlink' | 'other';
+
+export interface FileEntry {
+	name: string;
+	/** Server-relative POSIX path, e.g. `world/level.dat`. */
+	path: string;
+	kind: FileKind;
+	size: number;
+	/** RFC 3339 modification time, when known. */
+	modifiedAt: string | null;
+	/** Protected manager artifact or root `eula.txt`. */
+	readOnly: boolean;
+}
+
+/** `GET /api/v1/servers/{id}/files?path=` */
+export interface DirectoryListing {
+	path: string;
+	/** Directories first; at most 5000 entries. */
+	entries: FileEntry[];
+	truncated: boolean;
+	/** False while the server runs or Docker is unavailable. */
+	canWrite: boolean;
+}
+
+/** `GET /api/v1/servers/{id}/files/content?path=` (UTF-8 only, at most 1 MiB). */
+export interface FileContent {
+	path: string;
+	content: string;
+	/** SHA-256 of the content; send it back on save to detect concurrent edits. */
+	etag: string;
+	size: number;
+	readOnly: boolean;
+	canWrite: boolean;
+}
+
+/** `PUT /api/v1/servers/{id}/files/content?path=` */
+export interface SavedFile {
+	path: string;
+	etag: string;
+	size: number;
+}
+
+// Network ----------------------------------------------------------------------
+
+/** `GET /api/v1/servers/{id}/network` */
+export interface ServerNetwork {
+	port: number;
+	/** Per-server bind address; `null` uses the manager default. */
+	publishIp: string | null;
+	/** Address the next container will bind to. */
+	effectivePublishIp: string;
+	/** Address and port of the current container, `null` when none exists. */
+	boundPublishIp: string | null;
+	boundPort: number | null;
+	/** The running container still uses an older binding. */
+	restartRequired: boolean;
+	status: RuntimeStatus;
+}
+
+export interface UpdateNetworkRequest {
+	port: number;
+	/** `null` restores the manager default bind address. */
+	publishIp: string | null;
+}

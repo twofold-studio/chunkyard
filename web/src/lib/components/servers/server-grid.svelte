@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { AddTile } from '#lib/components/app/index.js';
 	import ServerCard from './server-card.svelte';
+	import { rise, stagger } from '#lib/motion/index.js';
 	import type { ServerView } from '#lib/api/index.js';
 
 	interface Props {
@@ -26,8 +27,8 @@
 			class="h-full min-h-36 gap-2 p-4"
 		/>
 	</li>
-	{#each servers as server (server.id)}
-		<li class="min-w-0">
+	{#each servers as server, index (server.id)}
+		<li class="min-w-0" in:rise|global={{ delay: stagger(index + 1) }}>
 			<ServerCard {server} />
 		</li>
 	{/each}
