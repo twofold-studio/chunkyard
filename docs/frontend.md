@@ -4,7 +4,7 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 
 ## What it does
 
-- **Authentication.** Reads `/api/v1/setup/status`. First-run setup in two steps (verify the setup token, then create the owner with email and password) and email/password sign-in when authentication is enabled; sign-out from the sidebar. When the backend runs with `MCM_AUTH__ENABLED=false`, setup and login are skipped and the sidebar shows "Authentication disabled"; no user is shown or invented. An expired session on any request returns the browser to sign-in.
+- **Authentication.** Reads `/api/v1/setup/status`. First-run setup in two steps (verify the setup token, then create the owner with email and password) and email/password sign-in when authentication is enabled; sign-out from the sidebar. When the backend runs with `CHUNKYARD_AUTH__ENABLED=false`, setup and login are skipped and the sidebar shows "Authentication disabled"; no user is shown or invented. An expired session on any request returns the browser to sign-in.
 - **Servers.** List with container status, refreshed every 10 s while the tab is visible. Create form for Docker servers (name, port, image, heap, CPUs, JAR path, EULA) with the backend's validation limits. Detail page with start, stop, restart and force kill (kill asks for confirmation), EULA accept/revoke while stopped, read-only configuration, the managed directory with a copy button, console snapshot and command entry.
 - **Java runtimes.** Inventory, system discovery, and Temurin install from `/api/v1/java/available` with job polling.
 - **API reference.** A searchable, locally rendered view of the live OpenAPI document, including request/response schemas and examples; no request execution.
@@ -13,8 +13,8 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 
 ## Behaviour to know
 
-- A small version badge opens a changelog modal, including on setup/login. `MCM_HTTP__SHOW_VERSION=false` hides it and disables changelog delivery.
-- Every mutation sends `X-MCM-CSRF: 1`; requests are same-origin with relative paths. The UI must be served from the origin in `MCM_HTTP__PUBLIC_URL`.
+- A small version badge opens a changelog modal, including on setup/login. `CHUNKYARD_HTTP__SHOW_VERSION=false` hides it and disables changelog delivery.
+- Every mutation sends `X-MCM-CSRF: 1`; requests are same-origin with relative paths. The UI must be served from the origin in `CHUNKYARD_HTTP__PUBLIC_URL`.
 - Lifecycle actions and Java installs are jobs. The UI polls `/api/v1/jobs/{id}` every second and shows queued/running/finished only; the backend reports no percentage.
 - The console is a snapshot of the last 200 lines. It is replaced, never appended, every 3 s while the server is running, the Console tab is open and the browser tab is visible. Auto-refresh can be turned off. Stopped servers show one snapshot.
 - Server status is re-read every 5 s on the detail page. "Container running" means the process runs; Minecraft may still be starting.
@@ -38,11 +38,11 @@ cargo run -p mcm-server -- serve
 
 Open `http://127.0.0.1:8420`. Rust serves the UI and API on the same origin, including direct navigation and refreshes on `/servers` and `/java`. The Docker image builds and includes the UI automatically; no Node runtime or separate web server is needed at runtime.
 
-`http.ui_dir` defaults to `web/build`, relative to the working directory. Set `MCM_HTTP__UI_DIR=/absolute/path/to/build` for an installed binary, or set it to an empty string for API-only operation. A missing directory also starts in API-only mode; an existing directory without `200.html`, or containing symlinks, fails startup. Assets are loaded once with a 64 MiB bundle limit; restart after replacing the build. UI files are distributed alongside the binary, not embedded in it. Source maps and hidden files are excluded.
+`http.ui_dir` defaults to `web/build`, relative to the working directory. Set `CHUNKYARD_HTTP__UI_DIR=/absolute/path/to/build` for an installed binary, or set it to an empty string for API-only operation. A missing directory also starts in API-only mode; an existing directory without `200.html`, or containing symlinks, fails startup. Assets are loaded once with a 64 MiB bundle limit; restart after replacing the build. UI files are distributed alongside the binary, not embedded in it. Source maps and hidden files are excluded.
 
 HTML uses `no-store` and a page CSP with hashes for the build's inline bootstrap scripts. JavaScript `eval()` and inline event handlers are blocked; same-origin scripts, API calls and fonts are allowed. Inline styles support Svelte components. Hashed `/_app/immutable/` assets have a one-year immutable cache policy; other assets revalidate using ETags. API responses retain their restrictive CSP and `no-store`. Host/origin/CSRF checks apply across both UI and API routes. Unknown `/api` routes return JSON errors, and missing assets return 404 instead of the SPA.
 
-For a reverse proxy, preserve the original `Host` and set `MCM_HTTP__PUBLIC_URL` to the external origin. Vite remains available for development as described in `web/README.md`.
+For a reverse proxy, preserve the original `Host` and set `CHUNKYARD_HTTP__PUBLIC_URL` to the external origin. Vite remains available for development as described in `web/README.md`.
 
 ## Integration limits
 

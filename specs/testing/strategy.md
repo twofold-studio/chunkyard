@@ -15,7 +15,7 @@ Everything is tested. A feature is not done until its tests in the phase `tests.
 | Frontend unit | Vitest | `web/src/**/*.test.ts` | every push | no |
 | Frontend component | Vitest + `@testing-library/svelte` + jsdom | co-located | every push | no |
 | E2E | Playwright against the real `mcm` binary + fake-mc | `e2e/tests/*.spec.ts` | every push (Chromium), nightly (Chromium+Firefox+WebKit) | no |
-| Real-server smoke | `cargo nextest -p mcm-server --features smoke` | `crates/mcm-server/tests/smoke_*.rs` | nightly + manual; opt-in locally `MCM_SMOKE=1` | **yes** (downloads JRE + real jars) |
+| Real-server smoke | `cargo nextest -p mcm-server --features smoke` | `crates/mcm-server/tests/smoke_*.rs` | nightly + manual; opt-in locally `CHUNKYARD_SMOKE=1` | **yes** (downloads JRE + real jars) |
 | Relay soak | custom bin | `crates/mcm-relay/benches/` | nightly (phase 7+) | no |
 
 ## Principles

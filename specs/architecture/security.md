@@ -127,7 +127,7 @@ Default listen `127.0.0.1:8420`; TLS via reverse proxy or built-in (`[http.tls]`
 ## Secrets storage
 
 - Master key `<data>/secret.key` (0600). Encrypted columns use XChaCha20-Poly1305; **AAD = `"<table>.<column>:<row_id>"`**, so ciphertexts cannot be swapped between rows or columns.
-- CurseForge key: `MCM_INTEGRATIONS__CURSEFORGE_API_KEY` env / `integrations.curseforge_api_key` config / settings UI (encrypted). Env wins.
+- CurseForge key: `CHUNKYARD_INTEGRATIONS__CURSEFORGE_API_KEY` env / `integrations.curseforge_api_key` config / settings UI (encrypted). Env wins.
 
 ## Supply chain
 

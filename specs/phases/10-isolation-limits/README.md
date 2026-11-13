@@ -76,8 +76,8 @@ Admin override per server: `dockerImage` (any image with `java` on PATH); the JR
 - [ ] All `P10-FR-*` implemented and mapped to passing tests.
 - [ ] Spawner conformance suite passes for `NativeSpawner`, `ShimSpawner`, `DockerSpawner`.
 - [ ] Shim: server keeps running and console resumes (with replay, epoch reset) after mcm is killed with SIGKILL and restarted.
-- [ ] Docker suite (`MCM_TEST_DOCKER=1`) green in the **`docker-integration` merge-queue job** ([ci.md](../../testing/ci.md#merge-queue)): lifecycle, console, re-adopt, OOM, limits, hardening via `docker inspect`.
-- [ ] Delegated cgroup suite green on a runner with `Delegate=yes` (`MCM_TEST_CGROUPS=1`); `none` mode degradation tested everywhere.
+- [ ] Docker suite (`CHUNKYARD_TEST_DOCKER=1`) green in the **`docker-integration` merge-queue job** ([ci.md](../../testing/ci.md#merge-queue)): lifecycle, console, re-adopt, OOM, limits, hardening via `docker inspect`.
+- [ ] Delegated cgroup suite green on a runner with `Delegate=yes` (`CHUNKYARD_TEST_CGROUPS=1`); `none` mode degradation tested everywhere.
 - [ ] Switching native → shim → docker → native preserves files; switching to native/shim with conflicting user grants returns 409.
 - [ ] mcm-in-Docker compose example (`docker/compose.yml`) documented and smoke-tested.
 - [ ] Container config reviewed against [security.md](../../architecture/security.md#process-isolation-stance).

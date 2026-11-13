@@ -73,7 +73,7 @@
 
 	<SettingsSection
 		title="Network"
-		description="Host port published for container port 25565/TCP on MCM_DOCKER__PUBLISH_IP (loopback by default)."
+		description="Host port published for container port 25565/TCP on CHUNKYARD_DOCKER__PUBLISH_IP (loopback by default)."
 		icon={NetworkIcon}
 	>
 		{@render value('Game port', String(server.port))}

@@ -157,7 +157,7 @@ Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust
 | `upload_session_full_flow_sha256_ok` | A | 28 |
 | `upload_session_resume_after_disconnect` (drop connection mid-chunk; status shows last durable offset) | A | 28 |
 | `upload_offset_mismatch_409_returns_received` / `upload_hash_mismatch_422` / `upload_other_principal_404` | A | 28 |
-| `upload_insufficient_space_507` (small tmpfs via `MCM_TEST_DOCKER` or injected `DiskSpace` fake) | A | 28 |
+| `upload_insufficient_space_507` (small tmpfs via `CHUNKYARD_TEST_DOCKER` or injected `DiskSpace` fake) | A | 28 |
 | `upload_session_gc_after_24h` (FakeClock) | U (`mcm-fs`) | 28 |
 | `archive_and_extract_jobs_end_to_end` / `extract_job_zip_slip_fails_with_code` | A | 29, 03 |
 | `extract_job_insufficient_space_fails_fs_no_space` (injected `DiskSpace`) | A | 29, 03 |

@@ -1,6 +1,6 @@
 # Backend development
 
-The backend includes Java runtime management, strict configuration, owner/session authentication, a JSON HTTP service, and persistent install jobs. Start it with `cargo run -p mcm-server -- serve`. Build the UI with `pnpm --dir web build` first to serve it on the same address, or use `MCM_HTTP__UI_DIR=` for API-only development. See [the current HTTP API](http-api.md) for setup and integration. The first frontend slice is implemented in `web/`; see [frontend usage](frontend.md) for its screens and development setup.
+The backend includes Java runtime management, strict configuration, owner/session authentication, a JSON HTTP service, and persistent install jobs. Start it with `cargo run -p mcm-server -- serve`. Build the UI with `pnpm --dir web build` first to serve it on the same address, or use `CHUNKYARD_HTTP__UI_DIR=` for API-only development. See [the current HTTP API](http-api.md) for setup and integration. The first frontend slice is implemented in `web/`; see [frontend usage](frontend.md) for its screens and development setup.
 
 ```sh
 cargo run -p mcm-server -- java discover
@@ -12,7 +12,7 @@ cargo run -p mcm-server -- java select 8 --strict
 cargo run -p mcm-server -- java inspect /path/to/bin/java
 ```
 
-Use `--data-dir /path/to/data` or `MCM_DATA_DIR` to choose storage. The default is `./data`. Commands print JSON to stdout and diagnostics to stderr. Runtime IDs stay stable across discovery and repeated installations. A future server record can pin this ID; `mcm_java::select` handles automatic selection.
+Use `--data-dir /path/to/data` or `CHUNKYARD_DATA_DIR` to choose storage. The default is `./data`. Commands print JSON to stdout and diagnostics to stderr. Runtime IDs stay stable across discovery and repeated installations. A future server record can pin this ID; `mcm_java::select` handles automatic selection.
 
 Discovery checks `JAVA_HOME`, `PATH`, and common vendor directories on Windows and Linux. Executable aliases are deduplicated, probes run four at a time, each with a ten-second timeout and bounded output. JVM injection environment variables are not inherited. System runtimes are never modified. Only trusted administrators should invoke discovery or inspect: probing runs local executables.
 

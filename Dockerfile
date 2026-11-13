@@ -17,7 +17,7 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build /mcm /usr/local/bin/mcm
 COPY --from=web-build /web/build /opt/mcm/web
-ENV MCM_HTTP__LISTEN=0.0.0.0:8420 MCM_DATA_DIR=/data MCM_HTTP__UI_DIR=/opt/mcm/web
+ENV CHUNKYARD_HTTP__LISTEN=0.0.0.0:8420 CHUNKYARD_DATA_DIR=/data CHUNKYARD_HTTP__UI_DIR=/opt/mcm/web
 VOLUME ["/data"]
 EXPOSE 8420
 ENTRYPOINT ["mcm"]

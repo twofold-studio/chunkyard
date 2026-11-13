@@ -1,6 +1,6 @@
 # Authentication and authorization
 
-> Current scope override: this is a single-owner service with simple email/password login. `MCM_AUTH__ENABLED=false` disables account setup and session requirements for local/protected deployments. Host/origin/CSRF checks still apply. Multi-user permissions, scoped API tokens and TOTP below are deferred, not prerequisites for the core. Current implemented contracts are in `docs/http-api.md`.
+> Current scope override: this is a single-owner service with simple email/password login. `CHUNKYARD_AUTH__ENABLED=false` disables account setup and session requirements for local/protected deployments. Host/origin/CSRF checks still apply. Multi-user permissions, scoped API tokens and TOTP below are deferred, not prerequisites for the core. Current implemented contracts are in `docs/http-api.md`.
 
 
 Owned by `mcm-auth`; HTTP extraction in `mcm-api::auth`.

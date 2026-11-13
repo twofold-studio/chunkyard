@@ -56,8 +56,8 @@ describe('parseMarkdown', () => {
 	});
 
 	it('does not treat identifiers with underscores as emphasis', () => {
-		expect(parseInline('MCM_HTTP__SHOW_VERSION=false')).toEqual([
-			{ type: 'text', text: 'MCM_HTTP__SHOW_VERSION=false' }
+		expect(parseInline('CHUNKYARD_HTTP__SHOW_VERSION=false')).toEqual([
+			{ type: 'text', text: 'CHUNKYARD_HTTP__SHOW_VERSION=false' }
 		]);
 	});
 });

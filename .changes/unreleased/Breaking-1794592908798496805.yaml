@@ -1,0 +1,3 @@
+kind: Breaking
+body: Rename application environment variables from MCM_* to CHUNKYARD_* with no legacy aliases. Rename every existing setting, including CONFIG, DATA_DIR, HTTP, AUTH, JAVA and DOCKER variables, and rebuild/update Docker deployment environments together before upgrading. Old names now fail startup with a migration message; persisted data and TOML keys remain unchanged.
+time: 2026-11-13T20:01:48.798496805+02:00

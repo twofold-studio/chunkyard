@@ -1,12 +1,12 @@
 # Phase 10 — Test plan
 
-Kinds: U unit, P property, I integration (crate), A API (`crates/mcm-api-tests/tests/p10_*.rs` via `TestApp`), D Docker-gated (`MCM_TEST_DOCKER=1`; runs in the `docker-integration` merge-queue job, [ci.md](../../testing/ci.md#merge-queue)), G cgroup-gated (`MCM_TEST_CGROUPS=1`, runner whose test scope has `Delegate=yes`), C component, E E2E. Tests with real processes (fake-mc, shim, containers) use real time with short timeouts; paused time only for pure logic.
+Kinds: U unit, P property, I integration (crate), A API (`crates/mcm-api-tests/tests/p10_*.rs` via `TestApp`), D Docker-gated (`CHUNKYARD_TEST_DOCKER=1`; runs in the `docker-integration` merge-queue job, [ci.md](../../testing/ci.md#merge-queue)), G cgroup-gated (`CHUNKYARD_TEST_CGROUPS=1`, runner whose test scope has `Delegate=yes`), C component, E E2E. Tests with real processes (fake-mc, shim, containers) use real time with short timeouts; paused time only for pure logic.
 
 ## Test infrastructure
 
 - `fake-mc-server` built for `x86_64-unknown-linux-musl` so the FakeJre (`bin/java` → fake) runs inside the runtime image mounted at `/opt/java`.
-- `mcm-testkit::docker::TestDocker` — skips with a visible `SKIPPED` unless `MCM_TEST_DOCKER=1`; builds `docker/runtime.Dockerfile` as `mcm-runtime:test`; all objects labelled `mcm.test_run=<uuid>` and removed on drop.
-- `mcm-testkit::cgroup::TestCgroup` — skips unless `MCM_TEST_CGROUPS=1`; CI runs the suite inside a delegated transient system scope created by the runner setup (not by mcm).
+- `mcm-testkit::docker::TestDocker` — skips with a visible `SKIPPED` unless `CHUNKYARD_TEST_DOCKER=1`; builds `docker/runtime.Dockerfile` as `mcm-runtime:test`; all objects labelled `mcm.test_run=<uuid>` and removed on drop.
+- `mcm-testkit::cgroup::TestCgroup` — skips unless `CHUNKYARD_TEST_CGROUPS=1`; CI runs the suite inside a delegated transient system scope created by the runner setup (not by mcm).
 - `FakeDockerApi` (trait `DockerApi` over the bollard calls used) for spec-building and adoption logic without a daemon.
 - `mcm-testkit::spawner_conformance::run_all(spawner)` — phase 1 lifecycle scenarios parameterised over spawners.
 

@@ -3,7 +3,7 @@
   "info": {
     "title": "Chunkyard API",
     "version": "0.1.0",
-    "description": "Single-owner Minecraft manager. Cookie authentication is required unless MCM_AUTH__ENABLED=false. Authentication-disabled mode grants full access, with user:null. Host/origin and X-MCM-CSRF protections apply in both modes. JSON request bodies are limited to 1 MiB. API responses use no-store. Jobs are durable; console and resource metrics are snapshots."
+    "description": "Single-owner Minecraft manager. Cookie authentication is required unless CHUNKYARD_AUTH__ENABLED=false. Authentication-disabled mode grants full access, with user:null. Host/origin and X-MCM-CSRF protections apply in both modes. JSON request bodies are limited to 1 MiB. API responses use no-store. Jobs are durable; console and resource metrics are snapshots."
   },
   "servers": [
     {

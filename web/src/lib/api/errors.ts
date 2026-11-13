@@ -8,7 +8,7 @@ export interface ErrorMessage {
 }
 
 const ORIGIN_HINT =
-	'Open the UI at the exact origin configured as MCM_HTTP__PUBLIC_URL (for development, http://localhost:5173).';
+	'Open the UI at the exact origin configured as CHUNKYARD_HTTP__PUBLIC_URL (for development, http://localhost:5173).';
 
 const KNOWN: Record<string, Omit<ErrorMessage, 'detail'> & { detail?: string }> = {
 	'network.unavailable': {
@@ -48,7 +48,7 @@ const KNOWN: Record<string, Omit<ErrorMessage, 'detail'> & { detail?: string }> 
 	'server.not_found': { title: 'Server not found' },
 	'docker.unavailable': {
 		title: 'Docker unavailable',
-		hint: 'The manager needs a reachable Linux Docker engine. Check DOCKER_HOST and MCM_DOCKER__ENABLED.'
+		hint: 'The manager needs a reachable Linux Docker engine. Check DOCKER_HOST and CHUNKYARD_DOCKER__ENABLED.'
 	},
 	'docker.identity_mismatch': { title: 'Container ownership mismatch' },
 	'docker.failed': { title: 'Docker operation failed' },
@@ -68,7 +68,7 @@ const KNOWN: Record<string, Omit<ErrorMessage, 'detail'> & { detail?: string }> 
 	'download.failed': { title: 'Download failed' },
 	'version.disabled': {
 		title: 'Version information disabled',
-		hint: 'The manager hides its version and changelog (MCM_HTTP__SHOW_VERSION=false).'
+		hint: 'The manager hides its version and changelog (CHUNKYARD_HTTP__SHOW_VERSION=false).'
 	},
 	validation: { title: 'Invalid input' }
 };

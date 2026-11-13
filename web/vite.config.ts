@@ -4,7 +4,7 @@ import { playwright } from '@vitest/browser-playwright';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 
-const BACKEND = process.env.MCM_DEV_BACKEND ?? 'http://127.0.0.1:8420';
+const BACKEND = process.env.CHUNKYARD_DEV_BACKEND ?? 'http://127.0.0.1:8420';
 // Optional system Chromium/Chrome for component tests (e.g. on NixOS).
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
@@ -22,13 +22,13 @@ export default defineConfig({
 		})
 	],
 	server: {
-		// Fixed origin so it can match MCM_HTTP__PUBLIC_URL on the backend.
+		// Fixed origin so it can match CHUNKYARD_HTTP__PUBLIC_URL on the backend.
 		host: 'localhost',
 		port: 5173,
 		strictPort: true,
 		proxy: {
 			// Keep the browser's Host header (changeOrigin: false): the backend checks Host and
-			// Origin against MCM_HTTP__PUBLIC_URL and has no CORS support.
+			// Origin against CHUNKYARD_HTTP__PUBLIC_URL and has no CORS support.
 			'/api': { target: BACKEND, changeOrigin: false },
 			'/healthz': { target: BACKEND, changeOrigin: false }
 		}

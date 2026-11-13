@@ -13,7 +13,7 @@ use std::{path::PathBuf, sync::Arc};
 struct Cli {
     #[arg(long, global = true)]
     data_dir: Option<PathBuf>,
-    #[arg(long, env = "MCM_CONFIG", global = true)]
+    #[arg(long, global = true, help = "Configuration file (or CHUNKYARD_CONFIG)")]
     config: Option<PathBuf>,
     #[command(subcommand)]
     command: Option<Command>,

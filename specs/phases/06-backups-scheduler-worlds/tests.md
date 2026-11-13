@@ -36,7 +36,7 @@ Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust
 | `local_storage_put_is_atomic_rename` | `tests/local_storage.rs` | 12 | I |
 | `s3_storage_multipart_roundtrip_memory_store` | `tests/s3_storage.rs` (`object_store::memory`) | 12 | I |
 | `s3_storage_failure_aborts_multipart` | `tests/s3_storage.rs` | 10, 12 | I |
-| `s3_storage_minio_roundtrip` (gated `MCM_TEST_DOCKER=1`) | `tests/s3_minio.rs` | 12 | I |
+| `s3_storage_minio_roundtrip` (gated `CHUNKYARD_TEST_DOCKER=1`) | `tests/s3_minio.rs` | 12 | I |
 | `s3_storage_get_range_returns_slice` | `tests/s3_storage.rs` | 17 | I |
 | `retention_*` (6 properties in [retention.md](retention.md)) | `src/retention.rs` | 14 | P |
 | `retention_examples_from_spec` (table-driven, all examples) | `src/retention.rs` | 14 | U |

@@ -9,7 +9,7 @@
 
 ## Recording
 
-`cargo xtask record-fixtures <vendor>` (manual, network required) fetches the live endpoints listed in `xtask/fixtures.toml`, applies trimming rules (`jq` expressions), and writes files. A CurseForge key is read from `MCM_CURSEFORGE_API_KEY`; the key header is stripped from anything saved.
+`cargo xtask record-fixtures <vendor>` (manual, network required) fetches the live endpoints listed in `xtask/fixtures.toml`, applies trimming rules (`jq` expressions), and writes files. A CurseForge key is read from `CHUNKYARD_CURSEFORGE_API_KEY`; the key header is stripped from anything saved.
 
 ## Inventory (initial)
 
@@ -27,7 +27,7 @@
 | Modrinth | search, project, versions, version-file by hash, `.mrpack` index (synthesised zip) | mcm-modplatforms |
 | Hangar | projects search, versions | mcm-modplatforms |
 | Discord | webhook 204 / 429 with `retry_after` | mcm-notify |
-| S3 | MinIO in Docker for integration (`testcontainers`), gated by `MCM_TEST_DOCKER=1`; default S3 tests use `object_store::memory` | mcm-backup |
+| S3 | MinIO in Docker for integration (`testcontainers`), gated by `CHUNKYARD_TEST_DOCKER=1`; default S3 tests use `object_store::memory` | mcm-backup |
 
 ## Failure fixtures
 

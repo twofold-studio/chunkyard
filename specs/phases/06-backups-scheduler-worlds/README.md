@@ -57,7 +57,7 @@ Protect player data and automate routine operations: consistent hot backups to l
 - [ ] Hot backup of a running fake-mc server issues `save-off` → `save-all flush` → `save-on` in that order, and `save-on` is sent even when archiving fails (fault-injection test).
 - [ ] Restore rollback proven by fault-injection test (extraction fails mid-way → original directory byte-identical).
 - [ ] Retention algorithm proptests pass (locked never deleted; result independent of input order; idempotent).
-- [ ] S3 target tested against `object_store::memory` in default CI and MinIO under `MCM_TEST_DOCKER=1`.
+- [ ] S3 target tested against `object_store::memory` in default CI and MinIO under `CHUNKYARD_TEST_DOCKER=1`.
 - [ ] Scheduler logic tests run on `FakeClock` with in-memory fakes of the core traits; tests touching fake-mc use real time with short countdowns. DST transitions covered for `Europe/Berlin` and `America/New_York`.
 - [ ] Untrusted-manifest tests pass (crafted `launch`/`javaPath` ignored, oversize manifest rejected).
 - [ ] Backup download denied without `console.write`.

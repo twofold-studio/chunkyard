@@ -34,11 +34,11 @@ async function test(enabled, showVersion = true) {
     {
       env: {
         ...process.env,
-        MCM_AUTH__ENABLED: String(enabled),
-        MCM_HTTP__SHOW_VERSION: String(showVersion),
-        MCM_HTTP__PUBLIC_URL: base,
-        MCM_HTTP__UI_DIR: resolve("web/build"),
-        MCM_DOCKER__ENABLED: "false",
+        CHUNKYARD_AUTH__ENABLED: String(enabled),
+        CHUNKYARD_HTTP__SHOW_VERSION: String(showVersion),
+        CHUNKYARD_HTTP__PUBLIC_URL: base,
+        CHUNKYARD_HTTP__UI_DIR: resolve("web/build"),
+        CHUNKYARD_DOCKER__ENABLED: "false",
       },
       stdio: ["ignore", "pipe", "pipe"],
     },

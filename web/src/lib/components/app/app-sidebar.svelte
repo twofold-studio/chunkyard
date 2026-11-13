@@ -101,7 +101,7 @@
 				<Sidebar.MenuItem>
 					<div
 						class="flex h-10 items-center gap-2 px-3 text-sm text-muted-foreground"
-						title="The backend runs with MCM_AUTH__ENABLED=false; anyone who can reach it has full control."
+						title="The backend runs with CHUNKYARD_AUTH__ENABLED=false; anyone who can reach it has full control."
 					>
 						<ShieldOffIcon class="size-4 shrink-0" aria-hidden="true" />
 						<span class="truncate">Authentication disabled</span>

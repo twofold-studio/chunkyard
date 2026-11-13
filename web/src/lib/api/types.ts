@@ -23,7 +23,7 @@ export interface SessionMe {
 	isAdmin: boolean;
 }
 
-/** `GET /api/v1/auth/me` when the backend runs with `MCM_AUTH__ENABLED=false`. */
+/** `GET /api/v1/auth/me` when the backend runs with `CHUNKYARD_AUTH__ENABLED=false`. */
 export interface AuthDisabledMe {
 	authEnabled: false;
 	user: null;
@@ -164,7 +164,7 @@ export interface Items<T> {
 export type ServerAction = 'start' | 'stop' | 'restart' | 'kill';
 
 /**
- * `GET /api/v1/system/version` (public). Disabled with `MCM_HTTP__SHOW_VERSION=false`,
+ * `GET /api/v1/system/version` (public). Disabled with `CHUNKYARD_HTTP__SHOW_VERSION=false`,
  * in which case every field except `enabled` is `null`.
  */
 export type VersionInfo =

@@ -1,9 +1,9 @@
 data_dir = "data"
 
 [http]
-# Built SPA directory; MCM_HTTP__UI_DIR="" disables UI hosting.
+# Built SPA directory; CHUNKYARD_HTTP__UI_DIR="" disables UI hosting.
 ui_dir = "web/build"
-# Show the optional version/changelog UI; MCM_HTTP__SHOW_VERSION=false hides it.
+# Show the optional version/changelog UI; CHUNKYARD_HTTP__SHOW_VERSION=false hides it.
 show_version = true
 listen = "127.0.0.1:8420"
 # public_url = "https://minecraft.example.com"
@@ -14,7 +14,7 @@ allow_insecure_http = false
 allow_system_java = true
 
 [auth]
-# Override with MCM_AUTH__ENABLED=false for a trusted local/VPN environment.
+# Override with CHUNKYARD_AUTH__ENABLED=false for a trusted local/VPN environment.
 enabled = true
 
 [docker]

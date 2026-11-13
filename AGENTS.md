@@ -11,7 +11,7 @@ Use Changie for the project changelog. Read `docs/changelog.md` for commands.
 
 # Current product scope
 
-Build a single-owner Minecraft manager. Authentication is simple email/password, enabled by default and switchable with `MCM_AUTH__ENABLED=false` for local/protected environments. Multi-user roles/permissions, 2FA and scoped API tokens in the original specs are deferred; do not prioritize them over server lifecycle, console, settings and installers. Preserve browser origin/CSRF checks in both auth modes. Frontend implementation is delegated to Opus. Codex owns the Rust backend; coordinate through the implemented API contracts in docs/http-api.md and docs/docker.md.
+Build a single-owner Minecraft manager. Authentication is simple email/password, enabled by default and switchable with `CHUNKYARD_AUTH__ENABLED=false` for local/protected environments. Multi-user roles/permissions, 2FA and scoped API tokens in the original specs are deferred; do not prioritize them over server lifecycle, console, settings and installers. Preserve browser origin/CSRF checks in both auth modes. Codex handles trivial UI edits (copy, labels, metadata, small styling or mechanical changes) directly. Delegate brand-new UI, non-trivial additions, and substantial UI rework to Claude Opus. Codex owns the Rust backend; coordinate through the implemented API contracts in docs/http-api.md and docs/docker.md.
 
 # Milestone commits
 

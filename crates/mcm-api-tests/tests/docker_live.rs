@@ -21,7 +21,7 @@ async fn real_docker_start_console_restart_adoption_stop_and_kill() -> Result {
         ..Default::default()
     };
     config.auth.enabled = false;
-    config.docker.runtime_image = std::env::var("MCM_TEST_DOCKER_IMAGE")
+    config.docker.runtime_image = std::env::var("CHUNKYARD_TEST_DOCKER_IMAGE")
         .unwrap_or_else(|_| "mcm-manager-test-runtime:local".into());
     config.docker.stop_timeout_s = 3;
     let backend = build_state(&config).await?;
@@ -36,7 +36,7 @@ async fn real_docker_start_console_restart_adoption_stop_and_kill() -> Result {
     let id = created.server.id.clone();
     let instance = std::fs::read_to_string(directory.path().join("instance-id"))?;
     let _cleanup = ContainerCleanup(format!("mcm-{instance}-{id}"));
-    if let Ok(source) = std::env::var("MCM_TEST_SERVER_JAR") {
+    if let Ok(source) = std::env::var("CHUNKYARD_TEST_SERVER_JAR") {
         std::fs::copy(source, created.directory.join("server.jar"))?;
     } else {
         std::fs::write(
@@ -131,7 +131,7 @@ async fn foreign_container_ownership_is_rejected_without_starting_it() -> Result
         ..Default::default()
     };
     config.auth.enabled = false;
-    config.docker.runtime_image = std::env::var("MCM_TEST_DOCKER_IMAGE")
+    config.docker.runtime_image = std::env::var("CHUNKYARD_TEST_DOCKER_IMAGE")
         .unwrap_or_else(|_| "mcm-manager-test-runtime:local".into());
     let backend = build_state(&config).await?;
     let created = backend

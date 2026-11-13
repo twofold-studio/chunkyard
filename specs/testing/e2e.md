@@ -4,7 +4,7 @@
 
 - Located in `e2e/` (own `package.json`, `playwright.config.ts`).
 - Tests run against the **real release-mode `mcm` binary** with the embedded UI, never against Vite.
-- Global setup builds nothing; CI passes `MCM_BIN` (path to built binary) and `FAKE_MC_BIN`.
+- Global setup builds nothing; CI passes `CHUNKYARD_BIN` (path to built binary) and `FAKE_MC_BIN`.
 - Each worker launches its own `mcm` via a fixture:
 
 ```ts
@@ -20,7 +20,7 @@ export const test = base.extend<{ mcm: McmInstance }>({
 });
 ```
 
-- Upstream mocks: a small Node HTTP server (`e2e/upstreams/`) that serves the fixture JSON from `crates/*/tests/fixtures` so Rust and E2E share data. `mcm` is pointed at it through config overrides (`MCM_INTEGRATIONS__*_BASE_URL`, test-only keys enabled by `MCM_TEST_MODE=1`, rejected in release builds unless that env is set).
+- Upstream mocks: a small Node HTTP server (`e2e/upstreams/`) that serves the fixture JSON from `crates/*/tests/fixtures` so Rust and E2E share data. `mcm` is pointed at it through config overrides (`CHUNKYARD_INTEGRATIONS__*_BASE_URL`, test-only keys enabled by `CHUNKYARD_TEST_MODE=1`, rejected in release builds unless that env is set).
 - Auth: `storageState` produced by a setup project that completes `/setup` and logs in.
 
 ## Conventions
@@ -41,7 +41,7 @@ export const test = base.extend<{ mcm: McmInstance }>({
 
 ## Real-server smoke suite (opt-in)
 
-Rust tests in `crates/mcm-server/tests/smoke_*.rs`, compiled only with `--features smoke`, run only when `MCM_SMOKE=1`:
+Rust tests in `crates/mcm-server/tests/smoke_*.rs`, compiled only with `--features smoke`, run only when `CHUNKYARD_SMOKE=1`:
 
 | Test | Does |
 |---|---|
@@ -52,7 +52,7 @@ Rust tests in `crates/mcm-server/tests/smoke_*.rs`, compiled only with `--featur
 | `smoke_forge_1_21` | Forge ≥ 1.20.3: LaunchSpec derived by **parsing** generated `run.sh` (never executed), start/stop |
 | `smoke_neoforge_latest` | NeoForge install + launch |
 | `smoke_legacy_1_12_2_java8` | Java 8 selection, start/stop |
-| `smoke_curseforge_server_pack` | Requires `MCM_CURSEFORGE_API_KEY`; imports a small known pack |
+| `smoke_curseforge_server_pack` | Requires `CHUNKYARD_CURSEFORGE_API_KEY`; imports a small known pack |
 | `smoke_mrpack_import` | Imports a small Modrinth pack |
 | `smoke_capture_log_fixtures` | For vanilla, paper, fabric, forge, neoforge, velocity: start, run `say Done (1.0s)! For help, type "help"` and `say Alice joined the game` (spoof attempts via the `[Server]` broadcast path), `save-all flush`, stop; write the console output to `target/log-fixtures/<flavour>-<ver>.log` for review and commit into `crates/mcm-protocol/tests/fixtures/logs/`. Player-chat lines (needs a real client) are added by hand from a manual session and marked `# manual` in the fixture |
 | `smoke_fake_parity` | Runs the shared lifecycle scenario against real Paper and asserts identical observable events as with fake-mc |

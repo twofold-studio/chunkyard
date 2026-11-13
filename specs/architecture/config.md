@@ -5,13 +5,13 @@ Owned by `mcm-config`, which **composes** the `*Config` sub-structs defined by e
 ## Sources (later wins)
 
 1. Built-in defaults.
-2. `/etc/mcm/mcm.toml`, or path from `--config` / `MCM_CONFIG`.
-3. Environment: `MCM_` prefix, `__` as section separator (`MCM_HTTP__LISTEN=0.0.0.0:8420`).
+2. `/etc/mcm/mcm.toml`, or path from `--config` / `CHUNKYARD_CONFIG`.
+3. Environment: `CHUNKYARD_` prefix, `__` as section separator (`CHUNKYARD_HTTP__LISTEN=0.0.0.0:8420`).
 4. CLI flags for a handful of keys (`--listen`, `--data-dir`).
 
 Unknown keys are an error. `mcm config check` validates and prints the effective config with secrets redacted.
 
-**Non-config `MCM_` variables** are excluded from the env provider before `deny_unknown_fields` applies: `MCM_CONFIG`, `MCM_LOG` (alias for `RUST_LOG`), `MCM_SMOKE`, `MCM_TEST_DOCKER`, `MCM_CURSEFORGE_TEST_KEY`, and any `MCM_TEST_*`. Only variables containing `__` (section separator) or matching a top-level key (`MCM_DATA_DIR`) are treated as config.
+**Non-config `CHUNKYARD_` variables** are excluded from the env provider before `deny_unknown_fields` applies: `CHUNKYARD_CONFIG`, `CHUNKYARD_LOG` (alias for `RUST_LOG`), `CHUNKYARD_SMOKE`, `CHUNKYARD_TEST_DOCKER`, `CHUNKYARD_CURSEFORGE_TEST_KEY`, and any `CHUNKYARD_TEST_*`. Only variables containing `__` (section separator) or matching a top-level key (`CHUNKYARD_DATA_DIR`) are treated as config.
 
 **Listen/origin rule:** if `http.listen` is not a loopback address, `http.public_url` is required (startup error `config.public_url_required`); see [auth.md](auth.md#first-run-setup).
 
@@ -55,7 +55,7 @@ max_bytes = 10737418240                     # download cache LRU cap (10 GiB)
 allow_system_java = true                    # detect java on PATH / JAVA_HOME / common dirs
 
 [integrations]
-curseforge_api_key = ""                     # env: MCM_INTEGRATIONS__CURSEFORGE_API_KEY (the only env name)
+curseforge_api_key = ""                     # env: CHUNKYARD_INTEGRATIONS__CURSEFORGE_API_KEY (the only env name)
 user_agent_contact = "admin@example.com"    # appended to User-Agent (Modrinth/Paper etiquette)
 
 [limits]

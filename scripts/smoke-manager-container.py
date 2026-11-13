@@ -64,9 +64,9 @@ def main():
                    "--group-add", str(os.stat("/var/run/docker.sock").st_gid),
                    "-p", f"127.0.0.1:{port}:8420", "-v", f"{directory}:/data",
                    "-v", "/var/run/docker.sock:/var/run/docker.sock",
-                   "-e", "MCM_AUTH__ENABLED=false", "-e", f"MCM_HTTP__PUBLIC_URL={base}",
-                   "-e", "MCM_HTTP__ALLOW_INSECURE_HTTP=true",
-                   "-e", f"MCM_DOCKER__HOST_DATA_DIR={directory}", "mcm-manager:local")
+                   "-e", "CHUNKYARD_AUTH__ENABLED=false", "-e", f"CHUNKYARD_HTTP__PUBLIC_URL={base}",
+                   "-e", "CHUNKYARD_HTTP__ALLOW_INSECURE_HTTP=true",
+                   "-e", f"CHUNKYARD_DOCKER__HOST_DATA_DIR={directory}", "mcm-manager:local")
             ready()
             with client.open(base + "/servers", timeout=15) as response:
                 assert response.headers.get_content_type() == "text/html"

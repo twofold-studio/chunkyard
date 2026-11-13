@@ -39,7 +39,7 @@ flowchart LR
 | `e2e-all-browsers` | Chromium + Firefox + WebKit |
 | `fuzz-long` | 15 min/target, corpus cached and minimised weekly |
 | `proptest-long` | `PROPTEST_CASES=10000` |
-| `smoke-real` | `MCM_SMOKE=1`, needs `MCM_CURSEFORGE_API_KEY` secret; installs JREs via mcm itself (no `setup-java`) |
+| `smoke-real` | `CHUNKYARD_SMOKE=1`, needs `CHUNKYARD_CURSEFORGE_API_KEY` secret; installs JREs via mcm itself (no `setup-java`) |
 | `contract` | Live API schema drift check (fixtures.md) |
 | `audit` | `cargo audit`, `pnpm audit --prod` |
 | `relay-soak` (P9+) | 10 min, 500 concurrent fake players through relay |
@@ -48,7 +48,7 @@ flowchart LR
 
 | Job | Notes |
 |---|---|
-| `docker-integration` | Runner with Docker: `MCM_TEST_DOCKER=1 cargo nextest run -p mcm-api-tests -p mcm-process -p mcm-backup --features docker` (MinIO S3 tests, Docker runtime P10). Required check on the merge queue to `main`; also nightly |
+| `docker-integration` | Runner with Docker: `CHUNKYARD_TEST_DOCKER=1 cargo nextest run -p mcm-api-tests -p mcm-process -p mcm-backup --features docker` (MinIO S3 tests, Docker runtime P10). Required check on the merge queue to `main`; also nightly |
 
 ## Release (tag `v*`)
 

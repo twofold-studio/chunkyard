@@ -4,13 +4,13 @@ SvelteKit (Svelte 5, TypeScript) single-page app styled with Tailwind v4 and sha
 
 ## Development
 
-The backend has no CORS support and checks `Host`, `Origin` and `X-MCM-CSRF` against `MCM_HTTP__PUBLIC_URL`. In development the Vite server proxies `/api` and `/healthz` to the backend while keeping the browser's `Host` header, so the backend must be told that the browser origin is the Vite origin:
+The backend has no CORS support and checks `Host`, `Origin` and `X-MCM-CSRF` against `CHUNKYARD_HTTP__PUBLIC_URL`. In development the Vite server proxies `/api` and `/healthz` to the backend while keeping the browser's `Host` header, so the backend must be told that the browser origin is the Vite origin:
 
 ```sh
 # terminal 1: backend (from the repository root)
-MCM_HTTP__PUBLIC_URL=http://localhost:5173 cargo run -p mcm-server -- serve
+CHUNKYARD_HTTP__PUBLIC_URL=http://localhost:5173 cargo run -p mcm-server -- serve
 # optional: trusted local use without login
-MCM_AUTH__ENABLED=false MCM_HTTP__PUBLIC_URL=http://localhost:5173 cargo run -p mcm-server -- serve
+CHUNKYARD_AUTH__ENABLED=false CHUNKYARD_HTTP__PUBLIC_URL=http://localhost:5173 cargo run -p mcm-server -- serve
 
 # terminal 2: frontend
 cd web
@@ -18,7 +18,7 @@ pnpm install
 pnpm dev            # always http://localhost:5173 (strictPort)
 ```
 
-Open exactly `http://localhost:5173`. Using `127.0.0.1:5173` instead changes the origin and mutations fail with `auth.csrf`/`http.host`. Set `MCM_DEV_BACKEND` to proxy to a backend other than `http://127.0.0.1:8420`.
+Open exactly `http://localhost:5173`. Using `127.0.0.1:5173` instead changes the origin and mutations fail with `auth.csrf`/`http.host`. Set `CHUNKYARD_DEV_BACKEND` to proxy to a backend other than `http://127.0.0.1:8420`.
 
 With authentication enabled, the first visit shows owner setup. Read the token from `<data-dir>/setup-token` on the backend host.
 

@@ -111,6 +111,6 @@ describe('request', () => {
 
 	it('describes CSRF/origin rejections with the public URL hint', () => {
 		const message = describeError(new ApiError(403, 'auth.csrf', 'Same-origin required.'));
-		expect(message.hint).toMatch(/MCM_HTTP__PUBLIC_URL/);
+		expect(message.hint).toMatch(/CHUNKYARD_HTTP__PUBLIC_URL/);
 	});
 });

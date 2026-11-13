@@ -20,9 +20,9 @@ const daemon = spawn(
   {
     env: {
       ...process.env,
-      MCM_AUTH__ENABLED: "false",
-      MCM_HTTP__PUBLIC_URL: base,
-      MCM_HTTP__UI_DIR: resolve("web/build"),
+      CHUNKYARD_AUTH__ENABLED: "false",
+      CHUNKYARD_HTTP__PUBLIC_URL: base,
+      CHUNKYARD_HTTP__UI_DIR: resolve("web/build"),
     },
     stdio: "ignore",
   },

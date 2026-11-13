@@ -1,18 +1,18 @@
 # Current backend HTTP API
 
-Start with `cargo run -p mcm-server -- serve`, or run `mcm` without a subcommand. The default address is `http://127.0.0.1:8420`. It serves the built UI from `web/build/` alongside the JSON API when available; see [frontend usage](frontend.md) for build and hosting instructions. Set `MCM_HTTP__UI_DIR=` for API-only operation.
+Start with `cargo run -p mcm-server -- serve`, or run `mcm` without a subcommand. The default address is `http://127.0.0.1:8420`. It serves the built UI from `web/build/` alongside the JSON API when available; see [frontend usage](frontend.md) for build and hosting instructions. Set `CHUNKYARD_HTTP__UI_DIR=` for API-only operation.
 
-`mcm config check` prints effective configuration. Sources, in order: defaults, `--config`/`MCM_CONFIG` (or `/etc/mcm/mcm.toml` when present), environment, and CLI `--data-dir`/`serve --listen`. Unknown config keys fail validation. See `mcm.example.toml`.
+`mcm config check` prints effective configuration. Sources, in order: defaults, `--config`/`CHUNKYARD_CONFIG` (or `/etc/mcm/mcm.toml` when present), environment, and CLI `--data-dir`/`serve --listen`. Unknown config keys fail validation. See `mcm.example.toml`.
 
 Authentication is enabled by default. To run without login in a trusted local or VPN environment:
 
 ```sh
-MCM_AUTH__ENABLED=false cargo run -p mcm-server -- serve
+CHUNKYARD_AUTH__ENABLED=false cargo run -p mcm-server -- serve
 ```
 
-The setting is read at startup and overrides `[auth] enabled` in TOML. Disabled mode requires no owner, creates no setup token, and grants full control to callers who can reach the service. `/api/v1/setup/status` returns `{authEnabled:false, required:false}`; `/api/v1/auth/me` reports `principal.kind: "auth_disabled"` with `user:null`. Setup and login return 409 `auth.disabled`; logout simply clears the cookie. Jobs in this mode have `createdBy:null`. Host, origin, and CSRF protections remain active. Restart with `MCM_AUTH__ENABLED=true` to require login again; if no owner exists, first-run setup is required.
+The setting is read at startup and overrides `[auth] enabled` in TOML. Disabled mode requires no owner, creates no setup token, and grants full control to callers who can reach the service. `/api/v1/setup/status` returns `{authEnabled:false, required:false}`; `/api/v1/auth/me` reports `principal.kind: "auth_disabled"` with `user:null`. Setup and login return 409 `auth.disabled`; logout simply clears the cookie. Jobs in this mode have `createdBy:null`. Host, origin, and CSRF protections remain active. Restart with `CHUNKYARD_AUTH__ENABLED=true` to require login again; if no owner exists, first-run setup is required.
 
-For VPN access, set `MCM_HTTP__LISTEN=0.0.0.0:8420` and `MCM_HTTP__PUBLIC_URL` to the URL used by your devices. Plain HTTP on that listener also needs `MCM_HTTP__ALLOW_INSECURE_HTTP=true`; HTTPS reverse proxies do not. These listener settings apply independently of the auth switch.
+For VPN access, set `CHUNKYARD_HTTP__LISTEN=0.0.0.0:8420` and `CHUNKYARD_HTTP__PUBLIC_URL` to the URL used by your devices. Plain HTTP on that listener also needs `CHUNKYARD_HTTP__ALLOW_INSECURE_HTTP=true`; HTTPS reverse proxies do not. These listener settings apply independently of the auth switch.
 
 New setup/login requests use `email`, and user responses expose `email` instead of `username`. Emails are normalized for login. There is no email-delivery, verification, or password-reset-email service.
 
@@ -67,4 +67,10 @@ Server lifecycle and console routes are documented in [docker.md](docker.md). Th
 
 `GET /api/v1/system/version` returns `{enabled:true, version:"0.1.0", channel:"development"}` for the current development build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
 
-`[http] show_version = true` is the default. Set `MCM_HTTP__SHOW_VERSION=false`, restart/redeploy, and reload the page to hide the badge: version metadata then returns `{enabled:false, version:null, channel:null}`, and the changelog endpoint returns 404 `version.disabled`. The UI fetches changelog content only when the modal opens. The package version changes during an explicit release; development pushes update Unreleased notes without bumping versions.
+`[http] show_version = true` is the default. Set `CHUNKYARD_HTTP__SHOW_VERSION=false`, restart/redeploy, and reload the page to hide the badge: version metadata then returns `{enabled:false, version:null, channel:null}`, and the changelog endpoint returns 404 `version.disabled`. The UI fetches changelog content only when the modal opens. The package version changes during an explicit release; development pushes update Unreleased notes without bumping versions.
+
+## Environment name migration
+
+Only `CHUNKYARD_*` application environment variables are supported. Rename all `MCM_*` settings before upgrading; old names now stop startup with a migration message rather than being silently ignored. For example, use `CHUNKYARD_AUTH__ENABLED`, `CHUNKYARD_HTTP__PUBLIC_URL`, `CHUNKYARD_HTTP__SHOW_VERSION`, `CHUNKYARD_DATA_DIR`, and `CHUNKYARD_CONFIG`.
+
+`CHUNKYARD_CONFIG` selects a TOML file when `--config` is absent. Explicit `--config` takes precedence over the environment file path; normal environment settings override values inside the selected file, and CLI data/listen options apply last. TOML keys, data directories, the `mcm` executable, session cookie and CSRF header are not renamed by this migration. Rebuild the Docker image and update its runtime environment together; data volumes remain reusable.

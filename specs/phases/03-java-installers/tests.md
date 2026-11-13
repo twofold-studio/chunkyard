@@ -1,6 +1,6 @@
 # Phase 3 — Test plan
 
-Kinds: **U** unit, **P** proptest, **F** fuzz, **I** crate integration (wiremock / FakeJre / fake shims), **A** API integration (`mcm-api-tests`, `TestApp` built with `test-hooks` + `Upstreams` + fake-mc; real time, short timeouts), **C** frontend, **E** Playwright, **S** real-server smoke (nightly, `MCM_SMOKE=1`). Fixtures per [fixtures.md](../../testing/fixtures.md); shims per [fake-server.md](../../testing/fake-server.md).
+Kinds: **U** unit, **P** proptest, **F** fuzz, **I** crate integration (wiremock / FakeJre / fake shims), **A** API integration (`mcm-api-tests`, `TestApp` built with `test-hooks` + `Upstreams` + fake-mc; real time, short timeouts), **C** frontend, **E** Playwright, **S** real-server smoke (nightly, `CHUNKYARD_SMOKE=1`). Fixtures per [fixtures.md](../../testing/fixtures.md); shims per [fake-server.md](../../testing/fake-server.md).
 
 ## mcm-java (`crates/mcm-java/src/**`, `tests/*.rs`)
 

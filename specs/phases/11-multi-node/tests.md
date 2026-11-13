@@ -85,7 +85,7 @@ Kinds: U unit, P property, I integration, A API (`TestApp`/`TestCluster`), C com
 
 ## E2E (`e2e/tests/p10-nodes.spec.ts`)
 
-E2E launches primary + one agent binary (`MCM_BIN agent`) with temp dirs.
+E2E launches primary + one agent binary (`CHUNKYARD_BIN agent`) with temp dirs.
 
 | Scenario | FR / US |
 |---|---|

@@ -80,7 +80,7 @@
 
 		<SettingsSection
 			title="Network"
-			description="Host port published for container port 25565/TCP. It binds to MCM_DOCKER__PUBLISH_IP (loopback by default)."
+			description="Host port published for container port 25565/TCP. It binds to CHUNKYARD_DOCKER__PUBLISH_IP (loopback by default)."
 			icon={NetworkIcon}
 		>
 			<Field.Field data-invalid={liveErrors.port ? true : undefined}>

@@ -23,8 +23,8 @@ Kinds: U = unit, P = property, I = crate integration, A = API integration (`crat
 | `config_validate_reports_all_errors` | `mcm-config/src/validate.rs` | 04 | U |
 | `config_insecure_public_url_requires_flag` | `mcm-config/src/validate.rs` | 04 | U |
 | `config_non_loopback_listen_requires_public_url` | `mcm-config/src/validate.rs` | 04 | U |
-| `config_non_config_mcm_env_vars_ignored` (`MCM_CONFIG`, `MCM_SMOKE`, `MCM_TEST_FOO`, `MCM_CURSEFORGE_TEST_KEY` set → loads) | `mcm-config/tests/load.rs` | 04 | I |
-| `config_unknown_sectioned_env_var_rejected` (`MCM_HTTP__BOGUS`) | `mcm-config/tests/load.rs` | 04 | I |
+| `config_non_config_mcm_env_vars_ignored` (`CHUNKYARD_CONFIG`, `CHUNKYARD_SMOKE`, `CHUNKYARD_TEST_FOO`, `CHUNKYARD_CURSEFORGE_TEST_KEY` set → loads) | `mcm-config/tests/load.rs` | 04 | I |
+| `config_unknown_sectioned_env_var_rejected` (`CHUNKYARD_HTTP__BOGUS`) | `mcm-config/tests/load.rs` | 04 | I |
 | `startup_creates_data_tree_with_modes` | `mcm-server/tests/startup.rs` | 05 | I |
 | `startup_second_instance_fails_on_lock` | `mcm-server/tests/startup.rs` | 05 | I |
 | `secret_key_created_0600_and_reused` | `mcm-server/tests/startup.rs` | 06 | I |

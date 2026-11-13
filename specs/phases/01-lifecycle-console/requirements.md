@@ -102,7 +102,7 @@ Permissions from [auth.md](../../architecture/auth.md#permission-catalog-per-ser
 
 - **Native runtime is single-trust** ([security.md](../../architecture/security.md#native-runtime-is-single-trust)): every server runs as the mcm OS user, so jar sources, `java_path`, custom launch, JVM args and (from P2) file writes are code execution as mcm. In P1 all of these are admin-only; P8 enforces the rule for delegated grants; P10 Docker is required for real isolation.
 - Import roots canonicalized at config load; symlinks inside imported trees are not copied.
-- Child env cleared except allow-listed variables; `MCM_*` never inherited.
+- Child env cleared except allow-listed variables; `CHUNKYARD_*` never inherited.
 - No mcm state in the server dir; nothing under `servers/<id>` is trusted (process-model "State directory").
 - RCON is untouched in P1 — no password to leak, no port exposed.
 - All outbound fetches through `SafeHttp` (SSRF, rebinding, redirect validation).

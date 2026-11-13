@@ -9,8 +9,8 @@ Use the repository's root Dockerfile, context `/`, and container HTTP port 8420.
 Set the following runtime environment in Dokploy:
 
 ```dotenv
-MCM_HTTP__PUBLIC_URL=https://chunkyard.fractal-tess.xyz
-MCM_DOCKER__HOST_DATA_DIR=/var/lib/docker/volumes/chunkyard-data/_data
+CHUNKYARD_HTTP__PUBLIC_URL=https://chunkyard.fractal-tess.xyz
+CHUNKYARD_DOCKER__HOST_DATA_DIR=/var/lib/docker/volumes/chunkyard-data/_data
 ```
 
 The image already binds `0.0.0.0:8420`, stores data at `/data`, and serves its bundled UI. Configure the following mounts before the first deployment:
@@ -22,7 +22,7 @@ The image already binds `0.0.0.0:8420`, stores data at `/data`, and serves its b
 
 The host-visible volume path above assumes the verified `/var/lib/docker` engine data root and local volume driver. Check the named volume's actual mountpoint before starting a server. This explicit path translation is required because server containers are siblings of the manager, not nested containers.
 
-The first-install trial keeps the default game-port bind, `127.0.0.1`. To allow players on the mesh later, set `MCM_DOCKER__PUBLISH_IP=100.91.0.4` in Dokploy and redeploy before creating game containers; permitted peers can then connect to `oracle.netbird.cloud:<game-port>`. Public internet game access is not configured. The web UI uses Dokploy's HTTPS proxy. Keep the Docker socket private; do not publish Docker TCP management or Minecraft RCON ports.
+The first-install trial keeps the default game-port bind, `127.0.0.1`. To allow players on the mesh later, set `CHUNKYARD_DOCKER__PUBLISH_IP=100.91.0.4` in Dokploy and redeploy before creating game containers; permitted peers can then connect to `oracle.netbird.cloud:<game-port>`. Public internet game access is not configured. The web UI uses Dokploy's HTTPS proxy. Keep the Docker socket private; do not publish Docker TCP management or Minecraft RCON ports.
 
 The first-install trial leaves optional CPU and memory tuning unset. If you later want a 1 GiB/one-CPU manager limit, configure it in Dokploy. The Dokploy API expects `memoryLimit: "1073741824"` (bytes) and `cpuLimit: "1000000000"` (nanocpus). Set `updateConfigSwarm.Order` to `stop-first`; Dokploy defaults to `start-first`, which would overlap two managers on the same data directory. These limits do not cover sibling Minecraft containers: each server has its own heap, memory overhead, CPU and PID limits.
 
