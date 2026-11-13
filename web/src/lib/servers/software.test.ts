@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	buildSoftware,
+	cardSummary,
 	describeSoftware,
 	monogram,
 	needsInstall,
@@ -93,5 +94,31 @@ describe('monogram', () => {
 	it('uses up to two initials', () => {
 		expect(monogram('All the Mods 10')).toBe('AT');
 		expect(monogram('  ')).toBe('?');
+	});
+});
+
+describe('cardSummary', () => {
+	const launch = { path: 'server.jar', build: null, javaMajor: 21, checksum: 'ab' };
+
+	it('prefers the persisted launch version over the requested one', () => {
+		expect(
+			cardSummary({
+				software: { type: 'paper', version: '1.21.1' },
+				launch: { ...launch, version: '1.21.4' }
+			})
+		).toEqual({ software: 'Paper', version: '1.21.4' });
+	});
+
+	it('falls back to the requested version before install', () => {
+		expect(cardSummary({ software: { type: 'vanilla', version: '1.20.1' }, launch: null })).toEqual(
+			{ software: 'Vanilla', version: '1.20.1' }
+		);
+	});
+
+	it('labels manual JAR servers as Custom without a known version', () => {
+		expect(cardSummary({ software: null, launch: null })).toEqual({
+			software: 'Custom',
+			version: null
+		});
 	});
 });

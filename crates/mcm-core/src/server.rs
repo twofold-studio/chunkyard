@@ -30,7 +30,9 @@ pub struct CreateServer {
     #[serde(default = "default_runtime")]
     pub runtime: String,
     pub name: String,
-    pub port: u16,
+    /// Omit/null to allocate an unassigned managed host port.
+    #[serde(default)]
+    pub port: Option<u16>,
     #[serde(default = "default_jar")]
     pub jar: String,
     #[serde(default)]
@@ -101,6 +103,14 @@ pub struct ServerView {
     pub directory: PathBuf,
     pub status: RuntimeStatus,
 }
+/// Completed deletion. Retained files are never implicitly adopted by a new instance.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeletedServer {
+    pub id: String,
+    pub files_deleted: bool,
+    pub retained_directory: Option<PathBuf>,
+}
 /// Point-in-time container measurements. Missing measurements are null, never
 /// invented zeroes. CPU is percent of one logical core and may exceed 100.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -141,7 +151,7 @@ pub enum ServerError {
     NotFound,
     #[error("server operation already in progress")]
     Busy,
-    #[error("game port is already assigned to another server")]
+    #[error("another server is already running on this game port")]
     PortInUse,
     #[error("server is already running")]
     AlreadyRunning,
@@ -172,6 +182,7 @@ pub enum ServerError {
 }
 #[async_trait]
 pub trait ServerRepo: Send + Sync {
+    async fn delete(&self, id: &str) -> Result<(), RepositoryError>;
     async fn insert(&self, server: &Server) -> Result<(), ServerError>;
     async fn set_eula(&self, id: &str, accepted: bool) -> Result<(), RepositoryError>;
     async fn set_installation(
@@ -187,6 +198,8 @@ pub trait ServerRepo: Send + Sync {
 /// the single managed directory belonging to the persisted server.
 #[async_trait]
 pub trait ServerRuntime: Send + Sync {
+    /// Remove only this manager's stopped container; never force removal.
+    async fn remove(&self, server: &Server) -> Result<(), ServerError>;
     async fn info(&self) -> DockerInfo;
     async fn metrics(&self, server: &Server) -> Result<ServerMetrics, ServerError>;
     async fn status(&self, server: &Server) -> Result<RuntimeStatus, ServerError>;
@@ -202,6 +215,7 @@ pub trait ServerRuntime: Send + Sync {
 }
 #[async_trait]
 pub trait ServerService: Send + Sync {
+    async fn delete(&self, id: &str, delete_files: bool) -> Result<DeletedServer, ServerError>;
     async fn install(&self, id: &str) -> Result<ServerView, ServerError>;
     async fn create(&self, request: CreateServer) -> Result<ServerView, ServerError>;
     async fn list(&self) -> Result<Vec<ServerView>, ServerError>;

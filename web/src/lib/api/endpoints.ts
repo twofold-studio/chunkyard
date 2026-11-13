@@ -66,6 +66,20 @@ export const createServer = (body: CreateServerRequest, o: Opts = {}) =>
 export const installServer = (id: string, o: Opts = {}) =>
 	request<{ job: Job }>(`/api/v1/servers/${enc(id)}/install`, { ...o, method: 'POST' });
 
+/**
+ * `DELETE /api/v1/servers/{id}?deleteFiles=…` (202, job kind `server.delete`). Only stopped
+ * servers with no running operation; never force-stops. `deleteFiles` defaults to false, which
+ * keeps the managed directory (worlds, config, logs) on the manager host.
+ */
+export const deleteServer = (id: string, deleteFiles = false, o: Opts = {}) =>
+	request<{ job: Job }>(
+		`/api/v1/servers/${enc(id)}?deleteFiles=${deleteFiles ? 'true' : 'false'}`,
+		{
+			...o,
+			method: 'DELETE'
+		}
+	);
+
 export const setEula = (id: string, accepted: boolean, o: Opts = {}) =>
 	request<{ server: ServerView }>(`/api/v1/servers/${enc(id)}/eula`, {
 		...o,

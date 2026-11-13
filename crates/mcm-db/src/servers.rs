@@ -18,6 +18,14 @@ impl SqliteServerRepo {
 }
 #[async_trait]
 impl ServerRepo for SqliteServerRepo {
+    async fn delete(&self, id: &str) -> Result<(), RepositoryError> {
+        sqlx::query("DELETE FROM servers WHERE id=?")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(storage)?;
+        Ok(())
+    }
     async fn insert(&self, server: &Server) -> Result<(), ServerError> {
         let document = serde_json::to_string(server).map_err(storage)?;
         sqlx::query("INSERT INTO servers(id, port, document) VALUES (?, ?, ?)")
@@ -26,16 +34,7 @@ impl ServerRepo for SqliteServerRepo {
             .bind(document)
             .execute(&self.pool)
             .await
-            .map_err(|error| {
-                if error
-                    .as_database_error()
-                    .is_some_and(|e| e.is_unique_violation())
-                {
-                    ServerError::PortInUse
-                } else {
-                    ServerError::Storage(storage(error))
-                }
-            })?;
+            .map_err(|error| ServerError::Storage(storage(error)))?;
         Ok(())
     }
     async fn set_eula(&self, id: &str, accepted: bool) -> Result<(), RepositoryError> {
@@ -71,5 +70,42 @@ impl ServerRepo for SqliteServerRepo {
         rows.iter()
             .map(|s| serde_json::from_str(s).map_err(storage))
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn shared_port_migration_preserves_existing_records_and_allows_duplicates()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await?;
+        sqlx::raw_sql(include_str!("../migrations/0004_servers.sql"))
+            .execute(&pool)
+            .await?;
+        sqlx::query(
+            "INSERT INTO servers VALUES ('existing', 25565, '{\"name\":\"Existing world\"}')",
+        )
+        .execute(&pool)
+        .await?;
+        sqlx::raw_sql(include_str!("../migrations/0005_shared_server_ports.sql"))
+            .execute(&pool)
+            .await?;
+        sqlx::query("INSERT INTO servers VALUES ('second', 25565, '{}')")
+            .execute(&pool)
+            .await?;
+        let preserved: String =
+            sqlx::query_scalar("SELECT document FROM servers WHERE id='existing'")
+                .fetch_one(&pool)
+                .await?;
+        assert_eq!(preserved, "{\"name\":\"Existing world\"}");
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM servers WHERE port=25565")
+            .fetch_one(&pool)
+            .await?;
+        assert_eq!(count, 2);
+        pool.close().await;
+        Ok(())
     }
 }

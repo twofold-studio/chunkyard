@@ -14,9 +14,15 @@
 	import ServerMetrics from '#lib/components/servers/server-metrics.svelte';
 	import ServerConfig from '#lib/components/servers/server-config.svelte';
 	import EulaDialog from '#lib/components/servers/eula-dialog.svelte';
+	import DeleteServerDialog from '#lib/components/servers/delete-server-dialog.svelte';
 	import ServerInstallPanel from '#lib/components/servers/server-install-panel.svelte';
 	import { describeSoftware, needsInstall } from '#lib/servers/software.js';
-	import { errorCode, type ServerAction, type ServerView } from '#lib/api/index.js';
+	import {
+		errorCode,
+		type DeletedServer,
+		type ServerAction,
+		type ServerView
+	} from '#lib/api/index.js';
 	import { ServerController } from '#lib/servers/server-controller.svelte.js';
 	import { poll } from '#lib/polling.js';
 	import { formatMemoryRange } from '#lib/format.js';
@@ -45,6 +51,10 @@
 	let tab = $state('console');
 	let eulaOpen = $state(false);
 	let consoleKey = $state(0);
+	/** Delete job in flight; the record must not be refreshed meanwhile. */
+	let deleting = $state(false);
+	/** Set once the delete job succeeded: the record no longer exists, so stop all requests. */
+	let removed = $state(false);
 
 	const labels: Record<ServerAction, string> = {
 		start: 'Starting',
@@ -60,6 +70,7 @@
 		untrack(() =>
 			poll(
 				async () => {
+					if (removed || deleting) return;
 					if (!controller.busy && controller.server.id === id) await controller.refresh();
 				},
 				{ intervalMs: 5000, immediate: false, signal: abort.signal }
@@ -92,6 +103,21 @@
 		if (job?.state === 'succeeded') toast.success(`Installed ${server.name}`);
 	}
 
+	async function onDeleted(deleted: DeletedServer) {
+		if (deleted.id !== server.id) return;
+		removed = true;
+		controller.destroy();
+		const name = server.name;
+		toast.success(`Deleted ${name}`, {
+			description: deleted.filesDeleted
+				? 'Its world and server files were deleted.'
+				: deleted.retainedDirectory
+					? `Files kept on the manager host at ${deleted.retainedDirectory}`
+					: 'Its files were kept on the manager host.'
+		});
+		await goto(resolve('servers'), { replaceState: true, invalidateAll: true });
+	}
+
 	function dismissCreated() {
 		goto(resolve(`servers/${server.id}`), { replaceState: true });
 	}
@@ -121,13 +147,21 @@
 			<span>{formatMemoryRange(server.memoryMinMb, server.memoryMaxMb)}</span>
 		</p>
 	</div>
-	<ServerActions
-		serverState={server.status.state}
-		busy={controller.busy}
-		pending={controller.action}
-		startBlocked={notInstalled}
-		{onAction}
-	/>
+	<div class="flex flex-wrap items-center gap-2">
+		<ServerActions
+			serverState={server.status.state}
+			busy={controller.busy || deleting || removed}
+			pending={controller.action}
+			startBlocked={notInstalled}
+			{onAction}
+		/>
+		<DeleteServerDialog
+			{server}
+			disabled={controller.busy || removed}
+			bind:deleting
+			ondeleted={onDeleted}
+		/>
+	</div>
 </header>
 
 {#if created && software}

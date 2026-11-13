@@ -84,7 +84,7 @@ async fn create_and_control_a_server_through_authenticated_jobs() -> Result {
     app.close().await
 }
 #[tokio::test]
-async fn creation_validates_paths_resources_runtime_and_port_conflicts() -> Result {
+async fn creation_validates_paths_resources_runtime_and_allows_shared_configured_ports() -> Result {
     let app = TestApp::with_auth(false).await?;
     for request in [
         json!({"name":"bad","port":0}),
@@ -117,7 +117,7 @@ async fn creation_validates_paths_resources_runtime_and_port_conflicts() -> Resu
             .send()
             .await?
             .status(),
-        409
+        201
     );
     assert_eq!(
         app.post("/api/v1/servers/not-an-id/start")

@@ -1,11 +1,50 @@
 use super::{DockerRuntime, docker_error};
 use async_trait::async_trait;
-use bollard::query_parameters::{CreateContainerOptionsBuilder, StopContainerOptionsBuilder};
+use bollard::query_parameters::{
+    CreateContainerOptionsBuilder, RemoveContainerOptionsBuilder, StopContainerOptionsBuilder,
+};
 use futures_util::StreamExt;
 use mcm_core::server::*;
 use std::{path::PathBuf, time::Duration};
 #[async_trait]
 impl ServerRuntime for DockerRuntime {
+    async fn remove(&self, server: &Server) -> Result<(), ServerError> {
+        let Some(container) = self.inspect(server).await? else {
+            return Ok(());
+        };
+        if container
+            .state
+            .as_ref()
+            .is_some_and(|s| s.running == Some(true) || s.paused == Some(true))
+        {
+            return Err(ServerError::AlreadyRunning);
+        }
+        let id = container.id.ok_or(ServerError::Docker)?;
+        let result = tokio::time::timeout(
+            Duration::from_secs(15),
+            self.client()?.remove_container(
+                &id,
+                Some(
+                    RemoveContainerOptionsBuilder::default()
+                        .force(false)
+                        .v(false)
+                        .build(),
+                ),
+            ),
+        )
+        .await
+        .map_err(|_| ServerError::DockerUnavailable)?;
+        match result {
+            Ok(()) => Ok(()),
+            Err(bollard::errors::Error::DockerResponseServerError {
+                status_code: 404, ..
+            }) => Ok(()),
+            Err(bollard::errors::Error::DockerResponseServerError {
+                status_code: 409, ..
+            }) => Err(ServerError::AlreadyRunning),
+            Err(error) => Err(docker_error(error)),
+        }
+    }
     async fn info(&self) -> DockerInfo {
         self.capability().await
     }
@@ -56,7 +95,17 @@ impl ServerRuntime for DockerRuntime {
         client
             .start_container(&self.name(server), None)
             .await
-            .map_err(docker_error)?;
+            .map_err(|error| {
+                if let bollard::errors::Error::DockerResponseServerError { message, .. } = &error {
+                    let message = message.to_ascii_lowercase();
+                    if message.contains("port is already allocated")
+                        || message.contains("address already in use")
+                    {
+                        return ServerError::PortInUse;
+                    }
+                }
+                docker_error(error)
+            })?;
         self.status(server).await
     }
     async fn stop(&self, server: &Server) -> Result<RuntimeStatus, ServerError> {

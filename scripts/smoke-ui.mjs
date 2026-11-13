@@ -2,7 +2,7 @@
 // Run after pnpm --dir web build and cargo build -p mcm-server.
 import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { createServer } from "node:net";
@@ -141,7 +141,7 @@ async function test(enabled, showVersion = true) {
     await page
       .getByLabel("Server name", { exact: true })
       .fill("Managed UI smoke");
-    await page.getByLabel("Game port", { exact: true }).fill("25566");
+    await page.getByLabel("Game port (optional)", { exact: true }).fill("25566");
     assert.equal(await page.getByLabel("JAR path", { exact: true }).count(), 0);
     const creation = page.waitForResponse(
       (response) =>
@@ -202,11 +202,35 @@ async function test(enabled, showVersion = true) {
       const response = await fetch("/api/v1/servers", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-MCM-CSRF": "1" },
-        body: JSON.stringify({ name: "UI smoke", port: 25565 }),
+        body: JSON.stringify({ name: "UI smoke" }),
       });
       if (!response.ok) throw new Error("Server record creation failed");
       return (await response.json()).server;
     });
+    assert.equal(
+      server.port,
+      25565,
+      "automatic port skips the configured 25566",
+    );
+    await page.goto(`${base}/servers`);
+    const grid = page.getByRole("list", { name: "Servers", exact: true });
+    await grid.getByTestId("server-card").first().waitFor();
+    assert.equal(await grid.getByTestId("server-card").count(), 2);
+    assert.equal(
+      await grid
+        .locator("li")
+        .first()
+        .getByRole("link", { name: /Create server/ })
+        .count(),
+      1,
+      "create tile occupies the first slot when instances exist",
+    );
+    const card = grid
+      .getByTestId("server-card")
+      .filter({ hasText: "Managed UI smoke" });
+    assert.match(await card.textContent(), /Vanilla/);
+    assert.match(await card.textContent(), /1\.21\.4/);
+    assert.match(await card.textContent(), /Port 25566/);
     await page.goto(`${base}/servers/${server.id}`);
     await page
       .getByRole("heading", { name: "Resources", exact: true })
@@ -254,6 +278,46 @@ async function test(enabled, showVersion = true) {
       );
       assert.equal(metadata.enabled, false);
       assert.equal(await badge.count(), 0);
+    }
+    if (liveInstall) {
+      // These are this test's temporary instances. Neither has a game container.
+      for (const [instance, deleteFiles] of [
+        [server, false],
+        [managed, true],
+      ]) {
+        await page.goto(`${base}/servers/${instance.id}`);
+        await page.getByRole("button", { name: "Delete", exact: true }).click();
+        const dialog = page.getByRole("alertdialog");
+        if (deleteFiles) {
+          await dialog
+            .getByRole("checkbox", {
+              name: "Also delete world and server files",
+            })
+            .check();
+        }
+        await dialog
+          .getByRole("button", {
+            name: deleteFiles ? "Delete server and files" : "Delete server",
+            exact: true,
+          })
+          .click();
+        await page.waitForURL(`${base}/servers`);
+        assert.equal(
+          await page.evaluate(
+            async (id) => (await fetch(`/api/v1/servers/${id}`)).status,
+            instance.id,
+          ),
+          404,
+        );
+        if (deleteFiles)
+          await assert.rejects(stat(instance.directory), { code: "ENOENT" });
+        else assert.equal((await stat(instance.directory)).isDirectory(), true);
+      }
+      await page
+        .getByRole("link", { name: /Create server/ })
+        .last()
+        .waitFor();
+      assert.equal(await page.getByTestId("server-card").count(), 0);
     }
     await sleep(150);
     assert.deepEqual(violations, [], "page violated its CSP");

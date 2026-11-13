@@ -24,7 +24,11 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 
 ## Not included
 
-There is no UI for deleting servers, editing resources after creation, file management, modpacks, historical metrics/graphs, multiple users or roles, 2FA, or API tokens, because the backend does not provide them yet. Vanilla/Paper installation is available in the creation UI.
+The server list uses compact responsive cards with software, installed/requested Minecraft version, RAM, CPUs and host port, each with an icon. A dashed Create server tile always occupies the first slot, including when instances already exist. The port field defaults to Automatic; an explicit port may be shared, but only one instance using it can run at a time.
+
+Stopped instances can be deleted from their detail page after confirmation. World and server files are retained on the manager host by default, with a copyable path. An explicit checkbox permanently deletes those files too. Deletion tracks only its job and returns to the list after success; it does not continue polling the removed server. An interrupted deletion may have partially completed, so errors do not promise that all requested files survived.
+
+There is no UI for editing resources after creation, file management, modpacks, historical metrics/graphs, multiple users or roles, 2FA, or API tokens, because the backend does not provide them yet. Vanilla/Paper installation is available in the creation UI.
 
 ## Production hosting
 

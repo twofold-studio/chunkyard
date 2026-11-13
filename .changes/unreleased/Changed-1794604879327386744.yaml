@@ -1,0 +1,3 @@
+kind: Changed
+body: 'REST API: POST /api/v1/servers accepts omitted/null ports for atomic automatic selection and permits explicitly shared ports. Start/restart jobs enforce one running or paused instance per port with server.port_in_use; SQLite migration preserves existing records while removing creation-time port uniqueness.'
+time: 2026-11-13T23:21:19.327386744+02:00

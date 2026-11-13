@@ -13,7 +13,7 @@ pub(crate) fn validate(request: &CreateServer) -> Result<(), ServerError> {
     {
         return Err(ServerError::Invalid("name must be 1–80 characters"));
     }
-    if request.port == 0 {
+    if request.port == Some(0) {
         return Err(ServerError::Invalid("port must be between 1 and 65535"));
     }
     if request.memory_min_mb < 128

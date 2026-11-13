@@ -1392,6 +1392,7 @@ dependencies = [
  "async-trait",
  "axum",
  "base64 0.22.1",
+ "futures-util",
  "mcm-api",
  "mcm-auth",
  "mcm-config",

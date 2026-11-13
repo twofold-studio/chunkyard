@@ -76,6 +76,15 @@ describe('request', () => {
 		expect(describeError(error).title).toBe('Server JAR missing');
 	});
 
+	it('explains a same-port start conflict without suggesting the port cannot be shared', () => {
+		const message = describeError(
+			new ApiError(409, 'server.port_in_use', 'Port 25565 is used by running server Lobby.')
+		);
+		expect(message.title).toBe('Port already in use');
+		expect(message.detail).toContain('Lobby');
+		expect(message.hint).toMatch(/Stop that server, or choose another port/);
+	});
+
 	it('maps network failures to network.unavailable', async () => {
 		const fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
 		const error = (await request('/x', { fetch }).catch((e: unknown) => e)) as ApiError;

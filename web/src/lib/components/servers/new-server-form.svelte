@@ -247,17 +247,23 @@
 						icon={NetworkIcon}
 					>
 						<Field.Field data-invalid={errors.port ? true : undefined}>
-							<Field.Label for="port">Game port</Field.Label>
+							<Field.Label for="port">Game port (optional)</Field.Label>
 							<Input
 								id="port"
 								type="number"
 								min={1}
 								max={65535}
 								bind:value={form.port}
+								placeholder="Automatic"
 								class="max-w-40"
 								aria-invalid={errors.port ? true : undefined}
 								disabled={locked}
 							/>
+							<Field.Description>
+								Leave blank to pick the first port from 25565 upwards that no other managed server
+								uses. You can reuse another server's port, but only one of them can run at a time.
+								Programs outside the manager could still occupy a port.
+							</Field.Description>
 							{#if errors.port}<Field.Error>{errors.port}</Field.Error>{/if}
 						</Field.Field>
 					</SettingsSection>

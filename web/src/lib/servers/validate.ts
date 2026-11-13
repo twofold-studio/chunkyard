@@ -3,7 +3,8 @@ import type { CreateServerRequest, ServerSoftware } from '#lib/api/index.js';
 /** Raw form values; numeric inputs bound with `type="number"` may be null when empty. */
 export interface ServerFormValues {
 	name: string;
-	port: number | null;
+	/** `null`/blank means "Automatic": the backend assigns the first free managed port. */
+	port: number | null | undefined;
 	dockerImage: string;
 	jar: string;
 	memoryMinMb: number | null;
@@ -19,7 +20,7 @@ export const DEFAULT_DOCKER_IMAGE = 'eclipse-temurin:21-jre';
 export function defaultServerForm(): ServerFormValues {
 	return {
 		name: '',
-		port: 25565,
+		port: null,
 		dockerImage: DEFAULT_DOCKER_IMAGE,
 		jar: 'server.jar',
 		memoryMinMb: 512,
@@ -31,7 +32,7 @@ export function defaultServerForm(): ServerFormValues {
 
 const IMAGE_RE = /^[A-Za-z0-9/_.:@-]+$/;
 
-function isInt(value: number | null): value is number {
+function isInt(value: number | null | undefined): value is number {
 	return value !== null && Number.isInteger(value);
 }
 
@@ -57,8 +58,8 @@ export function validateServerForm(
 	if (!name || [...v.name].length > 80 || /[\u0000-\u001f\u007f]/.test(v.name)) {
 		errors.name = 'Use 1–80 characters without control characters.';
 	}
-	if (!isInt(v.port) || v.port < 1 || v.port > 65535) {
-		errors.port = 'Enter a port between 1 and 65535.';
+	if (v.port != null && (!isInt(v.port) || v.port < 1 || v.port > 65535)) {
+		errors.port = 'Enter a port between 1 and 65535, or leave it blank for automatic.';
 	}
 	const image = v.dockerImage.trim();
 	if (managed && !image) {
@@ -94,7 +95,7 @@ export function validateServerForm(
 }
 
 /**
- * Builds the `POST /api/v1/servers` body. With `software`, `jar` is omitted and
+ * Builds the `POST /api/v1/servers` body. A blank port is omitted (automatic assignment). With `software`, `jar` is omitted and
  * `dockerImage` is only sent when explicitly overridden (which disables automatic Java).
  */
 export function toCreateRequest(
@@ -104,7 +105,8 @@ export function toCreateRequest(
 	const base: CreateServerRequest = {
 		name: v.name.trim(),
 		runtime: 'docker',
-		port: v.port ?? 0,
+		// Blank port is omitted so the backend assigns one; an explicit port is sent as-is.
+		...(v.port != null ? { port: v.port } : {}),
 		memoryMinMb: v.memoryMinMb ?? 0,
 		memoryMaxMb: v.memoryMaxMb ?? 0,
 		cpus: v.cpus ?? 0,

@@ -178,7 +178,7 @@ impl From<mcm_core::server::ServerError> for ApiError {
             E::NotFound => "The server does not exist.",
             E::Busy => "Another operation for this server is running.",
             E::MetricsBusy => "All metrics sampling slots are busy; retry shortly.",
-            E::PortInUse => "That game port is already assigned.",
+            E::PortInUse => "Another server is already running on that game port.",
             E::AlreadyRunning => "The server is already running.",
             E::NotRunning => "The server is not running.",
             E::ContainerConflict => "Container ownership labels do not match this instance.",

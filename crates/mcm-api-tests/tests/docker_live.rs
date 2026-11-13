@@ -48,6 +48,56 @@ async fn real_docker_start_console_restart_adoption_stop_and_kill() -> Result {
     assert!(stopped_metrics.cpu_percent.is_none());
     let started = backend.state.servers.start(&id).await?;
     assert_eq!(started.status.state, ServerState::Running);
+    let shared = backend
+        .state
+        .servers
+        .create(serde_json::from_value(json!({
+            "name":"Shared port fixture", "port":port, "acceptEula":true,
+            "memoryMinMb":128,"memoryMaxMb":256
+        }))?)
+        .await?;
+    let shared_name = format!("mcm-{instance}-{}", shared.server.id);
+    let _shared_cleanup = ContainerCleanup(shared_name);
+    std::fs::copy(
+        created.directory.join("server.jar"),
+        shared.directory.join("server.jar"),
+    )?;
+    assert!(matches!(
+        backend.state.servers.start(&shared.server.id).await,
+        Err(mcm_core::server::ServerError::PortInUse)
+    ));
+    let paused = Command::new("docker")
+        .args(["pause", &_cleanup.0])
+        .output()?;
+    assert!(paused.status.success());
+    let paused_conflict = backend.state.servers.start(&shared.server.id).await;
+    let unpaused = Command::new("docker")
+        .args(["unpause", &_cleanup.0])
+        .output()?;
+    assert!(unpaused.status.success());
+    assert!(matches!(
+        paused_conflict,
+        Err(mcm_core::server::ServerError::PortInUse)
+    ));
+    backend.state.servers.stop(&id).await?;
+    assert_eq!(
+        backend
+            .state
+            .servers
+            .start(&shared.server.id)
+            .await?
+            .status
+            .state,
+        ServerState::Running
+    );
+    backend.state.servers.stop(&shared.server.id).await?;
+    backend
+        .state
+        .servers
+        .delete(&shared.server.id, true)
+        .await?;
+    assert!(!shared.directory.exists());
+    backend.state.servers.start(&id).await?;
     for _ in 0..100 {
         if backend
             .state
@@ -118,6 +168,20 @@ async fn real_docker_start_console_restart_adoption_stop_and_kill() -> Result {
             .count()
             >= 2
     );
+    let deleted = reopened.state.servers.delete(&id, false).await?;
+    assert!(!deleted.files_deleted);
+    assert!(created.directory.join("starts.txt").exists());
+    assert!(matches!(
+        reopened.state.servers.get(&id).await,
+        Err(mcm_core::server::ServerError::NotFound)
+    ));
+    assert!(
+        !Command::new("docker")
+            .args(["inspect", &_cleanup.0])
+            .output()?
+            .status
+            .success()
+    );
     reopened.shutdown().await;
     Ok(())
 }
@@ -168,6 +232,15 @@ async fn foreign_container_ownership_is_rejected_without_starting_it() -> Result
     ));
     assert!(matches!(
         backend.state.servers.start(&created.server.id).await,
+        Err(mcm_core::server::ServerError::ContainerConflict)
+    ));
+    assert!(matches!(
+        backend.state.servers.delete(&created.server.id, true).await,
+        Err(mcm_core::server::ServerError::ContainerConflict)
+    ));
+    assert!(created.directory.join("server.jar").exists());
+    assert!(matches!(
+        backend.state.servers.get(&created.server.id).await,
         Err(mcm_core::server::ServerError::ContainerConflict)
     ));
     let output = Command::new("docker")

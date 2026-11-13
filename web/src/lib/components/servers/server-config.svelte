@@ -105,7 +105,7 @@
 
 	<SettingsSection
 		title="Network"
-		description="Host port published for container port 25565/TCP on CHUNKYARD_DOCKER__PUBLISH_IP (loopback by default)."
+		description="Host port published for container port 25565/TCP on CHUNKYARD_DOCKER__PUBLISH_IP (loopback by default). Other servers may share this port, but only one of them can run at a time."
 		icon={NetworkIcon}
 	>
 		{@render value('Game port', String(server.port))}

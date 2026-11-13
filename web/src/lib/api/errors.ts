@@ -51,7 +51,10 @@ const KNOWN: Record<string, Omit<ErrorMessage, 'detail'> & { detail?: string }> 
 	'software.download_failed': { title: 'Software download failed' },
 	'server.running': { title: 'Server is running' },
 	'server.not_running': { title: 'Server is not running' },
-	'server.port_in_use': { title: 'Port already assigned' },
+	'server.port_in_use': {
+		title: 'Port already in use',
+		hint: 'Another server using this port is running. Stop that server, or choose another port.'
+	},
 	'server.not_found': { title: 'Server not found' },
 	'docker.unavailable': {
 		title: 'Docker unavailable',

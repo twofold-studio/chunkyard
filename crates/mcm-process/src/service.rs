@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use futures_util::{StreamExt, TryStreamExt, stream};
 use mcm_core::server::*;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -17,6 +17,7 @@ pub struct ServerManager {
     runtime: Arc<dyn ServerRuntime>,
     locks: Mutex<HashMap<String, Arc<AsyncMutex<()>>>>,
     create_lock: AsyncMutex<()>,
+    port_locks: Mutex<HashMap<u16, Arc<AsyncMutex<()>>>>,
     installers: Option<Arc<dyn mcm_core::software::SoftwareService>>,
 }
 impl ServerManager {
@@ -33,6 +34,7 @@ impl ServerManager {
             runtime,
             locks: Mutex::new(HashMap::new()),
             create_lock: AsyncMutex::new(()),
+            port_locks: Mutex::new(HashMap::new()),
             installers: None,
         }
     }
@@ -97,11 +99,75 @@ impl ServerManager {
         {
             return Err(ServerError::MissingJar);
         }
+        let port_lock = {
+            let mut ports = self.port_locks.lock().map_err(|_| ServerError::Busy)?;
+            ports.entry(server.port).or_default().clone()
+        };
+        // Hold admission through Docker start, including image preparation. Two
+        // concurrent starts on different instances sharing a port cannot both pass.
+        let _port_guard = port_lock.lock().await;
+        for other in self.repo.list().await? {
+            if other.id == server.id || other.port != server.port {
+                continue;
+            }
+            match self.runtime.status(&other).await?.state {
+                ServerState::Running | ServerState::Paused => return Err(ServerError::PortInUse),
+                ServerState::Unknown => return Err(ServerError::DockerUnavailable),
+                ServerState::Stopped => (),
+            }
+        }
         self.runtime.start(server, directory).await
     }
 }
 #[async_trait]
 impl ServerService for ServerManager {
+    async fn delete(&self, id: &str, delete_files: bool) -> Result<DeletedServer, ServerError> {
+        let server = self.record(id).await?;
+        let lock = self.lock(&server.id)?;
+        let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
+        let server = self.record(id).await?;
+        let status = self.runtime.status(&server).await?;
+        if status.state != ServerState::Stopped {
+            return Err(ServerError::AlreadyRunning);
+        }
+        let directory = self.root.join(&server.id);
+        let retained = match tokio::fs::symlink_metadata(&directory).await {
+            Ok(meta) => {
+                if !meta.is_dir() || meta.file_type().is_symlink() {
+                    return Err(ServerError::Filesystem);
+                }
+                let canonical = tokio::fs::canonicalize(&directory)
+                    .await
+                    .map_err(fs_error)?;
+                let root = tokio::fs::canonicalize(&self.root)
+                    .await
+                    .map_err(fs_error)?;
+                if canonical.parent() != Some(root.as_path()) {
+                    return Err(ServerError::Filesystem);
+                }
+                Some(canonical)
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(fs_error(error)),
+        };
+        // Runtime rechecks ownership/state and removes by immutable container ID.
+        // Only after that succeeds may any world files or records be removed.
+        self.runtime.remove(&server).await?;
+        if delete_files && retained.is_some() {
+            match tokio::fs::remove_dir_all(&directory).await {
+                Ok(()) => (),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+                Err(error) => return Err(fs_error(error)),
+            }
+        }
+        self.repo.delete(&server.id).await?;
+        Ok(DeletedServer {
+            id: server.id,
+            files_deleted: delete_files,
+            retained_directory: if delete_files { None } else { retained },
+        })
+    }
+
     async fn install(&self, id: &str) -> Result<ServerView, ServerError> {
         let server = self.record(id).await?;
         let lock = self.lock(&server.id)?;
@@ -201,9 +267,13 @@ impl ServerService for ServerManager {
         if existing.len() >= 100 {
             return Err(ServerError::Invalid("maximum of 100 servers reached"));
         }
-        if existing.iter().any(|s| s.port == request.port) {
-            return Err(ServerError::PortInUse);
-        }
+        let assigned: HashSet<_> = existing.iter().map(|s| s.port).collect();
+        let port = match request.port {
+            Some(port) => port,
+            None => (25565..=u16::MAX)
+                .find(|port| !assigned.contains(port))
+                .ok_or(ServerError::PortInUse)?,
+        };
         let auto_java = request.software.is_some() && request.docker_image.is_none();
         let server = Server {
             id: Uuid::new_v4().to_string(),
@@ -213,7 +283,7 @@ impl ServerService for ServerManager {
             docker_image: request
                 .docker_image
                 .unwrap_or_else(|| self.default_image.clone()),
-            port: request.port,
+            port,
             memory_min_mb: request.memory_min_mb,
             memory_max_mb: request.memory_max_mb,
             cpus: request.cpus,
@@ -255,9 +325,10 @@ impl ServerService for ServerManager {
         self.runtime.metrics(&self.record(id).await?).await
     }
     async fn set_eula(&self, id: &str, accepted: bool) -> Result<ServerView, ServerError> {
-        let mut server = self.record(id).await?;
+        let server = self.record(id).await?;
         let lock = self.lock(&server.id)?;
         let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
+        let mut server = self.record(id).await?;
         let status = self.runtime.status(&server).await?;
         if status.state != ServerState::Stopped {
             return Err(ServerError::AlreadyRunning);
@@ -285,6 +356,7 @@ impl ServerService for ServerManager {
         let server = self.record(id).await?;
         let lock = self.lock(&server.id)?;
         let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
+        let server = self.record(id).await?;
         let status = self.start_inner(&server).await?;
         Ok(ServerView {
             directory: self.root.join(&server.id),
@@ -296,6 +368,7 @@ impl ServerService for ServerManager {
         let server = self.record(id).await?;
         let lock = self.lock(&server.id)?;
         let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
+        let server = self.record(id).await?;
         let status = self.runtime.stop(&server).await?;
         Ok(ServerView {
             directory: self.root.join(&server.id),
@@ -307,6 +380,7 @@ impl ServerService for ServerManager {
         let server = self.record(id).await?;
         let lock = self.lock(&server.id)?;
         let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
+        let server = self.record(id).await?;
         self.runtime.stop(&server).await?;
         let status = self.start_inner(&server).await?;
         Ok(ServerView {
@@ -319,6 +393,7 @@ impl ServerService for ServerManager {
         let server = self.record(id).await?;
         let lock = self.lock(&server.id)?;
         let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
+        let server = self.record(id).await?;
         let status = self.runtime.kill(&server).await?;
         Ok(ServerView {
             directory: self.root.join(&server.id),

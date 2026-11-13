@@ -18,6 +18,16 @@ impl FakeRuntime {
 }
 #[async_trait]
 impl ServerRuntime for FakeRuntime {
+    async fn remove(&self, server: &Server) -> Result<(), ServerError> {
+        if self.status(server).await?.state != ServerState::Stopped {
+            return Err(ServerError::AlreadyRunning);
+        }
+        self.states
+            .lock()
+            .map_err(|_| ServerError::Busy)?
+            .remove(&server.id);
+        Ok(())
+    }
     async fn info(&self) -> DockerInfo {
         DockerInfo {
             available: true,

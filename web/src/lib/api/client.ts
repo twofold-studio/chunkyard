@@ -42,7 +42,7 @@ export function isAbortError(error: unknown): boolean {
 }
 
 export interface RequestOptions {
-	method?: 'GET' | 'POST';
+	method?: 'GET' | 'POST' | 'DELETE';
 	body?: unknown;
 	signal?: AbortSignal;
 	/** SvelteKit's `fetch` inside load functions; defaults to the global. */

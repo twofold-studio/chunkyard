@@ -2,8 +2,8 @@
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import * as Alert from '#lib/components/ui/alert/index.js';
-	import { AddTile, ErrorAlert, PageHeader } from '#lib/components/app/index.js';
-	import ServerRow from '#lib/components/servers/server-row.svelte';
+	import { ErrorAlert, PageHeader } from '#lib/components/app/index.js';
+	import ServerGrid from '#lib/components/servers/server-grid.svelte';
 	import { listServers } from '#lib/api/index.js';
 	import { poll } from '#lib/polling.js';
 	import { resolve } from '$app/paths';
@@ -57,18 +57,4 @@
 	<ErrorAlert error={refreshError} />
 {/if}
 
-{#if servers.length === 0}
-	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-		<AddTile
-			href={resolve('servers/new')}
-			title="Create server"
-			description="Register a Docker-backed server, then copy your server JAR into its directory."
-		/>
-	</div>
-{:else}
-	<ul class="overflow-hidden rounded-lg border border-border bg-card" aria-label="Servers">
-		{#each servers as server (server.id)}
-			<ServerRow {server} />
-		{/each}
-	</ul>
-{/if}
+<ServerGrid {servers} createHref={resolve('servers/new')} />

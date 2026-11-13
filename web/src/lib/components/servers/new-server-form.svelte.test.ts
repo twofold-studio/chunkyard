@@ -163,7 +163,63 @@ describe('NewServerForm', () => {
 		});
 		expect(create.body).not.toHaveProperty('jar');
 		expect(create.body).not.toHaveProperty('dockerImage');
+		// Blank game port means automatic assignment: the field is omitted.
+		expect(create.body).not.toHaveProperty('port');
 		expect(calls.some((c) => c.path.endsWith('/start') || c.path.endsWith('/eula'))).toBe(false);
+	});
+
+	it('defaults the game port to automatic', async () => {
+		reply('GET', '/api/v1/software', ok(CATALOG));
+		setup();
+		await chooseVanilla();
+		const port = page.getByLabelText('Game port (optional)');
+		await expect.element(port).toHaveValue(null);
+		await expect.element(port).toHaveAttribute('placeholder', 'Automatic');
+	});
+
+	it('sends an explicit port even when another server already uses it', async () => {
+		reply('GET', '/api/v1/software', ok(CATALOG));
+		const { oncreated } = setup();
+		await chooseVanilla();
+		await page.getByLabelText('Game port (optional)').fill('25565');
+		await expect.element(page.getByText(/only one of them can run at a time/)).toBeVisible();
+		reply('POST', '/api/v1/servers', ok({ server: managedServer({ id: 'srv-1' }) }, 201));
+		reply('POST', '/api/v1/servers/srv-1/install', ok({ job: job('queued') }, 202));
+		reply(
+			'GET',
+			'/api/v1/jobs/job-1',
+			ok(
+				job('succeeded', {
+					result: {
+						server: managedServer({
+							launch: {
+								path: 'server.jar',
+								version: '1.21.1',
+								build: null,
+								javaMajor: 21,
+								checksum: 'ab'
+							}
+						})
+					}
+				})
+			)
+		);
+		await page.getByRole('button', { name: 'Create and install' }).click();
+		await vi.waitFor(() => expect(oncreated).toHaveBeenCalledOnce());
+		const creates = posts('/api/v1/servers');
+		expect(creates).toHaveLength(1);
+		// The chosen port is never renumbered.
+		expect(creates[0].body).toMatchObject({ port: 25565 });
+	});
+
+	it('rejects port 0 before sending a request', async () => {
+		reply('GET', '/api/v1/software', ok(CATALOG));
+		setup();
+		await chooseVanilla();
+		await page.getByLabelText('Game port (optional)').fill('0');
+		await page.getByRole('button', { name: 'Create and install' }).click();
+		await expect.element(page.getByText(/or leave it blank for automatic/)).toBeVisible();
+		expect(posts('/api/v1/servers')).toHaveLength(0);
 	});
 
 	it('clears the previous Paper build when the Minecraft version changes', async () => {

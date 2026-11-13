@@ -37,7 +37,10 @@ pub fn routes(state: AppState) -> Router {
         .route("/api/v1/openapi.json", get(openapi::document))
         .route("/api/v1/servers/{id}/metrics", get(servers::metrics))
         .route("/api/v1/servers", get(servers::list).post(servers::create))
-        .route("/api/v1/servers/{id}", get(servers::get))
+        .route(
+            "/api/v1/servers/{id}",
+            get(servers::get).delete(servers::delete),
+        )
         .route("/api/v1/servers/{id}/eula", post(servers::eula))
         .route("/api/v1/servers/{id}/start", post(servers::start))
         .route("/api/v1/servers/{id}/stop", post(servers::stop))

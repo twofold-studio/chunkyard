@@ -153,3 +153,21 @@ export function monogram(name: string): string {
 		.join('');
 	return letters.toUpperCase() || '?';
 }
+
+/**
+ * Short labels for a server card: software type ("Paper", "Vanilla", "Custom", …) and the
+ * Minecraft version, preferring the installed launch version over the requested selection.
+ */
+export function cardSummary(server: Pick<ServerView, 'software' | 'launch'>): {
+	software: string;
+	version: string | null;
+} {
+	const software = server.software ?? null;
+	const type = software ? describeSoftware(software).kind : 'Custom';
+	const label = software?.type === 'curseforge' ? 'CurseForge' : type;
+	const requested =
+		software && 'version' in software && typeof software.version === 'string'
+			? software.version
+			: null;
+	return { software: label, version: server.launch?.version || requested };
+}

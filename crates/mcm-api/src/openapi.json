@@ -50,9 +50,7 @@
     "/healthz": {
       "get": {
         "operationId": "get_healthz",
-        "tags": [
-          "System"
-        ],
+        "tags": ["System"],
         "summary": "Check database health",
         "responses": {
           "200": {
@@ -64,15 +62,10 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "ok",
-                        "db_unavailable"
-                      ]
+                      "enum": ["ok", "db_unavailable"]
                     }
                   },
-                  "required": [
-                    "status"
-                  ]
+                  "required": ["status"]
                 }
               }
             }
@@ -98,9 +91,7 @@
                       "const": "db_unavailable"
                     }
                   },
-                  "required": [
-                    "status"
-                  ]
+                  "required": ["status"]
                 }
               }
             }
@@ -112,9 +103,7 @@
     "/api/v1/setup/status": {
       "get": {
         "operationId": "get_api_v1_setup_status",
-        "tags": [
-          "Authentication"
-        ],
+        "tags": ["Authentication"],
         "summary": "Read setup and authentication mode",
         "responses": {
           "200": {
@@ -144,9 +133,7 @@
     "/api/v1/setup": {
       "post": {
         "operationId": "post_api_v1_setup",
-        "tags": [
-          "Authentication"
-        ],
+        "tags": ["Authentication"],
         "summary": "Create the owner and session",
         "responses": {
           "201": {
@@ -179,9 +166,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Required in both authentication modes."
           },
@@ -211,9 +196,7 @@
     "/api/v1/auth/login": {
       "post": {
         "operationId": "post_api_v1_auth_login",
-        "tags": [
-          "Authentication"
-        ],
+        "tags": ["Authentication"],
         "summary": "Sign in with email and password",
         "responses": {
           "200": {
@@ -246,9 +229,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Required in both authentication modes."
           },
@@ -278,9 +259,7 @@
     "/api/v1/auth/me": {
       "get": {
         "operationId": "get_api_v1_auth_me",
-        "tags": [
-          "Authentication"
-        ],
+        "tags": ["Authentication"],
         "summary": "Read the current principal",
         "responses": {
           "200": {
@@ -309,9 +288,7 @@
     "/api/v1/auth/logout": {
       "post": {
         "operationId": "post_api_v1_auth_logout",
-        "tags": [
-          "Authentication"
-        ],
+        "tags": ["Authentication"],
         "summary": "Revoke session and clear cookie",
         "responses": {
           "204": {
@@ -335,9 +312,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Required in both authentication modes."
           },
@@ -357,9 +332,7 @@
     "/api/v1/servers": {
       "get": {
         "operationId": "get_api_v1_servers",
-        "tags": [
-          "Servers"
-        ],
+        "tags": ["Servers"],
         "summary": "List managed servers",
         "responses": {
           "200": {
@@ -387,9 +360,7 @@
       },
       "post": {
         "operationId": "post_api_v1_servers",
-        "tags": [
-          "Servers"
-        ],
+        "tags": ["Servers"],
         "summary": "Create a Docker server",
         "responses": {
           "201": {
@@ -420,9 +391,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Required in both authentication modes."
           },
@@ -450,11 +419,59 @@
       }
     },
     "/api/v1/servers/{id}": {
+      "delete": {
+        "operationId": "delete_api_v1_servers_id",
+        "tags": ["Servers"],
+        "summary": "Delete a stopped instance",
+        "description": "Queues server.delete. Requires a stopped instance and excludes concurrent lifecycle/install work. Removes only the owned Docker container and instance record. Files are retained by default; deleteFiles=true also deletes the managed directory including worlds. Success job.result.deleted contains id, filesDeleted and retainedDirectory (null when no files remain). Interrupted cleanup can be retried on the same ID. Never force-stops a game server.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "deleteFiles",
+            "in": "query",
+            "schema": { "type": "boolean", "default": false },
+            "description": "Explicitly delete the instance world, configuration, logs and installed software."
+          },
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "enum": ["1"] }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "schema": { "type": "string", "format": "uri" },
+            "description": "Must match the public origin; same-origin Referer may substitute."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Deletion queued; poll the returned job.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JobResponse" }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; auth, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/Problem" }
+              }
+            }
+          }
+        }
+      },
       "get": {
         "operationId": "get_api_v1_servers_id",
-        "tags": [
-          "Servers"
-        ],
+        "tags": ["Servers"],
         "summary": "Read a managed server",
         "responses": {
           "200": {
@@ -494,9 +511,7 @@
     "/api/v1/servers/{id}/eula": {
       "post": {
         "operationId": "post_api_v1_servers_id_eula",
-        "tags": [
-          "Servers"
-        ],
+        "tags": ["Servers"],
         "summary": "Accept or revoke the Minecraft EULA",
         "responses": {
           "200": {
@@ -537,9 +552,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Required in both authentication modes."
           },
@@ -569,9 +582,7 @@
     "/api/v1/servers/{id}/start": {
       "post": {
         "operationId": "post_api_v1_servers_id_start",
-        "tags": [
-          "Servers"
-        ],
+        "tags": ["Servers"],
         "summary": "Start a server",
         "responses": {
           "202": {
@@ -612,9 +623,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Required in both authentication modes."
           },
@@ -634,9 +643,7 @@
     "/api/v1/servers/{id}/stop": {
       "post": {
         "operationId": "post_api_v1_servers_id_stop",
-        "tags": [
-          "Servers"
-        ],
+        "tags": ["Servers"],
         "summary": "Stop a server",
         "responses": {
           "202": {
@@ -677,9 +684,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Required in both authentication modes."
           },
@@ -699,9 +704,7 @@
     "/api/v1/servers/{id}/restart": {
       "post": {
         "operationId": "post_api_v1_servers_id_restart",
-        "tags": [
-          "Servers"
-        ],
+        "tags": ["Servers"],
         "summary": "Restart a server",
         "responses": {
           "202": {
@@ -742,9 +745,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Required in both authentication modes."
           },
@@ -764,9 +765,7 @@
     "/api/v1/servers/{id}/kill": {
       "post": {
         "operationId": "post_api_v1_servers_id_kill",
-        "tags": [
-          "Servers"
-        ],
+        "tags": ["Servers"],
         "summary": "Kill a server",
         "responses": {
           "202": {
@@ -807,9 +806,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Required in both authentication modes."
           },
@@ -829,9 +826,7 @@
     "/api/v1/servers/{id}/console": {
       "get": {
         "operationId": "get_api_v1_servers_id_console",
-        "tags": [
-          "Console"
-        ],
+        "tags": ["Console"],
         "summary": "Read recent console output",
         "responses": {
           "200": {
@@ -882,9 +877,7 @@
     "/api/v1/servers/{id}/console/commands": {
       "post": {
         "operationId": "post_api_v1_servers_id_console_commands",
-        "tags": [
-          "Console"
-        ],
+        "tags": ["Console"],
         "summary": "Send one console command",
         "responses": {
           "204": {
@@ -917,9 +910,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Required in both authentication modes."
           },
@@ -949,9 +940,7 @@
     "/api/v1/servers/{id}/metrics": {
       "get": {
         "operationId": "get_api_v1_servers_id_metrics",
-        "tags": [
-          "Monitoring"
-        ],
+        "tags": ["Monitoring"],
         "summary": "Sample container resources",
         "responses": {
           "200": {
@@ -992,9 +981,7 @@
     "/api/v1/system/isolation": {
       "get": {
         "operationId": "get_api_v1_system_isolation",
-        "tags": [
-          "System"
-        ],
+        "tags": ["System"],
         "summary": "Check Docker availability",
         "responses": {
           "200": {
@@ -1023,9 +1010,7 @@
     "/api/v1/java/runtimes": {
       "get": {
         "operationId": "get_api_v1_java_runtimes",
-        "tags": [
-          "Java"
-        ],
+        "tags": ["Java"],
         "summary": "List Java runtimes",
         "responses": {
           "200": {
@@ -1054,9 +1039,7 @@
     "/api/v1/java/runtimes/discover": {
       "post": {
         "operationId": "post_api_v1_java_runtimes_discover",
-        "tags": [
-          "Java"
-        ],
+        "tags": ["Java"],
         "summary": "Discover system Java installations",
         "responses": {
           "200": {
@@ -1088,9 +1071,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Required in both authentication modes."
           },
@@ -1110,9 +1091,7 @@
     "/api/v1/java/available": {
       "get": {
         "operationId": "get_api_v1_java_available",
-        "tags": [
-          "Java"
-        ],
+        "tags": ["Java"],
         "summary": "List installable Java major versions",
         "responses": {
           "200": {
@@ -1141,9 +1120,7 @@
     "/api/v1/java/runtimes/install": {
       "post": {
         "operationId": "post_api_v1_java_runtimes_install",
-        "tags": [
-          "Java"
-        ],
+        "tags": ["Java"],
         "summary": "Install a Temurin Java runtime",
         "responses": {
           "202": {
@@ -1175,9 +1152,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Required in both authentication modes."
           },
@@ -1207,9 +1182,7 @@
     "/api/v1/jobs": {
       "get": {
         "operationId": "get_api_v1_jobs",
-        "tags": [
-          "Jobs"
-        ],
+        "tags": ["Jobs"],
         "summary": "List durable background jobs",
         "responses": {
           "200": {
@@ -1258,9 +1231,7 @@
     "/api/v1/jobs/{id}": {
       "get": {
         "operationId": "get_api_v1_jobs_id",
-        "tags": [
-          "Jobs"
-        ],
+        "tags": ["Jobs"],
         "summary": "Read a background job",
         "responses": {
           "200": {
@@ -1300,9 +1271,7 @@
     "/api/v1/openapi.json": {
       "get": {
         "operationId": "get_api_v1_openapi_json",
-        "tags": [
-          "Documentation"
-        ],
+        "tags": ["Documentation"],
         "summary": "Download the OpenAPI document",
         "responses": {
           "200": {
@@ -1332,9 +1301,7 @@
     "/api/v1/setup/verify-token": {
       "post": {
         "operationId": "post_api_v1_setup_verify_token",
-        "tags": [
-          "Authentication"
-        ],
+        "tags": ["Authentication"],
         "summary": "Verify the setup token",
         "responses": {
           "204": {
@@ -1360,9 +1327,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Required in both authentication modes."
           },
@@ -1392,9 +1357,7 @@
     "/api/v1/system/version": {
       "get": {
         "operationId": "get_api_v1_system_version",
-        "tags": [
-          "System"
-        ],
+        "tags": ["System"],
         "summary": "Read version badge availability",
         "description": "Public bootstrap metadata. When http.show_version=false, returns enabled:false with version/channel null. This is the Cargo package version; it does not increment on every development commit.",
         "security": [],
@@ -1425,9 +1388,7 @@
     "/api/v1/system/changelog": {
       "get": {
         "operationId": "get_api_v1_system_changelog",
-        "tags": [
-          "System"
-        ],
+        "tags": ["System"],
         "summary": "Read the bundled project changelog",
         "description": "Public project release notes, available before owner setup. Returns 404 version.disabled when http.show_version=false. Contains no server data.",
         "security": [],
@@ -1458,9 +1419,7 @@
     "/api/v1/software": {
       "get": {
         "operationId": "get_api_v1_software",
-        "tags": [
-          "Software"
-        ],
+        "tags": ["Software"],
         "summary": "List supported software types",
         "parameters": [],
         "responses": {
@@ -1490,9 +1449,7 @@
     "/api/v1/software/{kind}/versions": {
       "get": {
         "operationId": "get_api_v1_software_kind_versions",
-        "tags": [
-          "Software"
-        ],
+        "tags": ["Software"],
         "summary": "List Minecraft releases, newest first",
         "parameters": [
           {
@@ -1501,10 +1458,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "vanilla",
-                "paper"
-              ]
+              "enum": ["vanilla", "paper"]
             }
           }
         ],
@@ -1535,9 +1489,7 @@
     "/api/v1/software/{kind}/versions/{version}/builds": {
       "get": {
         "operationId": "get_api_v1_software_kind_versions_version_builds",
-        "tags": [
-          "Software"
-        ],
+        "tags": ["Software"],
         "summary": "List stable Paper builds, newest first",
         "parameters": [
           {
@@ -1546,9 +1498,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "paper"
-              ]
+              "enum": ["paper"]
             }
           },
           {
@@ -1590,9 +1540,7 @@
     "/api/v1/servers/{id}/install": {
       "post": {
         "operationId": "post_api_v1_servers_id_install",
-        "tags": [
-          "Servers"
-        ],
+        "tags": ["Servers"],
         "summary": "Install selected Vanilla or Paper software",
         "responses": {
           "202": {
@@ -1633,9 +1581,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": [
-                "1"
-              ]
+              "enum": ["1"]
             },
             "description": "Required in both authentication modes."
           },
@@ -1682,13 +1628,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "type",
-          "title",
-          "status",
-          "code",
-          "detail"
-        ]
+        "required": ["type", "title", "status", "code", "detail"]
       },
       "User": {
         "type": "object",
@@ -1709,12 +1649,7 @@
             "format": "date-time"
           }
         },
-        "required": [
-          "id",
-          "email",
-          "role",
-          "createdAt"
-        ]
+        "required": ["id", "email", "role", "createdAt"]
       },
       "Me": {
         "oneOf": [
@@ -1734,9 +1669,7 @@
                     "const": "session"
                   }
                 },
-                "required": [
-                  "kind"
-                ]
+                "required": ["kind"]
               },
               "isAdmin": {
                 "type": "boolean"
@@ -1773,20 +1706,13 @@
                     "const": "auth_disabled"
                   }
                 },
-                "required": [
-                  "kind"
-                ]
+                "required": ["kind"]
               },
               "isAdmin": {
                 "type": "boolean"
               }
             },
-            "required": [
-              "authEnabled",
-              "user",
-              "principal",
-              "isAdmin"
-            ]
+            "required": ["authEnabled", "user", "principal", "isAdmin"]
           }
         ]
       },
@@ -1800,10 +1726,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "required",
-          "authEnabled"
-        ]
+        "required": ["required", "authEnabled"]
       },
       "SetupRequest": {
         "type": "object",
@@ -1822,11 +1745,7 @@
             "maxLength": 256
           }
         },
-        "required": [
-          "setupToken",
-          "email",
-          "password"
-        ],
+        "required": ["setupToken", "email", "password"],
         "additionalProperties": false
       },
       "LoginRequest": {
@@ -1841,10 +1760,7 @@
             "format": "password"
           }
         },
-        "required": [
-          "email",
-          "password"
-        ],
+        "required": ["email", "password"],
         "additionalProperties": false
       },
       "LoginResponse": {
@@ -1857,22 +1773,14 @@
             "$ref": "#/components/schemas/Me"
           }
         },
-        "required": [
-          "kind",
-          "me"
-        ]
+        "required": ["kind", "me"]
       },
       "RuntimeStatus": {
         "type": "object",
         "properties": {
           "state": {
             "type": "string",
-            "enum": [
-              "stopped",
-              "running",
-              "paused",
-              "unknown"
-            ]
+            "enum": ["stopped", "running", "paused", "unknown"]
           },
           "containerId": {
             "anyOf": [
@@ -1898,12 +1806,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "state",
-          "containerId",
-          "exitCode",
-          "oomKilled"
-        ]
+        "required": ["state", "containerId", "exitCode", "oomKilled"]
       },
       "Server": {
         "type": "object",
@@ -2000,9 +1903,7 @@
           },
           "runtime": {
             "type": "string",
-            "enum": [
-              "docker"
-            ],
+            "enum": ["docker"],
             "default": "docker"
           },
           "jar": {
@@ -2014,9 +1915,10 @@
             "type": "string"
           },
           "port": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "minimum": 1,
-            "maximum": 65535
+            "maximum": 65535,
+            "description": "Omit/null to atomically choose the first unassigned managed port from 25565. Explicit ports may be shared by stopped instances; only one instance per port may run at a time. Host services outside this manager can still occupy the port."
           },
           "memoryMinMb": {
             "type": "integer",
@@ -2051,10 +1953,7 @@
             ]
           }
         },
-        "required": [
-          "name",
-          "port"
-        ],
+        "required": ["name"],
         "additionalProperties": false,
         "description": "Creates a stopped Docker server record and initial files. Omit software for a manual JAR server. Managed software must be installed with POST /api/v1/servers/{id}/install. Java image is selected during installation unless dockerImage was explicitly provided. No download, EULA acceptance or game start occurs as a side effect of creation."
       },
@@ -2065,9 +1964,7 @@
             "$ref": "#/components/schemas/Server"
           }
         },
-        "required": [
-          "server"
-        ]
+        "required": ["server"]
       },
       "ServerList": {
         "type": "object",
@@ -2079,9 +1976,7 @@
             }
           }
         },
-        "required": [
-          "items"
-        ]
+        "required": ["items"]
       },
       "EulaRequest": {
         "type": "object",
@@ -2090,9 +1985,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "accepted"
-        ],
+        "required": ["accepted"],
         "additionalProperties": false
       },
       "CommandRequest": {
@@ -2105,9 +1998,7 @@
             "description": "One command, at most 4096 UTF-8 bytes. CR, LF and NUL are rejected."
           }
         },
-        "required": [
-          "line"
-        ],
+        "required": ["line"],
         "additionalProperties": false
       },
       "ConsoleLine": {
@@ -2120,10 +2011,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "stream",
-          "text"
-        ]
+        "required": ["stream", "text"]
       },
       "Console": {
         "type": "object",
@@ -2135,9 +2023,7 @@
             }
           }
         },
-        "required": [
-          "items"
-        ]
+        "required": ["items"]
       },
       "DockerInfo": {
         "type": "object",
@@ -2166,11 +2052,7 @@
             ]
           }
         },
-        "required": [
-          "available",
-          "version",
-          "reason"
-        ]
+        "required": ["available", "version", "reason"]
       },
       "Isolation": {
         "type": "object",
@@ -2179,9 +2061,7 @@
             "$ref": "#/components/schemas/DockerInfo"
           }
         },
-        "required": [
-          "docker"
-        ]
+        "required": ["docker"]
       },
       "JavaRuntime": {
         "type": "object",
@@ -2244,9 +2124,7 @@
             }
           }
         },
-        "required": [
-          "items"
-        ]
+        "required": ["items"]
       },
       "AvailableJava": {
         "type": "object",
@@ -2267,11 +2145,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "lts",
-          "all",
-          "mostRecentLts"
-        ]
+        "required": ["lts", "all", "mostRecentLts"]
       },
       "InstallJava": {
         "type": "object",
@@ -2282,9 +2156,7 @@
             "maximum": 65535
           }
         },
-        "required": [
-          "major"
-        ],
+        "required": ["major"],
         "additionalProperties": false
       },
       "JobFailure": {
@@ -2297,10 +2169,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "code",
-          "detail"
-        ]
+        "required": ["code", "detail"]
       },
       "Job": {
         "type": "object",
@@ -2325,13 +2194,7 @@
           },
           "state": {
             "type": "string",
-            "enum": [
-              "queued",
-              "running",
-              "succeeded",
-              "failed",
-              "cancelled"
-            ]
+            "enum": ["queued", "running", "succeeded", "failed", "cancelled"]
           },
           "progress": {
             "anyOf": [
@@ -2424,9 +2287,7 @@
             "$ref": "#/components/schemas/Job"
           }
         },
-        "required": [
-          "job"
-        ]
+        "required": ["job"]
       },
       "JobPage": {
         "type": "object",
@@ -2448,10 +2309,7 @@
             ]
           }
         },
-        "required": [
-          "items",
-          "nextCursor"
-        ]
+        "required": ["items", "nextCursor"]
       },
       "ServerMetrics": {
         "type": "object",
@@ -2616,9 +2474,7 @@
             "description": "Bootstrap token read from the private local setup-token file."
           }
         },
-        "required": [
-          "setupToken"
-        ],
+        "required": ["setupToken"],
         "additionalProperties": false
       },
       "VersionInfo": {
@@ -2628,23 +2484,13 @@
             "type": "boolean"
           },
           "version": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "channel": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           }
         },
-        "required": [
-          "enabled",
-          "version",
-          "channel"
-        ]
+        "required": ["enabled", "version", "channel"]
       },
       "Changelog": {
         "type": "object",
@@ -2657,10 +2503,7 @@
             "description": "The generated project changelog bundled with this build; no per-user or server history."
           }
         },
-        "required": [
-          "version",
-          "markdown"
-        ]
+        "required": ["version", "markdown"]
       },
       "Software": {
         "oneOf": [
@@ -2677,10 +2520,7 @@
                 "pattern": "^[A-Za-z0-9][A-Za-z0-9._+\\-]*$"
               }
             },
-            "required": [
-              "type",
-              "version"
-            ],
+            "required": ["type", "version"],
             "additionalProperties": false
           },
           {
@@ -2708,10 +2548,7 @@
                 ]
               }
             },
-            "required": [
-              "type",
-              "version"
-            ],
+            "required": ["type", "version"],
             "additionalProperties": false
           }
         ],
@@ -2746,13 +2583,7 @@
             "description": "Published SHA-1 (Vanilla) or SHA-256 (Paper) of the installed JAR."
           }
         },
-        "required": [
-          "path",
-          "version",
-          "build",
-          "javaMajor",
-          "checksum"
-        ],
+        "required": ["path", "version", "build", "javaMajor", "checksum"],
         "additionalProperties": false
       },
       "SoftwareCatalog": {
@@ -2765,11 +2596,7 @@
               "properties": {
                 "id": {
                   "type": "string",
-                  "enum": [
-                    "vanilla",
-                    "paper",
-                    "custom"
-                  ]
+                  "enum": ["vanilla", "paper", "custom"]
                 },
                 "name": {
                   "type": "string"
@@ -2788,18 +2615,11 @@
                   ]
                 }
               },
-              "required": [
-                "id",
-                "name",
-                "available",
-                "reason"
-              ]
+              "required": ["id", "name", "available", "reason"]
             }
           }
         },
-        "required": [
-          "items"
-        ]
+        "required": ["items"]
       },
       "SoftwareVersions": {
         "type": "object",
@@ -2816,16 +2636,11 @@
                   "type": "boolean"
                 }
               },
-              "required": [
-                "id",
-                "stable"
-              ]
+              "required": ["id", "stable"]
             }
           }
         },
-        "required": [
-          "items"
-        ]
+        "required": ["items"]
       }
     }
   }

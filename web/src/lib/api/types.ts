@@ -147,7 +147,13 @@ export interface CurseForgeFile {
 export interface CreateServerRequest {
 	name: string;
 	runtime?: 'docker';
-	port: number;
+	/**
+	 * Host game port. Omit (or `null`) to let the backend assign the first managed port from
+	 * 25565 upwards that no other server uses. An explicit port may be shared with other
+	 * servers; only one of them can run at a time (start/restart fails with
+	 * `server.port_in_use`). The response's `server.port` is the port actually assigned.
+	 */
+	port?: number | null;
 	jar?: string;
 	dockerImage?: string;
 	memoryMinMb?: number;
@@ -156,6 +162,14 @@ export interface CreateServerRequest {
 	acceptEula?: boolean;
 	/** Managed install; the backend picks a matching Java image unless `dockerImage` is set. */
 	software?: ServerSoftware;
+}
+
+/** `result.deleted` of a succeeded `server.delete` job. */
+export interface DeletedServer {
+	id: string;
+	filesDeleted: boolean;
+	/** Managed directory left on the manager host when files were kept; `null` when deleted. */
+	retainedDirectory: string | null;
 }
 
 /**

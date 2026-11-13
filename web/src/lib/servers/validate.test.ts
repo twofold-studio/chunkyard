@@ -66,3 +66,31 @@ describe('managed installs', () => {
 		);
 	});
 });
+
+describe('game port', () => {
+	const base = { ...defaultServerForm(), name: 'Survival' };
+
+	it('defaults to automatic and omits the port from the request', () => {
+		expect(base.port).toBeNull();
+		expect(validateServerForm(base)).toEqual({});
+		expect(toCreateRequest(base)).not.toHaveProperty('port');
+		expect(toCreateRequest(base, { type: 'vanilla', version: '1.21.1' })).not.toHaveProperty(
+			'port'
+		);
+		// An emptied number input can bind as undefined.
+		expect(toCreateRequest({ ...base, port: undefined })).not.toHaveProperty('port');
+	});
+
+	it('sends an explicit override unchanged', () => {
+		const form = { ...base, port: 25570 };
+		expect(validateServerForm(form)).toEqual({});
+		expect(toCreateRequest(form).port).toBe(25570);
+		expect(toCreateRequest({ ...base, port: 25565 }).port).toBe(25565);
+	});
+
+	it('rejects zero, out-of-range and fractional explicit ports', () => {
+		for (const port of [0, -1, 65536, 25565.5]) {
+			expect(validateServerForm({ ...base, port }).port).toBeDefined();
+		}
+	});
+});

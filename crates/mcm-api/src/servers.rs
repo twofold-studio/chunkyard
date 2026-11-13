@@ -91,6 +91,7 @@ pub(crate) async fn eula(
 }
 #[derive(Clone, Copy)]
 enum Action {
+    Delete { delete_files: bool },
     Install,
     Start,
     Stop,
@@ -106,6 +107,7 @@ async fn action(
     // Reject unknown IDs synchronously instead of enqueueing an unresolvable job.
     state.servers.get(&id).await?;
     let kind = match action {
+        Action::Delete { .. } => "server.delete",
         Action::Install => "server.install",
         Action::Start => "server.start",
         Action::Stop => "server.stop",
@@ -122,6 +124,13 @@ async fn action(
             actor.user_id(),
             Box::pin(async move {
                 let result = match action {
+                    Action::Delete { delete_files } => {
+                        return servers
+                            .delete(&id, delete_files)
+                            .await
+                            .map(|deleted| json!({"deleted":deleted}))
+                            .map_err(job_failure);
+                    }
                     Action::Install => servers.install(&id).await,
                     Action::Start => servers.start(&id).await,
                     Action::Stop => servers.stop(&id).await,
@@ -174,4 +183,40 @@ pub(crate) async fn install(
     Path(id): Path<String>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     action(state, actor, id, Action::Install).await
+}
+
+fn job_failure(error: mcm_core::server::ServerError) -> JobFailure {
+    JobFailure {
+        code: error.code().into(),
+        detail: error.public_detail(),
+    }
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct DeleteQuery {
+    #[serde(default)]
+    delete_files: bool,
+}
+pub(crate) async fn delete(
+    State(state): State<AppState>,
+    Extension(actor): Extension<Actor>,
+    Path(id): Path<String>,
+    query: Result<Query<DeleteQuery>, axum::extract::rejection::QueryRejection>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    let Query(query) = query.map_err(|_| {
+        ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "validation",
+            "Invalid deletion query; deleteFiles must be true or false.",
+        )
+    })?;
+    action(
+        state,
+        actor,
+        id,
+        Action::Delete {
+            delete_files: query.delete_files,
+        },
+    )
+    .await
 }
