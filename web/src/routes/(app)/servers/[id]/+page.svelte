@@ -14,6 +14,8 @@
 	import ServerMetrics from '#lib/components/servers/server-metrics.svelte';
 	import ServerConfig from '#lib/components/servers/server-config.svelte';
 	import EulaDialog from '#lib/components/servers/eula-dialog.svelte';
+	import ServerInstallPanel from '#lib/components/servers/server-install-panel.svelte';
+	import { describeSoftware, needsInstall } from '#lib/servers/software.js';
 	import { errorCode, type ServerAction, type ServerView } from '#lib/api/index.js';
 	import { ServerController } from '#lib/servers/server-controller.svelte.js';
 	import { poll } from '#lib/polling.js';
@@ -36,6 +38,9 @@
 	const server = $derived(controller.server);
 	const running = $derived(server.status.state === 'running');
 	const created = $derived(page.url.searchParams.has('created'));
+	const software = $derived(server.software ?? null);
+	const notInstalled = $derived(needsInstall(server));
+	const softwareSummary = $derived(software ? describeSoftware(software) : null);
 
 	let tab = $state('console');
 	let eulaOpen = $state(false);
@@ -82,6 +87,11 @@
 		}
 	}
 
+	async function onInstall() {
+		const job = await controller.install();
+		if (job?.state === 'succeeded') toast.success(`Installed ${server.name}`);
+	}
+
 	function dismissCreated() {
 		goto(resolve(`servers/${server.id}`), { replaceState: true });
 	}
@@ -100,6 +110,11 @@
 			<StatusBadge state={server.status.state} />
 		</div>
 		<p class="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
+			{#if softwareSummary}
+				<span class="text-foreground">
+					{softwareSummary.kind}{#if softwareSummary.detail}&nbsp;{softwareSummary.detail}{/if}
+				</span>
+			{/if}
 			<span>Docker</span>
 			<span class="font-mono">{server.dockerImage}</span>
 			<span>Port {server.port}</span>
@@ -110,11 +125,36 @@
 		serverState={server.status.state}
 		busy={controller.busy}
 		pending={controller.action}
+		startBlocked={notInstalled}
 		{onAction}
 	/>
 </header>
 
-{#if created}
+{#if created && software}
+	<Alert.Root>
+		<InfoIcon />
+		<Alert.Title>{notInstalled ? 'Server created' : 'Server installed'}</Alert.Title>
+		<Alert.Description class="flex flex-col gap-2">
+			<p>
+				{notInstalled
+					? 'Install its software below before the first start.'
+					: 'The software is installed. The server was not started.'}
+			</p>
+			{#if !server.acceptEula}
+				<p>Accept the Minecraft EULA in Configuration before the first start.</p>
+			{/if}
+		</Alert.Description>
+		<Button
+			variant="ghost"
+			size="icon-xs"
+			class="absolute top-2.5 right-2.5"
+			onclick={dismissCreated}
+			aria-label="Dismiss"
+		>
+			<XIcon />
+		</Button>
+	</Alert.Root>
+{:else if created}
 	<Alert.Root>
 		<InfoIcon />
 		<Alert.Title>Copy your server JAR before starting</Alert.Title>
@@ -138,6 +178,18 @@
 			<XIcon />
 		</Button>
 	</Alert.Root>
+{/if}
+
+{#if software && (notInstalled || controller.installJob)}
+	<ServerInstallPanel
+		{software}
+		job={controller.installJob}
+		error={controller.installError}
+		working={controller.installWorking}
+		installed={!notInstalled}
+		disabled={controller.busy || server.status.state === 'running'}
+		onInstall={notInstalled ? onInstall : undefined}
+	/>
 {/if}
 
 {#if controller.busy && controller.job && controller.action}

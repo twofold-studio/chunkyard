@@ -5,7 +5,7 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 ## What it does
 
 - **Authentication.** Reads `/api/v1/setup/status`. First-run setup in two steps (verify the setup token, then create the owner with email and password) and email/password sign-in when authentication is enabled; sign-out from the sidebar. When the backend runs with `CHUNKYARD_AUTH__ENABLED=false`, setup and login are skipped and the sidebar shows "Authentication disabled"; no user is shown or invented. An expired session on any request returns the browser to sign-in.
-- **Servers.** List with container status, refreshed every 10 s while the tab is visible. Create form for Docker servers (name, port, image, heap, CPUs, JAR path, EULA) with the backend's validation limits. Detail page with start, stop, restart and force kill (kill asks for confirmation), EULA accept/revoke while stopped, read-only configuration, the managed directory with a copy button, console snapshot and command entry.
+- **Servers.** List with container status, refreshed every 10 s while the tab is visible. Create form for Vanilla/Paper with Minecraft version and optional Paper build selection, automatic verified installation, Java image selection, name, port, heap, CPUs and explicit EULA acceptance. Custom JAR/image fields remain an advanced choice. Detail page with start, stop, restart and force kill (kill asks for confirmation), EULA accept/revoke while stopped, read-only configuration, the managed directory with a copy button, console snapshot and command entry.
 - **Java runtimes.** Inventory, system discovery, and Temurin install from `/api/v1/java/available` with job polling.
 - **API reference.** A searchable, locally rendered view of the live OpenAPI document, including request/response schemas and examples; no request execution.
 - **Resources.** A compact server-detail panel shows on-demand CPU, memory, uptime, PIDs and cumulative I/O; it polls every five seconds while running and visible, clears stale measurements on stop, and marks unknown values with a dash. See [monitoring](monitoring.md).
@@ -18,13 +18,13 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 - Lifecycle actions and Java installs are jobs. The UI polls `/api/v1/jobs/{id}` every second and shows queued/running/finished only; the backend reports no percentage.
 - The console is a snapshot of the last 200 lines. It is replaced, never appended, every 3 s while the server is running, the Console tab is open and the browser tab is visible. Auto-refresh can be turned off. Stopped servers show one snapshot.
 - Server status is re-read every 5 s on the detail page. "Container running" means the process runs; Minecraft may still be starting.
-- Creating a server does not download anything. The UI shows the target JAR path after creation and again when a start fails with `server.jar_missing`.
+- Creating a managed server submits creation followed by an install job automatically; it downloads the selected software, without starting Minecraft or accepting the EULA. Failed installs retain the server ID for retry. Only Custom JAR creation asks you to supply a file.
 - Docker servers use the JVM from their image. The Java page states that host runtimes are not used by Docker servers.
 - All polling and in-flight requests are cancelled when leaving a page.
 
 ## Not included
 
-There is no UI for deleting servers, editing resources after creation, file management, modpacks, historical metrics/graphs, multiple users or roles, 2FA, or API tokens, because the backend does not provide them yet. The Vanilla/Paper installer UI is deferred despite its backend APIs being ready.
+There is no UI for deleting servers, editing resources after creation, file management, modpacks, historical metrics/graphs, multiple users or roles, 2FA, or API tokens, because the backend does not provide them yet. Vanilla/Paper installation is available in the creation UI.
 
 ## Production hosting
 
@@ -53,6 +53,14 @@ For a reverse proxy, preserve the original `Host` and set `CHUNKYARD_HTTP__PUBLI
 
 After building the UI and `cargo build -p mcm-server --locked`, run `node scripts/smoke-ui.mjs`. It uses Playwright Chromium to check the real Rust service in both auth modes, owner setup, session persistence, navigation, refreshes and CSP violations. Install Chromium with `pnpm --dir web exec playwright install chromium`, or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an installed Chrome executable. The test uses temporary data and disables Docker operations. CI runs it after frontend validation, component/unit tests and the production build.
 
-## Next UI slice: Vanilla/Paper creation
+## Vanilla/Paper creation
 
-The backend now exposes protected software catalogs, Minecraft release versions, stable Paper builds and a durable `server.install` job. The current creation form remains the manual-JAR flow. A new software/version wizard is deliberately deferred to Opus. Implement only Vanilla/Paper for this slice; Forge/Fabric/CurseForge are research for later. Use the contracts in [http-api.md](http-api.md) and the workflow in [docker.md](docker.md#managed-vanilla-and-paper-installation-rest-api). Expose software, Minecraft version, optional Paper build (default latest stable), server name, port, heap and CPUs; keep Docker image/JAR choices advanced. The chosen release/build must remain pinned. After create, install against the returned ID, show indeterminate job state and retain that ID for retry. Start must stay unavailable while `software != null && launch == null`. Keep EULA acceptance explicit. World/gameplay options (game mode, difficulty, seed, max players, allowlist and view/simulation distance) belong to a later settings API, which is not implemented here.
+The backend now exposes protected software catalogs, Minecraft release versions, stable Paper builds and a durable `server.install` job. The creation wizard consumes these APIs and tracks the installation job. The current backend supports Vanilla/Paper; Forge/Fabric/CurseForge are research for later. Use the contracts in [http-api.md](http-api.md) and the workflow in [docker.md](docker.md#managed-vanilla-and-paper-installation-rest-api). The form exposes software, Minecraft version, optional Paper build (default latest stable), server name, port, heap and CPUs. Docker image overrides are optional; custom JARs are advanced. The chosen release/build must remain pinned. After create, install against the returned ID, show indeterminate job state and retain that ID for retry. Start must stay unavailable while `software != null && launch == null`. Keep EULA acceptance explicit. World/gameplay options (game mode, difficulty, seed, max players, allowlist and view/simulation distance) belong to a later settings API, which is not implemented here.
+
+For an opt-in production UI check using a real local Docker engine and an official Vanilla download (temporary data, no EULA acceptance or game startup), build the Rust binary/UI and run:
+
+```sh
+CHUNKYARD_TEST_LIVE_INSTALL=1 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/run/current-system/sw/bin/google-chrome-stable node scripts/smoke-ui.mjs
+```
+
+Without that flag, the smoke uses a fixed version-list fixture and disabled Docker to verify real create/install failure and same-record retry without upstream access. Leaving the creation page stops job tracking; installation continues on the backend, and the server detail page refreshes its saved installation state.

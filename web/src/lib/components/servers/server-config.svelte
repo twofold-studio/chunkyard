@@ -5,6 +5,7 @@
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import ScaleIcon from '@lucide/svelte/icons/scale';
 	import ActivityIcon from '@lucide/svelte/icons/activity';
+	import BlocksIcon from '@lucide/svelte/icons/blocks';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import {
@@ -14,6 +15,7 @@
 		StatusBadge
 	} from '#lib/components/app/index.js';
 	import { formatCpus, formatMemory } from '#lib/format.js';
+	import { describeSoftware, needsInstall } from '#lib/servers/software.js';
 	import type { ServerView } from '#lib/api/index.js';
 
 	interface Props {
@@ -25,6 +27,8 @@
 
 	let { server, busy, onRequestEula, onRevokeEula }: Props = $props();
 	const stopped = $derived(server.status.state === 'stopped');
+	const software = $derived(server.software ? describeSoftware(server.software) : null);
+	const launch = $derived(server.launch ?? null);
 </script>
 
 {#snippet value(label: string, text: string, mono = false)}
@@ -54,13 +58,38 @@
 		{/if}
 	</SettingsSection>
 
+	{#if software}
+		<SettingsSection
+			title="Software"
+			description="Installed and verified by the manager. Reinstalling is not supported."
+			icon={BlocksIcon}
+		>
+			<div class="grid gap-4 sm:grid-cols-3">
+				{@render value('Type', software.kind)}
+				{#if software.detail}{@render value('Selection', software.detail)}{/if}
+				{@render value('Status', needsInstall(server) ? 'Not installed' : 'Installed')}
+			</div>
+			{#if launch}
+				<div class="grid gap-4 sm:grid-cols-3">
+					{@render value('Minecraft', launch.version)}
+					{#if launch.build}{@render value('Build', launch.build)}{/if}
+					{@render value('Java', `Java ${launch.javaMajor}`)}
+				</div>
+				{@render value('Launch file', launch.path, true)}
+				{@render value('SHA-256', launch.checksum, true)}
+			{/if}
+		</SettingsSection>
+	{/if}
+
 	<SettingsSection
 		title="Directory"
-		description="Managed directory on the manager host, mounted at /data in the container. Copy the server JAR here."
+		description={software
+			? 'Managed directory on the manager host, mounted at /data in the container.'
+			: 'Managed directory on the manager host, mounted at /data in the container. Copy the server JAR here.'}
 		icon={FolderIcon}
 	>
 		<CopyText value={server.directory} label="Copy directory path" />
-		{@render value('Server JAR', server.jar, true)}
+		{#if !software}{@render value('Server JAR', server.jar, true)}{/if}
 	</SettingsSection>
 
 	<SettingsSection
@@ -69,6 +98,9 @@
 		icon={ContainerIcon}
 	>
 		{@render value('Image', server.dockerImage, true)}
+		{#if server.autoJava}
+			<p class="text-xs text-muted-foreground">Chosen automatically to match the required Java.</p>
+		{/if}
 	</SettingsSection>
 
 	<SettingsSection

@@ -32,13 +32,13 @@ Open `https://chunkyard.fractal-tess.xyz`. In the manager's Dokploy terminal, ru
 
 Start with one small server, then a second after checking memory and CPU headroom. A 2 GiB Java heap also needs at least 512 MiB of container overhead. Leave capacity for the OS, Dokploy and existing applications. An Oracle deployment is not a guarantee that every modpack fits its resources or supports ARM64.
 
-Creation currently writes initial configuration and EULA files but does not download a JAR. Choose a compatible Temurin image, place the JAR in the managed directory, and accept the Minecraft EULA yourself before starting. The REST API also supports selected Vanilla/Paper installation jobs; see [the workflow](docker.md#managed-vanilla-and-paper-installation-rest-api). The web creation form still uses manual JARs while its software/version selector is deferred. Use the existing console and [resource monitoring](monitoring.md) to inspect the trial; container running is not a Minecraft readiness check.
+Choose Vanilla or Paper and a Minecraft version in the creation form. Chunkyard downloads and verifies the server files and selects a matching Java image; you do not need to supply a JAR. Accept the Minecraft EULA yourself before starting. Custom JARs remain an optional advanced workflow. See [the installation workflow](docker.md#managed-vanilla-and-paper-installation-rest-api). Use the existing console and [resource monitoring](monitoring.md) to inspect the trial; container running is not a Minecraft readiness check.
 
 ## Check persistence and operation
 
 1. Complete owner setup and verify sign-in over HTTPS.
 2. Create a server and check its data appears in the named volume.
-3. Supply the JAR, accept its EULA, and start it. Read startup logs and check resources.
+3. Wait for installation, accept the EULA, and start it. Read startup logs and check resources.
 4. Connect from a NetBird peer to `oracle.netbird.cloud:<game-port>`.
 5. Restart the manager through Dokploy. The game container should remain running and be recognized by the new manager through its persistent instance ID.
 6. Stop the server through the UI and confirm Minecraft saves and exits.

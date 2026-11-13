@@ -61,6 +61,87 @@ export interface ServerView {
 	/** Managed directory on the manager host; the server JAR must be copied here. */
 	directory: string;
 	status: RuntimeStatus;
+	/**
+	 * Managed software the server was created with, or `null` for a manual JAR server.
+	 * Optional so records from older backends still type-check.
+	 */
+	software?: ServerSoftware | null;
+	/**
+	 * Resolved launch details written by a successful install.
+	 * `software != null && launch == null` means the server is not installed and cannot start.
+	 */
+	launch?: ServerLaunch | null;
+	/** The Docker image was chosen automatically to match the required Java. */
+	autoJava?: boolean;
+}
+
+export interface ServerLaunch {
+	path: string;
+	version: string;
+	build: string | null;
+	javaMajor: number;
+	checksum: string;
+}
+
+/** Software kinds listed by `GET /api/v1/software`. */
+export type SoftwareKind = 'vanilla' | 'paper' | 'fabric' | 'forge' | 'curseforge' | 'custom';
+
+/** Kinds that expose `GET /api/v1/software/{kind}/versions`. */
+export type VersionedSoftwareKind = 'vanilla' | 'paper' | 'fabric' | 'forge';
+
+/** Kinds with `GET /api/v1/software/{kind}/versions/{version}/builds`. */
+export type BuildSoftwareKind = 'paper' | 'fabric' | 'forge';
+
+/** Kinds that require a loader build (`loaderVersion`). */
+export type LoaderSoftwareKind = 'fabric' | 'forge';
+
+export interface SoftwareCatalogItem {
+	id: SoftwareKind;
+	name: string;
+	available: boolean;
+	/** Why the kind is unavailable (e.g. no CurseForge API key on the backend). */
+	reason: string | null;
+}
+
+export interface SoftwareVersion {
+	id: string;
+	stable: boolean;
+}
+
+/** `software` in `POST /api/v1/servers`; omitted for custom/manual JAR servers. */
+export type ServerSoftware =
+	| { type: 'vanilla'; version: string }
+	/** `build` omitted/null selects the latest stable Paper build at install time. */
+	| { type: 'paper'; version: string; build?: string | null }
+	| { type: LoaderSoftwareKind; version: string; loaderVersion: string }
+	| { type: 'curseforge'; projectId: number; fileId: number };
+
+export interface CurseForgeModpack {
+	id: number;
+	name: string;
+	summary: string;
+	websiteUrl: string | null;
+	logoUrl: string | null;
+	downloads: number;
+}
+
+export interface CurseForgePagination {
+	index: number;
+	pageSize: number;
+	totalCount: number;
+}
+
+export interface CurseForgeSearch {
+	items: CurseForgeModpack[];
+	pagination: CurseForgePagination;
+}
+
+/** An installable modpack release; only releases with a server pack are listed. */
+export interface CurseForgeFile {
+	id: number;
+	name: string;
+	gameVersions: string[];
+	serverPackFileId: number;
 }
 
 export interface CreateServerRequest {
@@ -73,6 +154,8 @@ export interface CreateServerRequest {
 	memoryMaxMb?: number;
 	cpus?: number;
 	acceptEula?: boolean;
+	/** Managed install; the backend picks a matching Java image unless `dockerImage` is set. */
+	software?: ServerSoftware;
 }
 
 /**

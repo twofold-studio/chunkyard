@@ -4,10 +4,12 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { StatusBadge } from '#lib/components/app/index.js';
 	import { formatCpus, formatMemoryRange } from '#lib/format.js';
+	import { describeSoftware, needsInstall } from '#lib/servers/software.js';
 	import { resolve } from '$app/paths';
 	import type { ServerView } from '#lib/api/index.js';
 
 	let { server }: { server: ServerView } = $props();
+	const software = $derived(server.software ? describeSoftware(server.software) : null);
 </script>
 
 <li class="border-b border-border last:border-b-0">
@@ -23,9 +25,13 @@
 		<div class="flex min-w-0 flex-1 flex-col gap-1">
 			<div class="flex min-w-0 items-center gap-2">
 				<span class="truncate text-sm font-medium">{server.name}</span>
+				{#if needsInstall(server)}<Badge variant="warning">Not installed</Badge>{/if}
 				{#if !server.acceptEula}<Badge variant="warning">EULA not accepted</Badge>{/if}
 			</div>
 			<p class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+				{#if software}<span
+						>{software.kind}{#if server.launch}&nbsp;{server.launch.version}{/if}</span
+					>{/if}
 				<span>Port {server.port}</span>
 				<span class="font-mono">{server.dockerImage}</span>
 				<span>{formatMemoryRange(server.memoryMinMb, server.memoryMaxMb)}</span>

@@ -42,6 +42,13 @@ const KNOWN: Record<string, Omit<ErrorMessage, 'detail'> & { detail?: string }> 
 		title: 'Operation in progress',
 		hint: 'Wait for the current operation to finish.'
 	},
+	'server.not_installed': {
+		title: 'Server software not installed',
+		hint: 'Install the server software from the server page, then start again.'
+	},
+	'server.already_installed': { title: 'Already installed' },
+	'software.upstream': { title: 'Software provider unavailable' },
+	'software.download_failed': { title: 'Software download failed' },
 	'server.running': { title: 'Server is running' },
 	'server.not_running': { title: 'Server is not running' },
 	'server.port_in_use': { title: 'Port already assigned' },

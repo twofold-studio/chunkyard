@@ -1,5 +1,6 @@
 import {
 	getServer,
+	installServer,
 	isAbortError,
 	isJobActive,
 	serverAction,
@@ -11,21 +12,18 @@ import {
 	type ServerView
 } from '#lib/api/index.js';
 
+import { installAndWait, serverFromResult } from './install.js';
+import { needsInstall } from './software.js';
+
 export interface ServerApi {
 	getServer: typeof getServer;
 	serverAction: typeof serverAction;
 	setEula: typeof setEula;
 	waitForJob: typeof waitForJob;
+	installServer: typeof installServer;
 }
 
-const defaultApi: ServerApi = { getServer, serverAction, setEula, waitForJob };
-
-function serverFromResult(result: unknown): ServerView | null {
-	if (result && typeof result === 'object' && 'server' in result) {
-		return (result as { server: ServerView }).server;
-	}
-	return null;
-}
+const defaultApi: ServerApi = { getServer, serverAction, setEula, waitForJob, installServer };
 
 /**
  * Owns one server's view model on the detail page: current record, the lifecycle
@@ -40,6 +38,12 @@ export class ServerController {
 	/** ApiError (request rejected) or JobFailure (job failed). */
 	error = $state.raw<unknown>(null);
 	eulaPending = $state(false);
+	/** Managed-software install job being tracked (or last finished). */
+	installJob = $state.raw<Job | null>(null);
+	/** Failure of the last install attempt, kept separate from lifecycle errors. */
+	installError = $state.raw<unknown>(null);
+	/** True while the install POST is in flight, before a job exists. */
+	#installRequested = $state(false);
 
 	#abort = new AbortController();
 	#api: ServerApi;
@@ -58,8 +62,17 @@ export class ServerController {
 		return this.#abort.signal;
 	}
 
+	get installing(): boolean {
+		return this.installJob !== null && isJobActive(this.installJob);
+	}
+
+	/** Install request or job in flight. */
+	get installWorking(): boolean {
+		return this.installing || this.#installRequested;
+	}
+
 	get busy(): boolean {
-		return (this.job !== null && isJobActive(this.job)) || this.eulaPending;
+		return (this.job !== null && isJobActive(this.job)) || this.eulaPending || this.installWorking;
 	}
 
 	/** Replace the record after navigating to a different server ID. */
@@ -72,6 +85,9 @@ export class ServerController {
 		this.job = null;
 		this.action = null;
 		this.error = null;
+		this.installJob = null;
+		this.installError = null;
+		this.#installRequested = false;
 	}
 
 	async refresh(): Promise<void> {
@@ -107,6 +123,39 @@ export class ServerController {
 			if (isAbortError(error)) return null;
 			this.error = error;
 			return null;
+		}
+	}
+
+	/**
+	 * Installs managed software for a server that is not installed yet. Retries reuse
+	 * this record; the server is never started and EULA acceptance is untouched.
+	 */
+	async install(): Promise<Job | null> {
+		if (this.busy || !needsInstall(this.server)) return null;
+		const id = this.server.id;
+		this.installError = null;
+		this.installJob = null;
+		this.#installRequested = true;
+		try {
+			const outcome = await installAndWait(id, {
+				signal: this.signal,
+				intervalMs: this.#jobIntervalMs,
+				api: this.#api,
+				onUpdate: (job) => {
+					this.#installRequested = false;
+					this.installJob = job;
+				}
+			});
+			this.installJob = outcome.job;
+			if (outcome.error) this.installError = outcome.error;
+			if (outcome.server && outcome.server.id === this.server.id) this.server = outcome.server;
+			else await this.refresh().catch(() => {});
+			return outcome.job;
+		} catch (error) {
+			if (!isAbortError(error)) this.installError = error;
+			return null;
+		} finally {
+			if (this.server.id === id) this.#installRequested = false;
 		}
 	}
 

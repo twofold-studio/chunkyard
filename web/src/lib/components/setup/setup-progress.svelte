@@ -6,12 +6,14 @@
 		/** Zero-based index of the current step. */
 		current: number;
 		steps: readonly string[];
+		/** Accessible name of the list. */
+		label?: string;
 	}
 
-	let { current, steps }: Props = $props();
+	let { current, steps, label = 'Setup progress' }: Props = $props();
 </script>
 
-<ol aria-label="Setup progress" class="flex items-center gap-2 text-xs">
+<ol aria-label={label} class="flex items-center gap-2 text-xs">
 	{#each steps as label, index (label)}
 		{@const done = index < current}
 		{@const active = index === current}

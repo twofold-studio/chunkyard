@@ -46,3 +46,23 @@ describe('validateServerForm', () => {
 		expect(validateServerForm({ ...base, jar: 'server.zip' }).jar).toBeDefined();
 	});
 });
+
+describe('managed installs', () => {
+	it('skips the JAR, allows an automatic image and sends software', () => {
+		const form = { ...defaultServerForm(), name: 'Paper', dockerImage: '', jar: '' };
+		expect(validateServerForm(form, { managed: true })).toEqual({});
+		const body = toCreateRequest(form, { type: 'paper', version: '1.21.1' });
+		expect(body).toMatchObject({ software: { type: 'paper', version: '1.21.1' } });
+		expect(body).not.toHaveProperty('jar');
+		expect(body).not.toHaveProperty('dockerImage');
+	});
+
+	it('still validates and sends an explicit image override', () => {
+		const form = { ...defaultServerForm(), name: 'Paper', dockerImage: '-bad' };
+		expect(validateServerForm(form, { managed: true }).dockerImage).toBeDefined();
+		const ok = { ...form, dockerImage: 'eclipse-temurin:17-jre' };
+		expect(toCreateRequest(ok, { type: 'vanilla', version: '1.20.1' }).dockerImage).toBe(
+			'eclipse-temurin:17-jre'
+		);
+	});
+});

@@ -50,4 +50,15 @@ describe('ServerActions', () => {
 		await page.getByRole('button', { name: 'Stop' }).click();
 		expect(onAction).toHaveBeenCalledWith('stop');
 	});
+
+	it('blocks start until managed software is installed', async () => {
+		render(ServerActions, {
+			serverState: 'stopped',
+			busy: false,
+			pending: null,
+			onAction: vi.fn(),
+			startBlocked: true
+		});
+		await expect.element(page.getByRole('button', { name: 'Start', exact: true })).toBeDisabled();
+	});
 });

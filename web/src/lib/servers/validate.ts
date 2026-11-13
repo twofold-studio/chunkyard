@@ -1,4 +1,4 @@
-import type { CreateServerRequest } from '#lib/api/index.js';
+import type { CreateServerRequest, ServerSoftware } from '#lib/api/index.js';
 
 /** Raw form values; numeric inputs bound with `type="number"` may be null when empty. */
 export interface ServerFormValues {
@@ -35,11 +35,22 @@ function isInt(value: number | null): value is number {
 	return value !== null && Number.isInteger(value);
 }
 
+export interface ValidateOptions {
+	/**
+	 * Managed install: the backend writes the server JAR and picks a Java image, so
+	 * `jar` is ignored and an empty `dockerImage` means "automatic".
+	 */
+	managed?: boolean;
+}
+
 /**
  * Mirrors crates/mcm-process/src/validation.rs so most mistakes are caught before
  * a request is sent. The backend remains authoritative.
  */
-export function validateServerForm(v: ServerFormValues): ServerFormErrors {
+export function validateServerForm(
+	v: ServerFormValues,
+	{ managed = false }: ValidateOptions = {}
+): ServerFormErrors {
 	const errors: ServerFormErrors = {};
 	const name = v.name.trim();
 	// eslint-disable-next-line no-control-regex
@@ -50,12 +61,16 @@ export function validateServerForm(v: ServerFormValues): ServerFormErrors {
 		errors.port = 'Enter a port between 1 and 65535.';
 	}
 	const image = v.dockerImage.trim();
-	if (!image || image.length > 255 || image.startsWith('-') || !IMAGE_RE.test(image)) {
+	if (managed && !image) {
+		// Automatic image selection.
+	} else if (!image || image.length > 255 || image.startsWith('-') || !IMAGE_RE.test(image)) {
 		errors.dockerImage = 'Enter a valid image reference, e.g. eclipse-temurin:21-jre.';
 	}
 	const jar = v.jar.trim();
 	const parts = jar.split('/');
-	if (
+	if (managed) {
+		// The installer decides the launch target.
+	} else if (
 		!jar.endsWith('.jar') ||
 		jar.length > 512 ||
 		jar.startsWith('/') ||
@@ -78,16 +93,24 @@ export function validateServerForm(v: ServerFormValues): ServerFormErrors {
 	return errors;
 }
 
-export function toCreateRequest(v: ServerFormValues): CreateServerRequest {
-	return {
+/**
+ * Builds the `POST /api/v1/servers` body. With `software`, `jar` is omitted and
+ * `dockerImage` is only sent when explicitly overridden (which disables automatic Java).
+ */
+export function toCreateRequest(
+	v: ServerFormValues,
+	software: ServerSoftware | null = null
+): CreateServerRequest {
+	const base: CreateServerRequest = {
 		name: v.name.trim(),
 		runtime: 'docker',
 		port: v.port ?? 0,
-		dockerImage: v.dockerImage.trim(),
-		jar: v.jar.trim(),
 		memoryMinMb: v.memoryMinMb ?? 0,
 		memoryMaxMb: v.memoryMaxMb ?? 0,
 		cpus: v.cpus ?? 0,
 		acceptEula: v.acceptEula
 	};
+	if (!software) return { ...base, dockerImage: v.dockerImage.trim(), jar: v.jar.trim() };
+	const image = v.dockerImage.trim();
+	return image ? { ...base, dockerImage: image, software } : { ...base, software };
 }

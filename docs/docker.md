@@ -20,7 +20,7 @@ Create a server with `POST /api/v1/servers`:
 }
 ```
 
-Set `acceptEula` to true only if you accept the Minecraft EULA. Creation returns 201 `{server}` with an ID, managed directory, configuration, and stopped status. For a manual server, copy your server JAR into the returned directory before starting. The REST API can also create and install a selected Vanilla or Paper release, as described below. The current web creation form still uses manual JARs; its software/version selector is deferred to Opus. File uploads are not available yet. The service writes initial `eula.txt` and `server.properties` files.
+Set `acceptEula` to true only if you accept the Minecraft EULA. Creation returns 201 `{server}` with an ID, managed directory, configuration, and stopped status. For a manual server, copy your server JAR into the returned directory before starting. The REST API can also create and install a selected Vanilla or Paper release, as described below. The web creation form now offers Vanilla/Paper version selection and runs the install automatically; no JAR needs to be supplied for these managed types. File uploads are not available yet. The service writes initial `eula.txt` and `server.properties` files.
 
 | Method | Endpoint | Response |
 |---|---|---|

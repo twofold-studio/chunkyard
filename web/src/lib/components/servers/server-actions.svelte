@@ -14,12 +14,16 @@
 		/** Action currently running, to show its spinner. */
 		pending: ServerAction | null;
 		onAction: (action: ServerAction) => void;
+		/** Managed software is not installed yet, so the server cannot start. */
+		startBlocked?: boolean;
 	}
 
-	let { serverState, busy, pending, onAction }: Props = $props();
+	let { serverState, busy, pending, onAction, startBlocked = false }: Props = $props();
 	let confirmKill = $state(false);
 
-	const canStart = $derived(!busy && (serverState === 'stopped' || serverState === 'unknown'));
+	const canStart = $derived(
+		!busy && !startBlocked && (serverState === 'stopped' || serverState === 'unknown')
+	);
 	const canStop = $derived(!busy && serverState === 'running');
 	const canKill = $derived(!busy && serverState !== 'stopped');
 </script>
@@ -31,7 +35,12 @@
 {/snippet}
 
 <div class="flex flex-wrap items-center gap-2">
-	<Button size="sm" disabled={!canStart} onclick={() => onAction('start')}>
+	<Button
+		size="sm"
+		disabled={!canStart}
+		title={startBlocked ? 'Install the server software before starting' : undefined}
+		onclick={() => onAction('start')}
+	>
 		{@render icon('start', PlayIcon)}
 		Start
 	</Button>

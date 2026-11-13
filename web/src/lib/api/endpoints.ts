@@ -2,8 +2,11 @@ import { request, type Fetch } from './client';
 import type {
 	AvailableJava,
 	Changelog,
+	BuildSoftwareKind,
 	ConsoleLine,
 	CreateServerRequest,
+	CurseForgeFile,
+	CurseForgeSearch,
 	Isolation,
 	Items,
 	JavaRuntime,
@@ -15,6 +18,9 @@ import type {
 	ServerView,
 	SessionMe,
 	SetupStatus,
+	SoftwareCatalogItem,
+	SoftwareVersion,
+	VersionedSoftwareKind,
 	VersionInfo
 } from './types';
 
@@ -56,6 +62,10 @@ export const getServer = (id: string, o: Opts = {}) =>
 export const createServer = (body: CreateServerRequest, o: Opts = {}) =>
 	request<{ server: ServerView }>('/api/v1/servers', { ...o, method: 'POST', body });
 
+/** Installs the persisted software selection (202). No request body; never starts the server. */
+export const installServer = (id: string, o: Opts = {}) =>
+	request<{ job: Job }>(`/api/v1/servers/${enc(id)}/install`, { ...o, method: 'POST' });
+
 export const setEula = (id: string, accepted: boolean, o: Opts = {}) =>
 	request<{ server: ServerView }>(`/api/v1/servers/${enc(id)}/eula`, {
 		...o,
@@ -80,6 +90,28 @@ export const getServerMetrics = (id: string, o: Opts = {}) =>
 	request<ServerMetrics>(`/api/v1/servers/${enc(id)}/metrics`, o);
 
 export const getIsolation = (o: Opts = {}) => request<Isolation>('/api/v1/system/isolation', o);
+
+// Software catalog & modpacks ----------------------------------------------------
+
+export const listSoftware = (o: Opts = {}) =>
+	request<Items<SoftwareCatalogItem>>('/api/v1/software', o);
+
+export const listSoftwareVersions = (kind: VersionedSoftwareKind, o: Opts = {}) =>
+	request<Items<SoftwareVersion>>(`/api/v1/software/${enc(kind)}/versions`, o);
+
+export const listSoftwareBuilds = (kind: BuildSoftwareKind, version: string, o: Opts = {}) =>
+	request<Items<SoftwareVersion>>(
+		`/api/v1/software/${enc(kind)}/versions/${enc(version)}/builds`,
+		o
+	);
+
+export const searchCurseForgeModpacks = (query: string, index = 0, o: Opts = {}) => {
+	const params = new URLSearchParams({ query, index: String(index) });
+	return request<CurseForgeSearch>(`/api/v1/modpacks/curseforge?${params}`, o);
+};
+
+export const listCurseForgeFiles = (projectId: number, o: Opts = {}) =>
+	request<Items<CurseForgeFile>>(`/api/v1/modpacks/curseforge/${enc(String(projectId))}/files`, o);
 
 // Public build information (no session required) ------------------------------
 

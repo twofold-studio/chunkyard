@@ -115,4 +115,73 @@ describe('ServerController', () => {
 		await expect(pending).resolves.toBeNull();
 		expect(controller.error).toBeNull();
 	});
+
+	it('installs managed software and adopts the installed record', async () => {
+		const managed = server('stopped', {
+			software: { type: 'vanilla', version: '1.21.1' },
+			launch: null
+		});
+		const installed = {
+			...managed,
+			launch: { path: 'server.jar', version: '1.21.1', build: null, javaMajor: 21, checksum: 'x' }
+		};
+		const installServer = vi
+			.fn()
+			.mockResolvedValue({ job: job('queued', { kind: 'server.install' }) });
+		const serverAction = vi.fn();
+		const controller = new ServerController(managed, {
+			api: {
+				installServer,
+				serverAction,
+				waitForJob: vi.fn().mockResolvedValue(job('succeeded', { result: { server: installed } }))
+			}
+		});
+		const final = await controller.install();
+		expect(final?.state).toBe('succeeded');
+		expect(installServer).toHaveBeenCalledWith('s1', expect.anything());
+		expect(controller.server.launch?.javaMajor).toBe(21);
+		// Never starts the server or changes EULA acceptance.
+		expect(serverAction).not.toHaveBeenCalled();
+		expect(controller.server.acceptEula).toBe(true);
+		// Already installed: no further install request.
+		expect(await controller.install()).toBeNull();
+		expect(installServer).toHaveBeenCalledOnce();
+	});
+
+	it('keeps an install failure separate and allows a retry on the same record', async () => {
+		const managed = server('stopped', {
+			software: { type: 'paper', version: '1.21.1' },
+			launch: null
+		});
+		const installServer = vi.fn().mockResolvedValue({ job: job('queued') });
+		const controller = new ServerController(managed, {
+			api: {
+				installServer,
+				getServer: vi.fn().mockResolvedValue(managed),
+				waitForJob: vi
+					.fn()
+					.mockResolvedValue(
+						job('failed', { error: { code: 'software.download_failed', detail: 'Bad checksum.' } })
+					)
+			}
+		});
+		await controller.install();
+		expect(controller.installError).toEqual({
+			code: 'software.download_failed',
+			detail: 'Bad checksum.'
+		});
+		expect(controller.error).toBeNull();
+		expect(controller.busy).toBe(false);
+		await controller.install();
+		expect(installServer).toHaveBeenCalledTimes(2);
+	});
+
+	it('does not install manual JAR servers', async () => {
+		const installServer = vi.fn();
+		const controller = new ServerController(server('stopped', { software: null }), {
+			api: { installServer }
+		});
+		expect(await controller.install()).toBeNull();
+		expect(installServer).not.toHaveBeenCalled();
+	});
 });

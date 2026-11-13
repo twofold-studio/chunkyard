@@ -1,3 +1,3 @@
 kind: Added
-body: 'REST API: list Vanilla/Paper Minecraft releases and stable Paper builds under /api/v1/software; create managed software selections and install them through /api/v1/servers/{id}/install jobs with verified downloads, pinned artifacts and automatic Docker Java selection. Existing manual JAR servers remain supported; the web creation wizard is deferred.'
+body: 'REST API: list Vanilla/Paper Minecraft releases and stable Paper builds under /api/v1/software; create managed software selections and install them through /api/v1/servers/{id}/install jobs with verified downloads, pinned artifacts and automatic Docker Java selection. Existing manual JAR servers remain supported.'
 time: 2026-11-13T21:40:03.34499223+02:00
