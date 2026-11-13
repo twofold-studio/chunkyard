@@ -107,3 +107,15 @@ fn ui_build_directory_can_be_selected_or_disabled_by_environment()
     assert!(config.http.ui_dir.is_none());
     Ok(())
 }
+
+#[test]
+fn version_visibility_defaults_on_and_requires_a_boolean_override()
+-> Result<(), Box<dyn std::error::Error>> {
+    assert!(Config::default().http.show_version);
+    let config = Config::load_with_env(None, [("MCM_HTTP__SHOW_VERSION".into(), "false".into())])?;
+    assert!(!config.http.show_version);
+    assert!(
+        Config::load_with_env(None, [("MCM_HTTP__SHOW_VERSION".into(), "hidden".into())]).is_err()
+    );
+    Ok(())
+}

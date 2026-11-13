@@ -9,3 +9,4 @@ export { default as SettingsSection } from './settings-section.svelte';
 export { default as StatusBadge } from './status-badge.svelte';
 export type { Crumb } from './types';
 export { default as AddTile } from './add-tile.svelte';
+export { default as VersionBadge } from './version-badge.svelte';

@@ -32,6 +32,8 @@ pub struct HttpConfig {
     pub allow_insecure_http: bool,
     /// Static SPA build directory; None keeps the service API-only.
     pub ui_dir: Option<PathBuf>,
+    /// Publish the optional version badge and bundled changelog.
+    pub show_version: bool,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -52,6 +54,7 @@ impl Default for HttpConfig {
             public_url: None,
             allow_insecure_http: false,
             ui_dir: Some("web/build".into()),
+            show_version: true,
         }
     }
 }

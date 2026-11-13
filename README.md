@@ -13,7 +13,7 @@
   <img src="assets/screenshots/hero.webp" alt="Chunkyard's server inventory and server creation form in its dark web interface" width="100%" />
 </p>
 
-<p align="center">Your Minecraft servers, in one yard.</p>
+<p align="center">Your Minecraft servers, in one yard.<br /><a href="https://chunkyard.fractal-tess.xyz">Open Chunkyard</a></p>
 
 Chunkyard is a self-hosted Minecraft Java Edition server manager for one owner. A Rust service and Svelte web UI let you manage Docker server instances from one address, with persistent storage and no separate Node service to run.
 

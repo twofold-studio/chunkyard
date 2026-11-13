@@ -6,6 +6,7 @@ use std::sync::Arc;
 pub struct AppState {
     pub health: Arc<dyn mcm_core::system::HealthCheck>,
     pub auth_enabled: bool,
+    pub show_version: bool,
     pub auth: Arc<AuthService>,
     pub servers: Arc<dyn mcm_core::server::ServerService>,
     pub java: Arc<dyn JavaRuntimeService>,

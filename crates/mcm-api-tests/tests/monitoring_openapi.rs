@@ -31,6 +31,8 @@ async fn schema_is_protected_and_references_only_local_resolvable_schemas() -> R
             );
             let expected_public = [
                 "/healthz",
+                "/api/v1/system/version",
+                "/api/v1/system/changelog",
                 "/api/v1/setup/status",
                 "/api/v1/setup",
                 "/api/v1/setup/verify-token",

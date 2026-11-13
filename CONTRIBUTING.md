@@ -16,3 +16,11 @@ cwebp -q 82 assets/screenshots/source/shots/hero.png -o assets/screenshots/hero.
 Install Playwright Chromium with `pnpm --dir web exec playwright install chromium`, or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an installed Chrome executable. The cover is rendered at 1600 × 1000 CSS pixels with a scale factor of two. Keep screenshots consistent with implemented behavior.
 
 The generated logo is in `assets/logo.png`, with the app copy at `web/static/logo.png`. Its generation prompt and source are recorded in [assets/brand/logo.md](assets/brand/logo.md).
+
+Browser icons are derived from the same logo with ImageMagick:
+
+```sh
+magick assets/logo.png -background none -define icon:auto-resize=48,32,16 web/static/favicon.ico
+magick assets/logo.png -resize 32x32 web/static/favicon-32.png
+magick assets/logo.png -resize 180x180 web/static/apple-touch-icon.png
+```

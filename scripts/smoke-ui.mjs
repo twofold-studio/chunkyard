@@ -17,7 +17,7 @@ const browser = await chromium.launch({
     : {}),
 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function test(enabled) {
+async function test(enabled, showVersion = true) {
   const directory = await mkdtemp(resolve(tmpdir(), "mcm-ui-smoke-"));
   const socket = createServer();
   await new Promise((r) => socket.listen(0, "127.0.0.1", r));
@@ -35,6 +35,7 @@ async function test(enabled) {
       env: {
         ...process.env,
         MCM_AUTH__ENABLED: String(enabled),
+        MCM_HTTP__SHOW_VERSION: String(showVersion),
         MCM_HTTP__PUBLIC_URL: base,
         MCM_HTTP__UI_DIR: resolve("web/build"),
         MCM_DOCKER__ENABLED: "false",
@@ -156,6 +157,27 @@ async function test(enabled) {
     await page.getByText("Chunkyard API", { exact: true }).first().waitFor();
     await page.reload();
     await page.getByText("Chunkyard API", { exact: true }).first().waitFor();
+    const badge = page.getByRole("button", {
+      name: /Chunkyard version .*View changelog/,
+    });
+    if (showVersion) {
+      await badge.click();
+      await page
+        .getByRole("dialog")
+        .getByRole("heading", { name: "Changelog", exact: true })
+        .waitFor();
+      await page
+        .getByRole("dialog")
+        .getByText("Unreleased", { exact: true })
+        .waitFor();
+      await page.keyboard.press("Escape");
+    } else {
+      const metadata = await page.evaluate(
+        async () => await (await fetch("/api/v1/system/version")).json(),
+      );
+      assert.equal(metadata.enabled, false);
+      assert.equal(await badge.count(), 0);
+    }
     await sleep(150);
     assert.deepEqual(violations, [], "page violated its CSP");
     assert.deepEqual(errors, [], "page script errors");
@@ -177,6 +199,7 @@ async function test(enabled) {
 try {
   await test(false);
   await test(true);
+  await test(false, false);
 } finally {
   await browser.close();
 }

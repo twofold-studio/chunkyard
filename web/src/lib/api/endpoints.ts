@@ -1,6 +1,7 @@
 import { request, type Fetch } from './client';
 import type {
 	AvailableJava,
+	Changelog,
 	ConsoleLine,
 	CreateServerRequest,
 	Isolation,
@@ -13,7 +14,8 @@ import type {
 	ServerMetrics,
 	ServerView,
 	SessionMe,
-	SetupStatus
+	SetupStatus,
+	VersionInfo
 } from './types';
 
 interface Opts {
@@ -78,6 +80,12 @@ export const getServerMetrics = (id: string, o: Opts = {}) =>
 	request<ServerMetrics>(`/api/v1/servers/${enc(id)}/metrics`, o);
 
 export const getIsolation = (o: Opts = {}) => request<Isolation>('/api/v1/system/isolation', o);
+
+// Public build information (no session required) ------------------------------
+
+export const getVersion = (o: Opts = {}) => request<VersionInfo>('/api/v1/system/version', o);
+
+export const getChangelog = (o: Opts = {}) => request<Changelog>('/api/v1/system/changelog', o);
 
 // Java & jobs ----------------------------------------------------------------
 

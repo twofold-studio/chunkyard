@@ -8,7 +8,7 @@ RUN pnpm build
 
 FROM rust:1.88-bookworm AS build
 WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml Cargo.lock CHANGELOG.md ./
 COPY crates ./crates
 RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/app/target,sharing=locked \
     cargo build --locked --release -p mcm-server && cp /app/target/release/mcm /mcm

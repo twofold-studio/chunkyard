@@ -43,6 +43,9 @@ impl Config {
                         Some(value.into())
                     }
                 }
+                "MCM_HTTP__SHOW_VERSION" => {
+                    config.http.show_version = value.parse().map_err(|_| invalid())?
+                }
                 "MCM_HTTP__PUBLIC_URL" => config.http.public_url = Some(value),
                 "MCM_HTTP__ALLOW_INSECURE_HTTP" => {
                     config.http.allow_insecure_http = value.parse().map_err(|_| invalid())?

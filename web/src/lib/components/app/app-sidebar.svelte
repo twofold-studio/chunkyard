@@ -10,6 +10,7 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import DockerStatus from './docker-status.svelte';
+	import VersionBadge from './version-badge.svelte';
 	import type { AuthContext } from '#lib/auth.js';
 
 	interface Props {
@@ -108,5 +109,8 @@
 				</Sidebar.MenuItem>
 			{/if}
 		</Sidebar.Menu>
+		<div class="flex px-3 pt-1 group-data-[collapsible=icon]:hidden">
+			<VersionBadge />
+		</div>
 	</Sidebar.Footer>
 </Sidebar.Root>

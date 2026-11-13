@@ -13,6 +13,7 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 
 ## Behaviour to know
 
+- A small version badge opens a changelog modal, including on setup/login. `MCM_HTTP__SHOW_VERSION=false` hides it and disables changelog delivery.
 - Every mutation sends `X-MCM-CSRF: 1`; requests are same-origin with relative paths. The UI must be served from the origin in `MCM_HTTP__PUBLIC_URL`.
 - Lifecycle actions and Java installs are jobs. The UI polls `/api/v1/jobs/{id}` every second and shows queued/running/finished only; the backend reports no percentage.
 - The console is a snapshot of the last 200 lines. It is replaced, never appended, every 3 s while the server is running, the Console tab is open and the browser tab is visible. Auto-refresh can be turned off. Stopped servers show one snapshot.

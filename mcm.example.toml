@@ -3,6 +3,8 @@ data_dir = "data"
 [http]
 # Built SPA directory; MCM_HTTP__UI_DIR="" disables UI hosting.
 ui_dir = "web/build"
+# Show the optional version/changelog UI; MCM_HTTP__SHOW_VERSION=false hides it.
+show_version = true
 listen = "127.0.0.1:8420"
 # public_url = "https://minecraft.example.com"
 # Non-loopback HTTP requires this explicit opt-in; HTTPS reverse proxies do not.

@@ -38,7 +38,7 @@ Sessions use a 32-byte random token; only SHA-256 is stored. Cookies are HttpOnl
 | GET | `/api/v1/jobs?limit=50&cursor=...` | `{items: Job[], nextCursor: string | null}`; max limit 200 |
 | GET | `/api/v1/jobs/{id}` | `Job` |
 
-When authentication is enabled, setup, token verification, login, health, and setup status are public. The remaining endpoints require the owner session. Before setup, protected endpoints return 503 `setup_required`. Errors use `application/problem+json`, with stable `code` and sanitized `detail`. JSON bodies are limited to 1 MiB. API responses include no-store, a restrictive CSP, security headers, and a generated request ID. Static UI pages have a separate page CSP and assets have cache policies; see [frontend hosting](frontend.md). Unknown `/api` routes return JSON problem responses even when UI hosting is enabled.
+When authentication is enabled, setup, token verification, login, health, setup status, and the optional version/changelog metadata are public. The remaining endpoints require the owner session. Before setup, protected endpoints return 503 `setup_required`. Errors use `application/problem+json`, with stable `code` and sanitized `detail`. JSON bodies are limited to 1 MiB. API responses include no-store, a restrictive CSP, security headers, and a generated request ID. Static UI pages have a separate page CSP and assets have cache policies; see [frontend hosting](frontend.md). Unknown `/api` routes return JSON problem responses even when UI hosting is enabled.
 
 `JavaRuntime` is the current core model: `{id, vendor, major, fullVersion, os, arch, path, managed, sha256}`. OS can be `linux`, `alpine-linux`, or `windows`. Planned fields such as `usedBy` and `installedAt` are not present yet. `java.allow_system_java = false` hides system runtimes and disables discovery.
 
@@ -62,3 +62,9 @@ Server lifecycle and console routes are documented in [docker.md](docker.md). Th
 `GET /api/v1/openapi.json` returns the current OpenAPI 3.1.1 document, including schemas, operations, cookie authentication and mutation CSRF requirements. It uses the normal owner-session/auth-disabled checks and `no-store`. The app's **API reference** page at `/api-docs` renders it locally with search, grouped operations, schema links and examples. It is read-only and sends no operation requests. Examples are illustrative, not recorded server data.
 
 `GET /api/v1/servers/{id}/metrics` returns a bounded, on-demand container resource snapshot. See [monitoring](monitoring.md) for units, missing measurements, sampling limits and readiness caveats.
+
+## Version badge and changelog
+
+`GET /api/v1/system/version` returns `{enabled:true, version:"0.1.0", channel:"development"}` for the current development build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
+
+`[http] show_version = true` is the default. Set `MCM_HTTP__SHOW_VERSION=false`, restart/redeploy, and reload the page to hide the badge: version metadata then returns `{enabled:false, version:null, channel:null}`, and the changelog endpoint returns 404 `version.disabled`. The UI fetches changelog content only when the modal opens. The package version changes during an explicit release; development pushes update Unreleased notes without bumping versions.

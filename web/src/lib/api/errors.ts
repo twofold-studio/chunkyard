@@ -66,6 +66,10 @@ const KNOWN: Record<string, Omit<ErrorMessage, 'detail'> & { detail?: string }> 
 	},
 	'java.installing': { title: 'Install already running' },
 	'download.failed': { title: 'Download failed' },
+	'version.disabled': {
+		title: 'Version information disabled',
+		hint: 'The manager hides its version and changelog (MCM_HTTP__SHOW_VERSION=false).'
+	},
 	validation: { title: 'Invalid input' }
 };
 

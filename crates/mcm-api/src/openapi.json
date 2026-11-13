@@ -1384,6 +1384,72 @@
           }
         }
       }
+    },
+    "/api/v1/system/version": {
+      "get": {
+        "operationId": "get_api_v1_system_version",
+        "tags": [
+          "System"
+        ],
+        "summary": "Read version badge availability",
+        "description": "Public bootstrap metadata. When http.show_version=false, returns enabled:false with version/channel null. This is the Cargo package version; it does not increment on every development commit.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Read version badge availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionInfo"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/system/changelog": {
+      "get": {
+        "operationId": "get_api_v1_system_changelog",
+        "tags": [
+          "System"
+        ],
+        "summary": "Read the bundled project changelog",
+        "description": "Public project release notes, available before owner setup. Returns 404 version.disabled when http.show_version=false. Contains no server data.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Read the bundled project changelog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Changelog"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2316,6 +2382,47 @@
           "setupToken"
         ],
         "additionalProperties": false
+      },
+      "VersionInfo": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "channel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "enabled",
+          "version",
+          "channel"
+        ]
+      },
+      "Changelog": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "markdown": {
+            "type": "string",
+            "description": "The generated project changelog bundled with this build; no per-user or server history."
+          }
+        },
+        "required": [
+          "version",
+          "markdown"
+        ]
       }
     }
   }

@@ -23,19 +23,23 @@ impl TestApp {
         Self::with_options(true, false).await
     }
     pub async fn with_options(discover: bool, fail_install: bool) -> Result<Self, Box<dyn Error>> {
-        Self::with_settings(discover, fail_install, true, false).await
+        Self::with_settings(discover, fail_install, true, false, true).await
     }
     pub async fn with_auth(enabled: bool) -> Result<Self, Box<dyn Error>> {
-        Self::with_settings(true, false, enabled, false).await
+        Self::with_settings(true, false, enabled, false, true).await
     }
     pub async fn with_ui() -> Result<Self, Box<dyn Error>> {
-        Self::with_settings(true, false, false, true).await
+        Self::with_settings(true, false, false, true, true).await
+    }
+    pub async fn with_version(enabled: bool) -> Result<Self, Box<dyn Error>> {
+        Self::with_settings(true, false, true, false, enabled).await
     }
     async fn with_settings(
         discover: bool,
         fail_install: bool,
         auth_enabled: bool,
         ui: bool,
+        show_version: bool,
     ) -> Result<Self, Box<dyn Error>> {
         let directory = tempfile::tempdir()?;
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
@@ -45,6 +49,7 @@ impl TestApp {
             ..Default::default()
         };
         config.http.listen = address;
+        config.http.show_version = show_version;
         config.auth.enabled = auth_enabled;
         config.java.allow_system_java = discover;
         let mut backend = build_state(&config).await?;

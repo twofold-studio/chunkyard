@@ -162,3 +162,17 @@ export interface Items<T> {
 }
 
 export type ServerAction = 'start' | 'stop' | 'restart' | 'kill';
+
+/**
+ * `GET /api/v1/system/version` (public). Disabled with `MCM_HTTP__SHOW_VERSION=false`,
+ * in which case every field except `enabled` is `null`.
+ */
+export type VersionInfo =
+	| { enabled: true; version: string; channel: string | null }
+	| { enabled: false; version: null; channel: null };
+
+/** `GET /api/v1/system/changelog` (public): the generated CHANGELOG.md. 404 `version.disabled` when off. */
+export interface Changelog {
+	version: string;
+	markdown: string;
+}

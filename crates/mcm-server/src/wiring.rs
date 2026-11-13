@@ -71,6 +71,7 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
         servers,
         health: Arc::new(database.clone()),
         auth_enabled: config.auth.enabled,
+        show_version: config.http.show_version,
         auth,
         java,
         jobs: jobs.clone(),

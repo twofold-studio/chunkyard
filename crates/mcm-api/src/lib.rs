@@ -7,6 +7,7 @@ mod openapi;
 mod security;
 mod servers;
 mod state;
+mod version;
 use axum::{
     Router, middleware,
     routing::{get, post},
@@ -55,6 +56,8 @@ pub fn routes(state: AppState) -> Router {
     Router::new()
         .merge(protected)
         .route("/healthz", get(auth::health))
+        .route("/api/v1/system/version", get(version::version))
+        .route("/api/v1/system/changelog", get(version::changelog))
         .route("/api/v1/setup/status", get(auth::setup_status))
         .route("/api/v1/setup", post(auth::setup))
         .route("/api/v1/setup/verify-token", post(auth::verify_setup_token))
