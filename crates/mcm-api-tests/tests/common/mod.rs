@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 mod runtime;
+mod software;
 use async_trait::async_trait;
 use mcm_core::java::{
     AvailableJava, JavaRuntime, JavaRuntimeId, JavaRuntimeService, JavaServiceError,
@@ -54,12 +55,16 @@ impl TestApp {
         config.java.allow_system_java = discover;
         let mut backend = build_state(&config).await?;
         backend.state.java = Arc::new(FakeJava { fail_install });
-        backend.state.servers = Arc::new(mcm_process::ServerManager::new(
-            directory.path().join("servers"),
-            "fixture-image".into(),
-            Arc::new(mcm_db::SqliteServerRepo::new(&backend.database)),
-            Arc::new(runtime::FakeRuntime::default()),
-        ));
+        backend.state.software = Arc::new(software::FakeSoftware::default());
+        backend.state.servers = Arc::new(
+            mcm_process::ServerManager::new(
+                directory.path().join("servers"),
+                "fixture-image".into(),
+                Arc::new(mcm_db::SqliteServerRepo::new(&backend.database)),
+                Arc::new(runtime::FakeRuntime::default()),
+            )
+            .with_installers(backend.state.software.clone()),
+        );
         let base = format!("http://{address}");
         let router = if ui {
             let assets = directory.path().join("ui");

@@ -16,6 +16,7 @@ scraper = { version = "0.24", default-features = false }
 mime_guess = "2"
 percent-encoding = "2"
 mcm-process.workspace = true
+mcm-install.workspace = true
 uuid.workspace = true
 mcm-api.workspace = true
 mcm-auth.workspace = true

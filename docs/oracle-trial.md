@@ -32,7 +32,7 @@ Open `https://chunkyard.fractal-tess.xyz`. In the manager's Dokploy terminal, ru
 
 Start with one small server, then a second after checking memory and CPU headroom. A 2 GiB Java heap also needs at least 512 MiB of container overhead. Leave capacity for the OS, Dokploy and existing applications. An Oracle deployment is not a guarantee that every modpack fits its resources or supports ARM64.
 
-Creation currently writes initial configuration and EULA files but does not download a JAR. Choose a compatible Temurin image, place the JAR in the managed directory, and accept the Minecraft EULA yourself before starting. Automatic installers remain upcoming work. Use the existing console and [resource monitoring](monitoring.md) to inspect the trial; container running is not a Minecraft readiness check.
+Creation currently writes initial configuration and EULA files but does not download a JAR. Choose a compatible Temurin image, place the JAR in the managed directory, and accept the Minecraft EULA yourself before starting. The REST API also supports selected Vanilla/Paper installation jobs; see [the workflow](docker.md#managed-vanilla-and-paper-installation-rest-api). The web creation form still uses manual JARs while its software/version selector is deferred. Use the existing console and [resource monitoring](monitoring.md) to inspect the trial; container running is not a Minecraft readiness check.
 
 ## Check persistence and operation
 

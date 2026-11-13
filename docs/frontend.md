@@ -24,7 +24,7 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 
 ## Not included
 
-There is no UI for deleting servers, editing resources after creation, file management, installers or modpacks, historical metrics/graphs, multiple users or roles, 2FA, or API tokens, because the backend does not provide them yet.
+There is no UI for deleting servers, editing resources after creation, file management, modpacks, historical metrics/graphs, multiple users or roles, 2FA, or API tokens, because the backend does not provide them yet. The Vanilla/Paper installer UI is deferred despite its backend APIs being ready.
 
 ## Production hosting
 
@@ -52,3 +52,7 @@ For a reverse proxy, preserve the original `Host` and set `CHUNKYARD_HTTP__PUBLI
 ## Hosting verification
 
 After building the UI and `cargo build -p mcm-server --locked`, run `node scripts/smoke-ui.mjs`. It uses Playwright Chromium to check the real Rust service in both auth modes, owner setup, session persistence, navigation, refreshes and CSP violations. Install Chromium with `pnpm --dir web exec playwright install chromium`, or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an installed Chrome executable. The test uses temporary data and disables Docker operations. CI runs it after frontend validation, component/unit tests and the production build.
+
+## Next UI slice: Vanilla/Paper creation
+
+The backend now exposes protected software catalogs, Minecraft release versions, stable Paper builds and a durable `server.install` job. The current creation form remains the manual-JAR flow. A new software/version wizard is deliberately deferred to Opus. Implement only Vanilla/Paper for this slice; Forge/Fabric/CurseForge are research for later. Use the contracts in [http-api.md](http-api.md) and the workflow in [docker.md](docker.md#managed-vanilla-and-paper-installation-rest-api). Expose software, Minecraft version, optional Paper build (default latest stable), server name, port, heap and CPUs; keep Docker image/JAR choices advanced. The chosen release/build must remain pinned. After create, install against the returned ID, show indeterminate job state and retain that ID for retry. Start must stay unavailable while `software != null && launch == null`. Keep EULA acceptance explicit. World/gameplay options (game mode, difficulty, seed, max players, allowlist and view/simulation distance) belong to a later settings API, which is not implemented here.

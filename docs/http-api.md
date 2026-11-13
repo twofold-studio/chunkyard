@@ -31,6 +31,10 @@ Sessions use a 32-byte random token; only SHA-256 is stored. Cookies are HttpOnl
 | POST | `/api/v1/auth/login` | `{kind: "session", me}` and session cookie; body `{email, password}` |
 | GET | `/api/v1/auth/me` | Current owner/session metadata |
 | POST | `/api/v1/auth/logout` | 204 and cleared cookie |
+| GET | `/api/v1/software` | `{items: [{id, name, available, reason}]}`; Vanilla, Paper, custom |
+| GET | `/api/v1/software/{kind}/versions` | `{items: [{id, stable}]}`; kind `vanilla` or `paper`; releases newest first |
+| GET | `/api/v1/software/paper/versions/{version}/builds` | `{items: [{id, stable}]}`; stable build IDs are strings, newest first |
+| POST | `/api/v1/servers/{id}/install` | 202 `{job}`; no body; installs the persisted software selection |
 | GET | `/api/v1/java/runtimes` | `{items: JavaRuntime[]}` |
 | POST | `/api/v1/java/runtimes/discover` | `{items: JavaRuntime[]}` |
 | GET | `/api/v1/java/available` | `{lts: number[], all: number[], mostRecentLts: number}` |
@@ -74,3 +78,5 @@ Server lifecycle and console routes are documented in [docker.md](docker.md). Th
 Only `CHUNKYARD_*` application environment variables are supported. Rename all `MCM_*` settings before upgrading; old names now stop startup with a migration message rather than being silently ignored. For example, use `CHUNKYARD_AUTH__ENABLED`, `CHUNKYARD_HTTP__PUBLIC_URL`, `CHUNKYARD_HTTP__SHOW_VERSION`, `CHUNKYARD_DATA_DIR`, and `CHUNKYARD_CONFIG`.
 
 `CHUNKYARD_CONFIG` selects a TOML file when `--config` is absent. Explicit `--config` takes precedence over the environment file path; normal environment settings override values inside the selected file, and CLI data/listen options apply last. TOML keys, data directories, the `mcm` executable, session cookie and CSRF header are not renamed by this migration. Rebuild the Docker image and update its runtime environment together; data volumes remain reusable.
+
+Managed server creation optionally accepts `software: {type: "vanilla", version}` or `{type: "paper", version, build?}`. `build` is a positive integer encoded as a string; omission selects the latest stable Paper build once at installation time. A null/omitted software selection preserves manual JAR behavior. The server response adds nullable `software`, nullable `launch: {path, version, build, javaMajor, checksum}` and boolean `autoJava`. Existing stored records default these fields to null/null/false, with no migration required. Creation still returns 201 and does not download anything. The UI should then submit `server.install`, follow its durable job and navigate to the returned server. If installation fails, retry against that same ID. Until success, Start fails with `server.not_installed`; a second install after success fails with `server.already_installed`. No automatic game start or EULA acceptance occurs. An explicit `dockerImage` prevents automatic JVM image selection. See [the installation workflow](docker.md#managed-vanilla-and-paper-installation-rest-api) for limits, checksum policy and retry behavior. New catalog routes use the same session/setup checks as other protected endpoints; the install mutation retains Origin/CSRF checks in both auth modes.

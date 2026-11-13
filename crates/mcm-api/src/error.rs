@@ -155,20 +155,26 @@ pub(crate) async fn method_not_allowed() -> ApiError {
 impl From<mcm_core::server::ServerError> for ApiError {
     fn from(error: mcm_core::server::ServerError) -> Self {
         use mcm_core::server::ServerError as E;
+        if let E::Software(error) = error {
+            return error.into();
+        }
         let status = match &error {
             E::Invalid(_) | E::EulaRequired => StatusCode::UNPROCESSABLE_ENTITY,
             E::NotFound => StatusCode::NOT_FOUND,
             E::Busy | E::PortInUse | E::AlreadyRunning | E::NotRunning | E::ContainerConflict => {
                 StatusCode::CONFLICT
             }
-            E::DockerUnavailable | E::MissingJar => StatusCode::FAILED_DEPENDENCY,
+            E::DockerUnavailable | E::MissingJar | E::NotInstalled => StatusCode::FAILED_DEPENDENCY,
             E::MetricsBusy => StatusCode::TOO_MANY_REQUESTS,
             E::Docker => StatusCode::BAD_GATEWAY,
-            E::Filesystem | E::Storage(_) => return Self::internal(error),
+            E::AlreadyInstalled => StatusCode::CONFLICT,
+            E::Software(_) | E::Filesystem | E::Storage(_) => return Self::internal(error),
         };
         // Domain messages contain only fixed text and never host paths.
         let detail = match &error {
             E::Invalid(detail) => *detail,
+            E::NotInstalled => "Install the selected software before starting the server.",
+            E::AlreadyInstalled => "Server software is already installed.",
             E::NotFound => "The server does not exist.",
             E::Busy => "Another operation for this server is running.",
             E::MetricsBusy => "All metrics sampling slots are busy; retry shortly.",
@@ -180,6 +186,26 @@ impl From<mcm_core::server::ServerError> for ApiError {
             E::MissingJar => "Place the configured JAR in the server directory before starting.",
             E::EulaRequired => "Accept the Minecraft EULA before starting.",
             _ => "The Docker operation failed.",
+        };
+        Self::new(status, error.code(), detail)
+    }
+}
+
+impl From<mcm_core::software::SoftwareError> for ApiError {
+    fn from(error: mcm_core::software::SoftwareError) -> Self {
+        use mcm_core::software::SoftwareError as E;
+        let status = match error {
+            E::Invalid => StatusCode::UNPROCESSABLE_ENTITY,
+            E::Upstream | E::Download => StatusCode::BAD_GATEWAY,
+            E::Filesystem => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        let detail = match error {
+            E::Invalid => "Select a valid software type, Minecraft release and Paper build.",
+            E::Upstream => {
+                "The software provider could not be reached or returned invalid metadata. Retry shortly."
+            }
+            E::Download => "The server software download failed integrity or size verification.",
+            E::Filesystem => "Server software could not be written to disk.",
         };
         Self::new(status, error.code(), detail)
     }

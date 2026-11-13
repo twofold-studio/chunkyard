@@ -37,7 +37,11 @@ impl DockerRuntime {
                 format!("-Xms{}M", server.memory_min_mb),
                 format!("-Xmx{}M", server.memory_max_mb),
                 "-jar".into(),
-                server.jar.clone(),
+                server
+                    .launch
+                    .as_ref()
+                    .map(|l| l.path.clone())
+                    .unwrap_or_else(|| server.jar.clone()),
                 "nogui".into(),
                 "--port".into(),
                 "25565".into(),
@@ -111,6 +115,9 @@ mod tests {
             memory_max_mb: 1024,
             cpus: 1.5,
             accept_eula: true,
+            software: None,
+            launch: None,
+            auto_java: false,
         }
     }
     #[test]
@@ -147,6 +154,33 @@ mod tests {
         assert_eq!(host["PortBindings"]["25565/tcp"][0]["HostIp"], "127.0.0.1");
         assert_eq!(value["Entrypoint"], serde_json::json!(["java"]));
         assert_eq!(value["Cmd"][3], "a directory/server.jar");
+        Ok(())
+    }
+    #[test]
+    fn managed_jar_launch_uses_the_persisted_artifact() -> Result<(), Box<dyn std::error::Error>> {
+        let runtime = DockerRuntime::new(
+            crate::DockerConfig {
+                enabled: false,
+                ..Default::default()
+            },
+            "instance".into(),
+        );
+        let mut server = server();
+        server.launch = Some(mcm_core::software::Launch {
+            path: ".chunkyard-software-test/server.jar".into(),
+            version: "1.21.4".into(),
+            build: Some("232".into()),
+            java_major: 21,
+            checksum: "verified".into(),
+        });
+        let body = serde_json::to_value(runtime.body(
+            &server,
+            "/managed/server".into(),
+            "sha256:resolved".into(),
+            "1000:1000".into(),
+        )?)?;
+        assert_eq!(body["Cmd"][3], ".chunkyard-software-test/server.jar");
+        assert_eq!(body["Image"], "sha256:resolved");
         Ok(())
     }
     #[test]

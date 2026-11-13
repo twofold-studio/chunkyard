@@ -8,6 +8,7 @@ pub struct AppState {
     pub auth_enabled: bool,
     pub show_version: bool,
     pub auth: Arc<AuthService>,
+    pub software: Arc<dyn mcm_core::software::SoftwareService>,
     pub servers: Arc<dyn mcm_core::server::ServerService>,
     pub java: Arc<dyn JavaRuntimeService>,
     pub jobs: Arc<dyn JobService>,

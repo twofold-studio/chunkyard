@@ -91,6 +91,7 @@ pub(crate) async fn eula(
 }
 #[derive(Clone, Copy)]
 enum Action {
+    Install,
     Start,
     Stop,
     Restart,
@@ -105,6 +106,7 @@ async fn action(
     // Reject unknown IDs synchronously instead of enqueueing an unresolvable job.
     state.servers.get(&id).await?;
     let kind = match action {
+        Action::Install => "server.install",
         Action::Start => "server.start",
         Action::Stop => "server.stop",
         Action::Restart => "server.restart",
@@ -120,6 +122,7 @@ async fn action(
             actor.user_id(),
             Box::pin(async move {
                 let result = match action {
+                    Action::Install => servers.install(&id).await,
                     Action::Start => servers.start(&id).await,
                     Action::Stop => servers.stop(&id).await,
                     Action::Restart => servers.restart(&id).await,
@@ -163,4 +166,12 @@ pub(crate) async fn kill(
     Path(id): Path<String>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     action(state, actor, id, Action::Kill).await
+}
+
+pub(crate) async fn install(
+    State(state): State<AppState>,
+    Extension(actor): Extension<Actor>,
+    Path(id): Path<String>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    action(state, actor, id, Action::Install).await
 }

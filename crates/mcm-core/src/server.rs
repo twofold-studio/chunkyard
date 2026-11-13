@@ -17,6 +17,12 @@ pub struct Server {
     pub memory_max_mb: u32,
     pub cpus: f64,
     pub accept_eula: bool,
+    #[serde(default)]
+    pub software: Option<crate::software::Software>,
+    #[serde(default)]
+    pub launch: Option<crate::software::Launch>,
+    #[serde(default)]
+    pub auto_java: bool,
 }
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -37,6 +43,8 @@ pub struct CreateServer {
     pub cpus: f64,
     #[serde(default)]
     pub accept_eula: bool,
+    #[serde(default)]
+    pub software: Option<crate::software::Software>,
 }
 fn default_runtime() -> String {
     "docker".into()
@@ -141,6 +149,12 @@ pub enum ServerError {
     NotRunning,
     #[error("place the configured server JAR in the server directory before starting")]
     MissingJar,
+    #[error("Install the selected software before starting the server.")]
+    NotInstalled,
+    #[error("Server software is already installed; reinstalling could overwrite server files.")]
+    AlreadyInstalled,
+    #[error(transparent)]
+    Software(#[from] crate::software::SoftwareError),
     #[error("accept the Minecraft EULA before starting")]
     EulaRequired,
     #[error("Docker is unavailable or is not a Linux container engine")]
@@ -160,6 +174,12 @@ pub enum ServerError {
 pub trait ServerRepo: Send + Sync {
     async fn insert(&self, server: &Server) -> Result<(), ServerError>;
     async fn set_eula(&self, id: &str, accepted: bool) -> Result<(), RepositoryError>;
+    async fn set_installation(
+        &self,
+        id: &str,
+        launch: &crate::software::Launch,
+        image: &str,
+    ) -> Result<(), RepositoryError>;
     async fn get(&self, id: &str) -> Result<Option<Server>, RepositoryError>;
     async fn list(&self) -> Result<Vec<Server>, RepositoryError>;
 }
@@ -182,6 +202,7 @@ pub trait ServerRuntime: Send + Sync {
 }
 #[async_trait]
 pub trait ServerService: Send + Sync {
+    async fn install(&self, id: &str) -> Result<ServerView, ServerError>;
     async fn create(&self, request: CreateServer) -> Result<ServerView, ServerError>;
     async fn list(&self) -> Result<Vec<ServerView>, ServerError>;
     async fn get(&self, id: &str) -> Result<ServerView, ServerError>;
@@ -205,6 +226,9 @@ impl ServerError {
             Self::PortInUse => "server.port_in_use",
             Self::AlreadyRunning => "server.running",
             Self::NotRunning => "server.not_running",
+            Self::Software(error) => error.code(),
+            Self::NotInstalled => "server.not_installed",
+            Self::AlreadyInstalled => "server.already_installed",
             Self::MissingJar => "server.jar_missing",
             Self::EulaRequired => "server.eula_required",
             Self::DockerUnavailable => "docker.unavailable",

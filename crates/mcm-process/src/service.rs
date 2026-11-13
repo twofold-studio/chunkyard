@@ -17,6 +17,7 @@ pub struct ServerManager {
     runtime: Arc<dyn ServerRuntime>,
     locks: Mutex<HashMap<String, Arc<AsyncMutex<()>>>>,
     create_lock: AsyncMutex<()>,
+    installers: Option<Arc<dyn mcm_core::software::SoftwareService>>,
 }
 impl ServerManager {
     pub fn new(
@@ -32,7 +33,15 @@ impl ServerManager {
             runtime,
             locks: Mutex::new(HashMap::new()),
             create_lock: AsyncMutex::new(()),
+            installers: None,
         }
+    }
+    pub fn with_installers(
+        mut self,
+        installers: Arc<dyn mcm_core::software::SoftwareService>,
+    ) -> Self {
+        self.installers = Some(installers);
+        self
     }
     async fn record(&self, id: &str) -> Result<Server, ServerError> {
         let id = Uuid::parse_str(id)
@@ -57,6 +66,9 @@ impl ServerManager {
         })
     }
     async fn start_inner(&self, server: &Server) -> Result<RuntimeStatus, ServerError> {
+        if server.software.is_some() && server.launch.is_none() {
+            return Err(ServerError::NotInstalled);
+        }
         if !server.accept_eula {
             return Err(ServerError::EulaRequired);
         }
@@ -69,9 +81,17 @@ impl ServerManager {
         if !directory.starts_with(&root) {
             return Err(ServerError::MissingJar);
         }
-        let jar = tokio::fs::canonicalize(directory.join(&server.jar))
-            .await
-            .map_err(|_| ServerError::MissingJar)?;
+        let jar = tokio::fs::canonicalize(
+            directory.join(
+                server
+                    .launch
+                    .as_ref()
+                    .map(|l| l.path.as_str())
+                    .unwrap_or(&server.jar),
+            ),
+        )
+        .await
+        .map_err(|_| ServerError::MissingJar)?;
         if !jar.starts_with(&directory)
             || !tokio::fs::metadata(jar).await.map_err(fs_error)?.is_file()
         {
@@ -82,8 +102,100 @@ impl ServerManager {
 }
 #[async_trait]
 impl ServerService for ServerManager {
+    async fn install(&self, id: &str) -> Result<ServerView, ServerError> {
+        let server = self.record(id).await?;
+        let lock = self.lock(&server.id)?;
+        let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
+        let mut server = self.record(id).await?;
+        if server.launch.is_some() {
+            return Err(ServerError::AlreadyInstalled);
+        }
+        let software = server.software.as_ref().ok_or(ServerError::Invalid(
+            "Custom servers use a manually supplied JAR.",
+        ))?;
+        let status = self.runtime.status(&server).await?;
+        if status.state != ServerState::Stopped {
+            return Err(ServerError::AlreadyRunning);
+        }
+        // An old game container would retain its original command/image across starts.
+        if status.container_id.is_some() {
+            return Err(ServerError::Invalid(
+                "Install software before creating a game container.",
+            ));
+        }
+        let directory = tokio::fs::canonicalize(self.root.join(&server.id))
+            .await
+            .map_err(fs_error)?;
+        let root = tokio::fs::canonicalize(&self.root)
+            .await
+            .map_err(fs_error)?;
+        if !directory.starts_with(root) {
+            return Err(ServerError::Filesystem);
+        }
+        let staging = tempfile::Builder::new()
+            .prefix(".chunkyard-software-")
+            .tempdir_in(&directory)
+            .map_err(fs_error)?;
+        let installers = self.installers.as_ref().ok_or(ServerError::Invalid(
+            "Server software installers are unavailable.",
+        ))?;
+        let mut launch = installers.prepare(software, staging.path()).await?;
+        if !tokio::fs::metadata(staging.path().join("server.jar"))
+            .await
+            .map_err(fs_error)?
+            .is_file()
+        {
+            return Err(ServerError::MissingJar);
+        }
+        // Keep the complete artifact before persisting its reference. Interrupted DB work
+        // can leave an unused directory, but never a record pointing at a deleted staging file.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            tokio::fs::set_permissions(
+                staging.path().join("server.jar"),
+                std::fs::Permissions::from_mode(0o644),
+            )
+            .await
+            .map_err(fs_error)?;
+            tokio::fs::set_permissions(staging.path(), std::fs::Permissions::from_mode(0o755))
+                .await
+                .map_err(fs_error)?;
+        }
+        let artifact = staging.keep();
+        let relative = artifact
+            .strip_prefix(&directory)
+            .map_err(|_| ServerError::Filesystem)?
+            .join("server.jar");
+        launch.path = relative
+            .to_str()
+            .ok_or(ServerError::Filesystem)?
+            .replace('\\', "/");
+        if server.auto_java {
+            server.docker_image = format!("eclipse-temurin:{}-jre", launch.java_major)
+        }
+        if let Err(error) = self
+            .repo
+            .set_installation(&server.id, &launch, &server.docker_image)
+            .await
+        {
+            let _ = tokio::fs::remove_dir_all(artifact).await;
+            return Err(error.into());
+        }
+        server.jar = launch.path.clone();
+        server.launch = Some(launch);
+        Ok(ServerView {
+            server,
+            directory,
+            status,
+        })
+    }
+
     async fn create(&self, request: CreateServer) -> Result<ServerView, ServerError> {
         validation::validate(&request)?;
+        if let Some(software) = &request.software {
+            software.validate()?;
+        }
         let _guard = self.create_lock.lock().await;
         let existing = self.repo.list().await?;
         if existing.len() >= 100 {
@@ -92,6 +204,7 @@ impl ServerService for ServerManager {
         if existing.iter().any(|s| s.port == request.port) {
             return Err(ServerError::PortInUse);
         }
+        let auto_java = request.software.is_some() && request.docker_image.is_none();
         let server = Server {
             id: Uuid::new_v4().to_string(),
             name: request.name.trim().into(),
@@ -105,6 +218,9 @@ impl ServerService for ServerManager {
             memory_max_mb: request.memory_max_mb,
             cpus: request.cpus,
             accept_eula: request.accept_eula,
+            auto_java,
+            software: request.software,
+            launch: None,
         };
         tokio::fs::create_dir_all(&self.root)
             .await

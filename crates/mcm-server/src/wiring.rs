@@ -58,16 +58,21 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
         Arc::new(Adoptium::new(http.clone())),
         http,
     ));
-    let servers = Arc::new(mcm_process::ServerManager::new(
-        config.data_dir.join("servers"),
-        config.docker.runtime_image.clone(),
-        Arc::new(SqliteServerRepo::new(&database)),
-        Arc::new(mcm_process::DockerRuntime::new(
-            config.docker.clone(),
-            crate::storage::instance_id(&config.data_dir)?,
-        )),
-    ));
+    let software = Arc::new(mcm_install::Installers::new()?);
+    let servers = Arc::new(
+        mcm_process::ServerManager::new(
+            config.data_dir.join("servers"),
+            config.docker.runtime_image.clone(),
+            Arc::new(SqliteServerRepo::new(&database)),
+            Arc::new(mcm_process::DockerRuntime::new(
+                config.docker.clone(),
+                crate::storage::instance_id(&config.data_dir)?,
+            )),
+        )
+        .with_installers(software.clone()),
+    );
     let state = AppState {
+        software,
         servers,
         health: Arc::new(database.clone()),
         auth_enabled: config.auth.enabled,

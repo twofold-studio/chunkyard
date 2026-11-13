@@ -21,7 +21,7 @@ Chunkyard is a self-hosted Minecraft Java Edition server manager for one owner. 
 - **Choose** a Docker image's Java version for each server, and discover or install host Java runtimes separately.
 - **Keep** a simple owner login, or disable authentication explicitly for a trusted local environment.
 
-This project is in active development. Bring your own server JAR; automatic server/modpack installers, file management, and backups are still on the roadmap. Host-managed Java installations are not used by Docker servers. Container status does not establish Minecraft readiness.
+This project is in active development. The REST API installs selected Vanilla and Paper releases with verified downloads and automatic Java image selection; the web creation form currently requires your own JAR while its version selector is deferred. Modpack installers, file management, and backups remain on the roadmap. Host-managed Java installations are not used by Docker servers. Container status does not establish Minecraft readiness.
 
 ## Run it
 

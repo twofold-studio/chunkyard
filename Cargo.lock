@@ -1470,6 +1470,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha1",
  "sha2",
  "tempfile",
  "thiserror",
@@ -1485,6 +1486,19 @@ dependencies = [
  "tempfile",
  "thiserror",
  "zip",
+]
+
+[[package]]
+name = "mcm-install"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "mcm-core",
+ "mcm-download",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -1559,6 +1573,7 @@ dependencies = [
  "mcm-core",
  "mcm-db",
  "mcm-download",
+ "mcm-install",
  "mcm-java",
  "mcm-jobs",
  "mcm-process",

@@ -43,6 +43,17 @@ impl ServerRepo for SqliteServerRepo {
             .bind(if accepted { "true" } else { "false" }).bind(id).execute(&self.pool).await.map_err(storage)?;
         Ok(())
     }
+    async fn set_installation(
+        &self,
+        id: &str,
+        launch: &mcm_core::software::Launch,
+        image: &str,
+    ) -> Result<(), RepositoryError> {
+        let document = serde_json::to_string(launch).map_err(storage)?;
+        sqlx::query("UPDATE servers SET document=json_set(document,'$.launch',json(?),'$.dockerImage',?,'$.jar',?) WHERE id=?")
+            .bind(document).bind(image).bind(&launch.path).bind(id).execute(&self.pool).await.map_err(storage)?;
+        Ok(())
+    }
     async fn get(&self, id: &str) -> Result<Option<Server>, RepositoryError> {
         let json: Option<String> = sqlx::query_scalar("SELECT document FROM servers WHERE id = ?")
             .bind(id)

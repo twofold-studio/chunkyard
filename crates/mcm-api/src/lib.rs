@@ -6,6 +6,7 @@ mod json;
 mod openapi;
 mod security;
 mod servers;
+mod software;
 mod state;
 mod version;
 use axum::{
@@ -26,6 +27,13 @@ pub fn secure_router(router: Router, state: AppState) -> Router {
 /// API routes without global middleware, for composition with a static SPA fallback.
 pub fn routes(state: AppState) -> Router {
     let protected = Router::new()
+        .route("/api/v1/software", get(software::catalog))
+        .route("/api/v1/software/{kind}/versions", get(software::versions))
+        .route(
+            "/api/v1/software/{kind}/versions/{version}/builds",
+            get(software::builds),
+        )
+        .route("/api/v1/servers/{id}/install", post(servers::install))
         .route("/api/v1/openapi.json", get(openapi::document))
         .route("/api/v1/servers/{id}/metrics", get(servers::metrics))
         .route("/api/v1/servers", get(servers::list).post(servers::create))

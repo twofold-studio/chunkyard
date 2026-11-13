@@ -35,6 +35,10 @@
     },
     {
       "name": "Documentation"
+    },
+    {
+      "name": "Software",
+      "description": "Official Vanilla/Paper versions and stable Paper builds."
     }
   ],
   "security": [
@@ -1450,6 +1454,203 @@
           }
         }
       }
+    },
+    "/api/v1/software": {
+      "get": {
+        "operationId": "get_api_v1_software",
+        "tags": [
+          "Software"
+        ],
+        "summary": "List supported software types",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List supported software types",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoftwareCatalog"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/software/{kind}/versions": {
+      "get": {
+        "operationId": "get_api_v1_software_kind_versions",
+        "tags": [
+          "Software"
+        ],
+        "summary": "List Minecraft releases, newest first",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "vanilla",
+                "paper"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List Minecraft releases, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoftwareVersions"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/software/{kind}/versions/{version}/builds": {
+      "get": {
+        "operationId": "get_api_v1_software_kind_versions_version_builds",
+        "tags": [
+          "Software"
+        ],
+        "summary": "List stable Paper builds, newest first",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "paper"
+              ]
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._+\\-]*$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List stable Paper builds, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoftwareVersions"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/install": {
+      "post": {
+        "operationId": "post_api_v1_servers_id_install",
+        "tags": [
+          "Servers"
+        ],
+        "summary": "Install selected Vanilla or Paper software",
+        "responses": {
+          "202": {
+            "description": "Installation queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns a server.install job. Requires a stopped managed server without an existing game container or successful installation. Downloads and verifies an official JAR, records the resolved version/build/checksum, and selects a matching JVM image unless explicitly overridden. Never starts a server or changes EULA acceptance. Retry failed jobs against this same server ID. Reinstallation of an installed server is rejected.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1745,6 +1946,30 @@
           },
           "status": {
             "$ref": "#/components/schemas/RuntimeStatus"
+          },
+          "software": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Software"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "launch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstalledLaunch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "autoJava": {
+            "type": "boolean",
+            "description": "Manager selects the matching Docker JVM image when no dockerImage was supplied for a managed install."
           }
         },
         "required": [
@@ -1759,7 +1984,10 @@
           "cpus",
           "acceptEula",
           "directory",
-          "status"
+          "status",
+          "software",
+          "launch",
+          "autoJava"
         ]
       },
       "CreateServer": {
@@ -1811,6 +2039,16 @@
           "acceptEula": {
             "type": "boolean",
             "default": false
+          },
+          "software": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Software"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1818,7 +2056,7 @@
           "port"
         ],
         "additionalProperties": false,
-        "description": "Creates a stopped Docker server record and initial files. Does not download a JAR. Min heap must not exceed max heap. Accept the EULA only if you agree to it."
+        "description": "Creates a stopped Docker server record and initial files. Omit software for a manual JAR server. Managed software must be installed with POST /api/v1/servers/{id}/install. Java image is selected during installation unless dockerImage was explicitly provided. No download, EULA acceptance or game start occurs as a side effect of creation."
       },
       "ServerResponse": {
         "type": "object",
@@ -2422,6 +2660,171 @@
         "required": [
           "version",
           "markdown"
+        ]
+      },
+      "Software": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "vanilla"
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._+\\-]*$"
+              }
+            },
+            "required": [
+              "type",
+              "version"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "paper"
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._+\\-]*$"
+              },
+              "build": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]*$",
+                    "description": "Optional stable build number. Omission resolves latest stable once during installation."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "version"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "description": "Managed software selection. Release versions only; Forge, Fabric and CurseForge are deferred."
+      },
+      "InstalledLaunch": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "build": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "javaMajor": {
+            "type": "integer",
+            "minimum": 8,
+            "maximum": 99
+          },
+          "checksum": {
+            "type": "string",
+            "description": "Published SHA-1 (Vanilla) or SHA-256 (Paper) of the installed JAR."
+          }
+        },
+        "required": [
+          "path",
+          "version",
+          "build",
+          "javaMajor",
+          "checksum"
+        ],
+        "additionalProperties": false
+      },
+      "SoftwareCatalog": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "vanilla",
+                    "paper",
+                    "custom"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "available": {
+                  "type": "boolean"
+                },
+                "reason": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "available",
+                "reason"
+              ]
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "SoftwareVersions": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "stable": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "stable"
+              ]
+            }
+          }
+        },
+        "required": [
+          "items"
         ]
       }
     }

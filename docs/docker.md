@@ -20,7 +20,7 @@ Create a server with `POST /api/v1/servers`:
 }
 ```
 
-Set `acceptEula` to true only if you accept the Minecraft EULA. Creation returns 201 `{server}` with an ID, managed directory, configuration, and stopped status. Copy your server JAR into the returned directory before starting. Automatic server downloads/installers and file uploads are not part of this increment. The service writes initial `eula.txt` and `server.properties` files.
+Set `acceptEula` to true only if you accept the Minecraft EULA. Creation returns 201 `{server}` with an ID, managed directory, configuration, and stopped status. For a manual server, copy your server JAR into the returned directory before starting. The REST API can also create and install a selected Vanilla or Paper release, as described below. The current web creation form still uses manual JARs; its software/version selector is deferred to Opus. File uploads are not available yet. The service writes initial `eula.txt` and `server.properties` files.
 
 | Method | Endpoint | Response |
 |---|---|---|
@@ -38,7 +38,24 @@ Set `acceptEula` to true only if you accept the Minecraft EULA. Creation returns
 
 These routes share the existing owner-session or explicitly disabled-auth mode. Mutations require the same origin and `X-MCM-CSRF: 1`. Poll `/api/v1/jobs/{id}` for actions; their `serverId` identifies the target and successful results contain `{server}`. Only one lifecycle operation per server may run at a time. Commands cannot contain CR, LF or NUL. Logs are a bounded snapshot, not a live WebSocket stream; tail is 1–1000 lines and output is capped at 4 MiB.
 
-The default image supplies Java 21. Choose a Java 8/17/etc. Temurin image when needed; Docker uses the image's JVM, not a host-managed JRE. Only JAR launches are currently supported. Installers will add automatic Java compatibility and Forge argument-file launches later.
+The default manual image supplies Java 21. Managed Vanilla installs use the Java major in Mojang metadata; Paper uses its published recommended Java table. Unless you explicitly pass `dockerImage`, installation chooses `eclipse-temurin:<major>-jre` and stores that choice with the server. An explicit image remains your compatibility responsibility. Docker uses the image JVM, not a host-managed JRE. Forge, Fabric and modpack installers are deferred.
+
+### Managed Vanilla and Paper installation (REST API)
+
+1. Read `GET /api/v1/software` and `/api/v1/software/vanilla/versions` or `/api/v1/software/paper/versions` for releases, newest first. Snapshots and prereleases are excluded. For Paper, read `/api/v1/software/paper/versions/{version}/builds` for stable builds, newest first.
+2. Create the stopped server with `POST /api/v1/servers` and an additional `software` field:
+
+   ```json
+   {"name":"Survival","port":25565,"software":{"type":"paper","version":"1.21.4","build":"232"}}
+   ```
+
+   Vanilla uses `{"type":"vanilla","version":"1.21.4"}`. Omit Paper's `build` to resolve the latest stable build at install time. Omit `software` for the existing manual workflow. These example versions are fixed examples, not the latest release.
+3. Submit `POST /api/v1/servers/{id}/install` without a body and poll the returned job. Success returns `result: {server}`. The actual version, Paper build, JVM major, checksum and relative JAR path are persisted in `server.launch`. `server.jar` points to that installed artifact. Subsequent starts use that exact artifact without checking for updates.
+4. Accept the EULA explicitly if you agree to it, then start the server. Installation never accepts the EULA or starts Minecraft. `software != null && launch == null` means installation has not succeeded; Start fails with `server.not_installed`.
+
+Installation uses official Mojang/Paper metadata and exact HTTPS host allowlists with public-IP DNS resolution, revalidates redirects, caps metadata at 4 MiB and each JAR at 512 MiB, and checks the published size and SHA-1 (Vanilla) or SHA-256 (Paper). The JAR is written into a private staging directory before its completed path is saved. Failed downloads remove partial files. Retry on the **same server ID**; do not create another server. The per-server operation lock prevents concurrent install/start/EULA/lifecycle mutations. Successful installs cannot be overwritten by calling install again. Software must be installed before any game container has been created, since an existing container retains its original image and command. Interrupted persistence can leave an unused `.chunkyard-software-*` directory; it is never selected for launch without a saved installation record.
+
+The normal test suite uses provider/runtime fixtures. `cargo test -p mcm-install --test live -- --ignored` checks live catalog responses and downloads real Vanilla/Paper JARs into temporary storage without accepting the EULA or starting a game server. Availability of old releases, upstream download hosts and Temurin images can vary; errors are returned through the job instead of substituting another version. Game readiness and real multiplayer compatibility are separate checks.
 
 Containers mount only their own managed server directory at `/data`, use an argv array with a `java` entrypoint, and publish container port 25565/TCP to the server's chosen host port. `CHUNKYARD_DOCKER__PUBLISH_IP` defaults to `127.0.0.1`; choose a reachable host interface when players should connect directly. RCON and Docker management ports are not published. Memory min/max control the Java heap. The container's hard memory/swap limit is max heap plus the larger of 256 MiB or 25% overhead; CPUs and process count are also limited. The root filesystem is read-only, capabilities are dropped, no-new-privileges is enabled, `/tmp` is a bounded tmpfs, and logs rotate at 10 MiB × 3 files.
 

@@ -55,7 +55,12 @@ impl ServerRuntime for FakeRuntime {
             .unwrap_or(ServerState::Stopped);
         Ok(RuntimeStatus {
             state,
-            container_id: Some(format!("fixture-{}", server.id)),
+            container_id: self
+                .states
+                .lock()
+                .map_err(|_| ServerError::Busy)?
+                .contains_key(&server.id)
+                .then(|| format!("fixture-{}", server.id)),
             exit_code: None,
             oom_killed: false,
         })

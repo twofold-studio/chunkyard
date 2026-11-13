@@ -22,6 +22,21 @@ impl SafeHttp {
             "objects.githubusercontent.com",
             "release-assets.githubusercontent.com",
         ];
+        Self::with_hosts(&hosts)
+    }
+
+    pub fn minecraft() -> Result<Self, DownloadError> {
+        Self::with_hosts(&[
+            "piston-meta.mojang.com",
+            "piston-data.mojang.com",
+            "launchermeta.mojang.com",
+            "launcher.mojang.com",
+            "fill.papermc.io",
+            "fill-data.papermc.io",
+        ])
+    }
+
+    fn with_hosts(hosts: &[&str]) -> Result<Self, DownloadError> {
         Ok(Self {
             client: Client::builder()
                 .https_only(true)
@@ -30,9 +45,9 @@ impl SafeHttp {
                 .redirect(Policy::none())
                 .connect_timeout(Duration::from_secs(15))
                 .timeout(Duration::from_secs(600))
-                .user_agent("mcm/0.1.0")
+                .user_agent("Chunkyard/0.1.0 (https://chunkyard.fractal-tess.xyz)")
                 .build()?,
-            hosts: hosts.into_iter().map(String::from).collect(),
+            hosts: hosts.iter().map(|host| String::from(*host)).collect(),
         })
     }
 
@@ -82,6 +97,21 @@ impl SafeHttp {
         serde_json_decode(&bytes)
     }
 
+    /// Minecraft publishes SHA-1; Paper publishes SHA-256. Both are size bounded.
+    pub async fn artifact(
+        &self,
+        url: Url,
+        destination: &Path,
+        size: u64,
+        checksum: &str,
+    ) -> Result<(), DownloadError> {
+        if size == 0 || size > 512 * 1024 * 1024 {
+            return Err(DownloadError::Size);
+        }
+        let response = self.get(url).await?;
+        write_artifact(response, destination, size, checksum).await
+    }
+
     /// Writes only to a caller-owned staging directory; no partially verified final file.
     pub async fn download(
         &self,
@@ -104,6 +134,25 @@ async fn write_verified(
     size: u64,
     sha256: &str,
 ) -> Result<(), DownloadError> {
+    if sha256.len() != 64 {
+        return Err(DownloadError::Checksum);
+    }
+    write_artifact(response, destination, size, sha256).await
+}
+async fn write_artifact(
+    response: reqwest::Response,
+    destination: &Path,
+    size: u64,
+    checksum: &str,
+) -> Result<(), DownloadError> {
+    let limit = size;
+    if size == 0
+        || size > 512 * 1024 * 1024
+        || !matches!(checksum.len(), 40 | 64)
+        || !checksum.bytes().all(|b| b.is_ascii_hexdigit())
+    {
+        return Err(DownloadError::Checksum);
+    }
     if response.content_length().is_some_and(|n| n != size) {
         return Err(DownloadError::Size);
     }
@@ -113,25 +162,51 @@ async fn write_verified(
         .open(destination)
         .await?;
     let mut stream = response.bytes_stream();
-    let mut hasher = Sha256::new();
-    let mut received = 0_u64;
+    let mut received = 0u64;
+    let mut hasher = ArtifactHash::new(checksum.len());
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
         received += chunk.len() as u64;
-        if received > size {
+        if received > limit {
             return Err(DownloadError::Size);
         }
         hasher.update(&chunk);
         file.write_all(&chunk).await?;
     }
-    if received != size {
+    if received == 0 || size != received {
         return Err(DownloadError::Size);
     }
-    if format!("{:x}", hasher.finalize()) != sha256.to_ascii_lowercase() {
+    if hasher.finish() != checksum.to_ascii_lowercase() {
         return Err(DownloadError::Checksum);
     }
     file.sync_all().await?;
     Ok(())
+}
+
+enum ArtifactHash {
+    Sha1(sha1::Sha1),
+    Sha256(Sha256),
+}
+impl ArtifactHash {
+    fn new(length: usize) -> Self {
+        if length == 40 {
+            Self::Sha1(sha1::Sha1::new())
+        } else {
+            Self::Sha256(Sha256::new())
+        }
+    }
+    fn update(&mut self, chunk: &[u8]) {
+        match self {
+            Self::Sha1(h) => h.update(chunk),
+            Self::Sha256(h) => h.update(chunk),
+        }
+    }
+    fn finish(self) -> String {
+        match self {
+            Self::Sha1(h) => format!("{:x}", h.finalize()),
+            Self::Sha256(h) => format!("{:x}", h.finalize()),
+        }
+    }
 }
 
 fn serde_json_decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, DownloadError> {
@@ -141,6 +216,28 @@ fn serde_json_decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, DownloadErr
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn minecraft_policy_is_separate_from_java_and_rejects_private_or_external_urls()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let client = SafeHttp::minecraft()?;
+        for value in [
+            "http://piston-data.mojang.com/server.jar",
+            "https://127.0.0.1/",
+            "https://fill.papermc.io.evil.com/",
+            "https://user@fill.papermc.io/",
+            "https://github.com/file",
+            "https://api.curseforge.com/",
+        ] {
+            assert!(client.validate(&Url::parse(value)?).is_err(), "{value}");
+        }
+        for value in [
+            "https://piston-data.mojang.com/server.jar",
+            "https://fill-data.papermc.io/file",
+        ] {
+            client.validate(&Url::parse(value)?)?;
+        }
+        Ok(())
+    }
     #[test]
     fn rejects_untrusted_urls() -> Result<(), Box<dyn std::error::Error>> {
         let client = SafeHttp::adoptium()?;
@@ -200,6 +297,35 @@ mod streaming_tests {
             write_verified(response().await?, &path, 3, &checksum)
                 .await
                 .is_err()
+        );
+        Ok(())
+    }
+    #[tokio::test]
+    async fn verifies_mojang_sha1_and_rejects_a_corrupt_artifact()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let checksum = format!("{:x}", sha1::Sha1::digest(b"abc"));
+        write_artifact(response().await?, &dir.path().join("valid"), 3, &checksum).await?;
+        assert_eq!(tokio::fs::read(dir.path().join("valid")).await?, b"abc");
+        assert!(matches!(
+            write_artifact(
+                response().await?,
+                &dir.path().join("corrupt"),
+                3,
+                &"0".repeat(40)
+            )
+            .await,
+            Err(DownloadError::Checksum)
+        ));
+        assert!(
+            write_verified(
+                response().await?,
+                &dir.path().join("not-sha256"),
+                3,
+                &checksum
+            )
+            .await
+            .is_err()
         );
         Ok(())
     }

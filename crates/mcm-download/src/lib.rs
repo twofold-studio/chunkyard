@@ -11,7 +11,7 @@ pub enum DownloadError {
     Redirect,
     #[error("response exceeds size limit or declared size does not match")]
     Size,
-    #[error("SHA-256 mismatch")]
+    #[error("artifact checksum mismatch")]
     Checksum,
     #[error(transparent)]
     Json(#[from] serde_json::Error),

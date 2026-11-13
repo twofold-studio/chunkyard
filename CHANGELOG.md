@@ -33,6 +33,7 @@ Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fr
 - Web UI: use logo-derived multi-size browser favicons and an Apple touch icon, with explicit page-head links.
 - REST API: public GET /api/v1/system/version and /api/v1/system/changelog provide package metadata and bundled project notes for the version UI. CHUNKYARD_HTTP__SHOW_VERSION=false hides version values and returns 404 for the changelog; enabled by default, including before owner setup.
 - Web UI: show a discreet version badge (for example v0.1.0 · dev) on setup, sign-in and the app sidebar from public GET /api/v1/system/version. Clicking it opens a scrollable changelog dialog that loads GET /api/v1/system/changelog only when first opened, with loading, error and retry states, and renders the Markdown as plain text without injecting HTML. The badge stays hidden, and the changelog is never requested, when the feature is disabled or the version request fails.
+- REST API: list Vanilla/Paper Minecraft releases and stable Paper builds under /api/v1/software; create managed software selections and install them through /api/v1/servers/{id}/install jobs with verified downloads, pinned artifacts and automatic Docker Java selection. Existing manual JAR servers remain supported; the web creation wizard is deferred.
 
 ### Changed
 

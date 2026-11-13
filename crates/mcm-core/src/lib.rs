@@ -5,3 +5,5 @@ pub mod jobs;
 pub mod repository;
 pub mod server;
 pub mod system;
+
+pub mod software;
