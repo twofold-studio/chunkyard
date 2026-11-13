@@ -11,10 +11,10 @@ use tokio::sync::Mutex as AsyncMutex;
 use uuid::Uuid;
 
 pub struct ServerManager {
-    root: PathBuf,
+    pub(crate) root: PathBuf,
     default_image: String,
     repo: Arc<dyn ServerRepo>,
-    runtime: Arc<dyn ServerRuntime>,
+    pub(crate) runtime: Arc<dyn ServerRuntime>,
     locks: Mutex<HashMap<String, Arc<AsyncMutex<()>>>>,
     create_lock: AsyncMutex<()>,
     port_locks: Mutex<HashMap<u16, Arc<AsyncMutex<()>>>>,
@@ -45,13 +45,13 @@ impl ServerManager {
         self.installers = Some(installers);
         self
     }
-    async fn record(&self, id: &str) -> Result<Server, ServerError> {
+    pub(crate) async fn record(&self, id: &str) -> Result<Server, ServerError> {
         let id = Uuid::parse_str(id)
             .map_err(|_| ServerError::NotFound)?
             .to_string();
         self.repo.get(&id).await?.ok_or(ServerError::NotFound)
     }
-    fn lock(&self, id: &str) -> Result<Arc<AsyncMutex<()>>, ServerError> {
+    pub(crate) fn lock(&self, id: &str) -> Result<Arc<AsyncMutex<()>>, ServerError> {
         let mut locks = self.locks.lock().map_err(|_| ServerError::Busy)?;
         Ok(locks.entry(id.into()).or_default().clone())
     }

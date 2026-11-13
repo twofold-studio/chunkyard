@@ -38,6 +38,15 @@ Sessions use a 32-byte random token; only SHA-256 is stored. Cookies are HttpOnl
 | DELETE | `/api/v1/servers/{id}?deleteFiles=false` | 202 `{job}`; stopped instance only; retains files by default |
 | GET | `/api/v1/servers/{id}/network` | `{port,publishIp,effectivePublishIp,boundPublishIp,boundPort,restartRequired,status}` |
 | PATCH | `/api/v1/servers/{id}/network` | 200 `{server}`; body `{port,publishIp}`; stopped only, null bind uses manager default |
+| GET | `/api/v1/servers/{id}/files?path=` | `{path,entries,truncated,canWrite}`; empty path lists instance root |
+| GET | `/api/v1/servers/{id}/files/content?path=...` | `{path,content,etag,size,readOnly,canWrite}`; UTF-8 text up to 1 MiB |
+| PUT | `/api/v1/servers/{id}/files/content?path=...` | `{path,etag,size}`; body `{content,etag}`; null etag creates only |
+| GET | `/api/v1/servers/{id}/files/download?path=...` | Streaming attachment for one regular file |
+| POST | `/api/v1/servers/{id}/files/upload?path=...&overwrite=false` | 201 `{entry}`; raw binary body up to 128 MiB |
+| POST | `/api/v1/servers/{id}/files/mkdir` | 201 `{entry}`; body `{path}`; parent must exist |
+| POST | `/api/v1/servers/{id}/files/move` | `{entry}`; body `{from,to}`; rename/move without overwrite |
+| POST | `/api/v1/servers/{id}/files/copy` | `{entry}`; body `{from,to}`; bounded directory/file copy without overwrite |
+| POST | `/api/v1/servers/{id}/files/delete` | 204; body `{path,recursive}`; permanent deletion |
 | GET | `/api/v1/java/runtimes` | `{items: JavaRuntime[]}` |
 | POST | `/api/v1/java/runtimes/discover` | `{items: JavaRuntime[]}` |
 | GET | `/api/v1/java/available` | `{lts: number[], all: number[], mostRecentLts: number}` |
@@ -45,7 +54,21 @@ Sessions use a 32-byte random token; only SHA-256 is stored. Cookies are HttpOnl
 | GET | `/api/v1/jobs?limit=50&cursor=...` | `{items: Job[], nextCursor: string | null}`; max limit 200 |
 | GET | `/api/v1/jobs/{id}` | `Job` |
 
-When authentication is enabled, setup, token verification, login, health, setup status, and the optional version/changelog metadata are public. The remaining endpoints require the owner session. Before setup, protected endpoints return 503 `setup_required`. Errors use `application/problem+json`, with stable `code` and sanitized `detail`. JSON bodies are limited to 1 MiB. API responses include no-store, a restrictive CSP, security headers, and a generated request ID. Static UI pages have a separate page CSP and assets have cache policies; see [frontend hosting](frontend.md). Unknown `/api` routes return JSON problem responses even when UI hosting is enabled.
+When authentication is enabled, setup, token verification, login, health, setup status, and the optional version/changelog metadata are public. The remaining endpoints require the owner session. Before setup, protected endpoints return 503 `setup_required`. Errors use `application/problem+json`, with stable `code` and sanitized `detail`. JSON bodies are limited to 1 MiB, except the editor's 8 MiB envelope for escaped text up to 1 MiB. API responses include no-store, a restrictive CSP, security headers, and a generated request ID. Static UI pages have a separate page CSP and assets have cache policies; see [frontend hosting](frontend.md). Unknown `/api` routes return JSON problem responses even when UI hosting is enabled.
+
+## Instance files
+
+File mutations require a stopped instance and use the same lock as installation, lifecycle, network changes and instance deletion. Reads/downloads work while running; `canWrite` becomes false. If Docker is unavailable, listing and reading still work with writes disabled. Operations run in blocking workers, retaining the lock until filesystem work actually finishes even if the browser disconnects.
+
+Paths are relative POSIX names inside one instance. Root listing uses an empty path; no operation may replace or delete root. Dot segments, absolute paths, backslashes, control characters and Windows device/alternate-stream names are rejected. Paths are limited to 1024 bytes, 32 components and 255 bytes per component. Directory capabilities and no-follow opens prevent symbolic-link traversal, including linked instance roots. `.chunkyard-*` components are hidden/protected. Root `eula.txt` is readable but changes use the separate EULA action.
+
+The text editor supports UTF-8 without NUL bytes. `etag` is the SHA-256 of the text read; send it on save, or null to create a new file. Stale saves return 409 `files.conflict` and leave the file intact. Writes/uploads stage in the same directory and publish only after successful completion. Uploads use a raw `File`/`Blob` body, not multipart or base64, with the usual CSRF header and same-origin credentials. Existing files require explicit `overwrite=true`. Up to four uploads and four downloads run at once; excess transfers return 429 `files.busy`. Uploads time out after 60 seconds without a body chunk. Downloads are single regular-file attachments; directory ZIP and Range requests are not implemented.
+
+Listings stop after 5000 inspected entries and report `truncated`; non-UTF-8 names are skipped. Copies are limited to 512 MiB, 5000 entries and 32 nested levels; failed directory copies clean up their newly created destination. Moves/copies refuse existing destinations, links and special files. Nonempty directory deletion requires `recursive=true` and is permanent. Stop external tools from editing the same instance during changes: editor etags detect changes since reading but do not provide a transaction with arbitrary host-side writers.
+
+File errors use `files.path_invalid` (422), `files.symlink`/`files.protected` (403), `files.not_found` (404), `files.exists`/`files.conflict`/`files.not_empty`/`files.server_running` (409), `files.too_large` (413), `files.binary` (415), and `files.io` (500). An overlapping lifecycle/file operation returns `server.busy` (409).
+
+Edit `server.properties` through the same text API. Changes take effect on the next start; saving never starts a server or accepts the EULA. The launcher forces the internal game port to 25565: change the published host port through `/network`. Authentication settings such as `online-mode` are left to the owner; Chunkyard does not change them automatically.
 
 `JavaRuntime` is the current core model: `{id, vendor, major, fullVersion, os, arch, path, managed, sha256}`. OS can be `linux`, `alpine-linux`, or `windows`. Planned fields such as `usedBy` and `installedAt` are not present yet. `java.allow_system_java = false` hides system runtimes and disables discovery.
 

@@ -5,7 +5,7 @@ use std::collections::HashSet;
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[tokio::test]
-async fn schema_is_protected_and_references_only_local_resolvable_schemas() -> Result {
+async fn schema_is_protected_and_references_only_local_resolvable_components() -> Result {
     let app = TestApp::new().await?;
     let url = format!("{}/api/v1/openapi.json", app.base);
     assert_eq!(app.client.get(&url).send().await?.status(), 503);
@@ -22,6 +22,11 @@ async fn schema_is_protected_and_references_only_local_resolvable_schemas() -> R
     let mut ids = HashSet::new();
     for (path, methods) in paths {
         for (method, operation) in methods.as_object().ok_or("methods missing")? {
+            if !["get", "post", "put", "patch", "delete", "head", "options"]
+                .contains(&method.as_str())
+            {
+                continue;
+            }
             assert!(
                 ids.insert(
                     operation["operationId"]
@@ -58,12 +63,18 @@ async fn schema_is_protected_and_references_only_local_resolvable_schemas() -> R
                 "documented route missing: {method} {path}"
             );
             assert!(operation["responses"].get("default").is_some());
-            if method == "post" {
+            if ["post", "put", "patch", "delete"].contains(&method.as_str()) {
                 assert!(
                     operation["parameters"]
                         .as_array()
-                        .ok_or("parameters missing")?
-                        .iter()
+                        .into_iter()
+                        .flatten()
+                        .chain(methods["parameters"].as_array().into_iter().flatten())
+                        .map(|p| p
+                            .get("$ref")
+                            .and_then(Value::as_str)
+                            .and_then(|reference| doc.pointer(&reference[1..]))
+                            .unwrap_or(p))
                         .any(|p| p["name"] == "X-MCM-CSRF" && p["required"] == true)
                 );
             }
@@ -79,7 +90,16 @@ fn check_references(value: &Value, doc: &Value) {
     match value {
         Value::Object(object) => {
             if let Some(reference) = object.get("$ref").and_then(Value::as_str) {
-                assert!(reference.starts_with("#/components/schemas/"));
+                assert!(
+                    [
+                        "#/components/schemas/",
+                        "#/components/parameters/",
+                        "#/components/responses/"
+                    ]
+                    .iter()
+                    .any(|prefix| reference.starts_with(prefix)),
+                    "external or unsupported reference {reference}"
+                );
                 assert!(
                     doc.pointer(&reference[1..]).is_some(),
                     "dangling reference {reference}"

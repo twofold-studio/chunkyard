@@ -1,0 +1,3 @@
+kind: Added
+body: 'REST API: add /api/v1/servers/{id}/files routes for bounded browsing, UTF-8 editing with stale-save checks, streaming uploads/downloads, mkdir, move, copy and confirmed recursive deletion. Mutations require a stopped instance and share its lifecycle lock; managed artifacts and EULA remain protected.'
+time: 2026-11-14T00:28:16.845717504+02:00

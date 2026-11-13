@@ -56,7 +56,7 @@ impl TestApp {
         let mut backend = build_state(&config).await?;
         backend.state.java = Arc::new(FakeJava { fail_install });
         backend.state.software = Arc::new(software::FakeSoftware::default());
-        backend.state.servers = Arc::new(
+        let servers = Arc::new(
             mcm_process::ServerManager::new(
                 directory.path().join("servers"),
                 "fixture-image".into(),
@@ -65,6 +65,8 @@ impl TestApp {
             )
             .with_installers(backend.state.software.clone()),
         );
+        backend.state.files = servers.clone();
+        backend.state.servers = servers;
         let base = format!("http://{address}");
         let router = if ui {
             let assets = directory.path().join("ui");

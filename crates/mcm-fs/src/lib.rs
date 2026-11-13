@@ -1,5 +1,6 @@
 //! Bounded archive extraction into new, private staging directories.
 mod archive;
+pub mod sandbox;
 pub use archive::{ArchiveFormat, extract};
 
 #[derive(Debug, thiserror::Error)]

@@ -77,6 +77,10 @@ Omit `port` (or use null) when creating an instance to allocate the first unassi
 
 Files remain on the manager host by default. A successful job returns `result.deleted: {id, filesDeleted, retainedDirectory}`; the directory is null if no files remain. Add `?deleteFiles=true` only to explicitly remove that instance's world, configuration, logs and installed software. Root symlinks are rejected; recursive cleanup does not traverse links into other directories. Retained files are not automatically imported into a new instance. Docker and filesystem cleanup cannot be one SQLite transaction: an interrupted or failed deletion may already have removed the container or some requested files while retaining the record. Retry deletion on that same ID to finish cleanup. Deletion uses the same session, Host/origin and CSRF checks as other mutations.
 
+## Instance file management
+
+The file API can browse/download files while an instance runs. Stop it before editing `server.properties`, uploading, moving, copying or deleting files. Changes apply on the next start. The launcher keeps Minecraft's internal port at 25565; published host port/address settings live in `/api/v1/servers/{id}/network`. File saves never change EULA acceptance or start the game. See [file routes and limits](http-api.md#instance-files).
+
 # Run the manager in Docker
 
 Build the image, which includes both the Rust service and the production UI:

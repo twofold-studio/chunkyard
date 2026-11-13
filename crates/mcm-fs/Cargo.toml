@@ -8,6 +8,12 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+mcm-core.workspace = true
+cap-std.workspace = true
+cap-fs-ext.workspace = true
+sha2.workspace = true
+uuid.workspace = true
+time.workspace = true
 flate2.workspace = true
 tar.workspace = true
 thiserror.workspace = true

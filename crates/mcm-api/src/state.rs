@@ -10,6 +10,7 @@ pub struct AppState {
     pub auth: Arc<AuthService>,
     pub software: Arc<dyn mcm_core::software::SoftwareService>,
     pub servers: Arc<dyn mcm_core::server::ServerService>,
+    pub files: Arc<dyn mcm_core::files::FileService>,
     pub java: Arc<dyn JavaRuntimeService>,
     pub jobs: Arc<dyn JobService>,
     pub origin: String,

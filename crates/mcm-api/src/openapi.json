@@ -3,7 +3,7 @@
   "info": {
     "title": "Chunkyard API",
     "version": "0.1.0",
-    "description": "Single-owner Minecraft manager. Cookie authentication is required unless CHUNKYARD_AUTH__ENABLED=false. Authentication-disabled mode grants full access, with user:null. Host/origin and X-MCM-CSRF protections apply in both modes. JSON request bodies are limited to 1 MiB. API responses use no-store. Jobs are durable; console and resource metrics are snapshots."
+    "description": "Single-owner Minecraft manager. Cookie authentication is required unless CHUNKYARD_AUTH__ENABLED=false. Authentication-disabled mode grants full access, with user:null. Host/origin and X-MCM-CSRF protections apply in both modes. JSON request bodies are limited to 1 MiB, except the text editor's 8 MiB envelope for escaped UTF-8 text up to 1 MiB. Raw uploads are streamed up to 128 MiB. API responses use no-store. Jobs are durable; console and resource metrics are snapshots."
   },
   "servers": [
     {
@@ -12,6 +12,10 @@
     }
   ],
   "tags": [
+    {
+      "name": "Files",
+      "description": "Instance-relative browsing and stopped-instance file operations."
+    },
     {
       "name": "Authentication"
     },
@@ -47,6 +51,276 @@
     }
   ],
   "paths": {
+    "/api/v1/servers/{id}/files": {
+      "parameters": [
+        { "$ref": "#/components/parameters/FileServerId" },
+        { "$ref": "#/components/parameters/FilePath" }
+      ],
+      "get": {
+        "operationId": "list_server_files",
+        "tags": ["Files"],
+        "summary": "List an instance-relative directory",
+        "description": "Empty path lists root. At most 5000 entries, directories first. Protected .chunkyard-* paths are hidden; links are listed without traversal. canWrite is false for running instances or an unavailable Docker engine.",
+        "responses": {
+          "200": {
+            "description": "Directory snapshot",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FileListing" }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/FileProblem" }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/files/content": {
+      "parameters": [
+        { "$ref": "#/components/parameters/FileServerId" },
+        { "$ref": "#/components/parameters/RequiredFilePath" }
+      ],
+      "get": {
+        "operationId": "read_server_file",
+        "tags": ["Files"],
+        "summary": "Read UTF-8 text up to 1 MiB",
+        "responses": {
+          "200": {
+            "description": "Text and SHA-256 etag",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FileContent" }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/FileProblem" }
+        }
+      },
+      "put": {
+        "operationId": "save_server_file",
+        "tags": ["Files"],
+        "summary": "Atomically save text on a stopped instance",
+        "description": "Send the etag from the previous read; null/omitted is create-only. Stale saves return 409 files.conflict. NUL/binary text is rejected. Root eula.txt is read-only. Requires a same-origin Origin/Referer and X-MCM-CSRF: 1.",
+        "parameters": [{ "$ref": "#/components/parameters/FileCsrf" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["content"],
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "description": "UTF-8 bytes at most 1 MiB; JSON envelope at most 8 MiB."
+                  },
+                  "etag": { "type": ["string", "null"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved file",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SavedFile" }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/FileProblem" }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/files/download": {
+      "parameters": [
+        { "$ref": "#/components/parameters/FileServerId" },
+        { "$ref": "#/components/parameters/RequiredFilePath" }
+      ],
+      "get": {
+        "operationId": "download_server_file",
+        "tags": ["Files"],
+        "summary": "Stream one regular file as an attachment",
+        "description": "Works while running. No directory ZIP or Range support. Maximum four concurrent downloads; 429 files.busy if all slots are occupied.",
+        "responses": {
+          "200": {
+            "description": "Attachment",
+            "headers": {
+              "Content-Disposition": { "schema": { "type": "string" } }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/FileProblem" }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/files/upload": {
+      "parameters": [
+        { "$ref": "#/components/parameters/FileServerId" },
+        { "$ref": "#/components/parameters/RequiredFilePath" },
+        { "$ref": "#/components/parameters/FileCsrf" },
+        {
+          "in": "query",
+          "name": "overwrite",
+          "schema": { "type": "boolean", "default": false }
+        }
+      ],
+      "post": {
+        "operationId": "upload_server_file",
+        "tags": ["Files"],
+        "summary": "Stream an upload into a stopped instance",
+        "description": "Raw body, not multipart/base64. Up to 128 MiB, four concurrent uploads, 60-second idle timeout. Atomic publication; existing file remains intact on interrupted/oversized uploads. Existing destinations require explicit overwrite=true. Requires same-origin Origin/Referer.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": { "type": "string", "format": "binary" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Uploaded entry",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FileEntryResponse" }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/FileProblem" }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/files/mkdir": {
+      "parameters": [
+        { "$ref": "#/components/parameters/FileServerId" },
+        { "$ref": "#/components/parameters/FileCsrf" }
+      ],
+      "post": {
+        "operationId": "mkdir_server_file",
+        "tags": ["Files"],
+        "summary": "Create a directory on a stopped instance",
+        "description": "Parent must exist. Requires same-origin Origin/Referer.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/FilePathRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created entry",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FileEntryResponse" }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/FileProblem" }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/files/move": {
+      "parameters": [
+        { "$ref": "#/components/parameters/FileServerId" },
+        { "$ref": "#/components/parameters/FileCsrf" }
+      ],
+      "post": {
+        "operationId": "move_server_file",
+        "tags": ["Files"],
+        "summary": "Move or rename a stopped instance's file/directory",
+        "description": "No overwrite or symbolic links. Destination parent must exist. Requires same-origin Origin/Referer.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/FileTransfer" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Moved entry",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FileEntryResponse" }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/FileProblem" }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/files/copy": {
+      "parameters": [
+        { "$ref": "#/components/parameters/FileServerId" },
+        { "$ref": "#/components/parameters/FileCsrf" }
+      ],
+      "post": {
+        "operationId": "copy_server_file",
+        "tags": ["Files"],
+        "summary": "Copy a stopped instance's file/directory",
+        "description": "No overwrite or symbolic links. Bounded to 512 MiB, 5000 entries and 32 levels. Failed directory copies remove their newly created destination. Requires same-origin Origin/Referer.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/FileTransfer" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Copied entry",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FileEntryResponse" }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/FileProblem" }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/files/delete": {
+      "parameters": [
+        { "$ref": "#/components/parameters/FileServerId" },
+        { "$ref": "#/components/parameters/FileCsrf" }
+      ],
+      "post": {
+        "operationId": "delete_server_file",
+        "tags": ["Files"],
+        "summary": "Permanently delete a stopped instance's file/directory",
+        "description": "Root, EULA and protected artifacts cannot be removed. Nonempty directories require recursive=true. Requires same-origin Origin/Referer.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path"],
+                "properties": {
+                  "path": { "type": "string", "minLength": 1 },
+                  "recursive": { "type": "boolean", "default": false }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "Removed" },
+          "default": { "$ref": "#/components/responses/FileProblem" }
+        }
+      }
+    },
     "/api/v1/servers/{id}/network": {
       "get": {
         "operationId": "get_server_network",
@@ -1696,6 +1970,43 @@
     }
   },
   "components": {
+    "parameters": {
+      "FileServerId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "FilePath": {
+        "name": "path",
+        "in": "query",
+        "schema": { "type": "string", "default": "" },
+        "description": "Instance-relative POSIX path. Empty only for listing root; no dot segments, backslashes, device names, or .chunkyard-* components."
+      },
+      "RequiredFilePath": {
+        "name": "path",
+        "in": "query",
+        "required": true,
+        "schema": { "type": "string", "minLength": 1 },
+        "description": "Instance-relative POSIX path; no dot segments, backslashes, device names, or .chunkyard-* components."
+      },
+      "FileCsrf": {
+        "name": "X-MCM-CSRF",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "enum": ["1"] }
+      }
+    },
+    "responses": {
+      "FileProblem": {
+        "description": "Problem response: path_invalid 422; symlink/protected 403; not_found 404; exists/conflict/not_empty/server_running 409; too_large 413; binary 415; busy 429; io 500. File codes use files. prefix. Lifecycle conflicts use server.busy 409. Authentication/origin protections also apply.",
+        "content": {
+          "application/problem+json": {
+            "schema": { "$ref": "#/components/schemas/Problem" }
+          }
+        }
+      }
+    },
     "securitySchemes": {
       "cookieAuth": {
         "type": "apiKey",
@@ -1705,6 +2016,73 @@
       }
     },
     "schemas": {
+      "FileEntry": {
+        "type": "object",
+        "required": ["name", "path", "kind", "size", "modifiedAt", "readOnly"],
+        "properties": {
+          "name": { "type": "string" },
+          "path": { "type": "string" },
+          "kind": { "enum": ["file", "directory", "symlink", "other"] },
+          "size": { "type": "integer", "minimum": 0 },
+          "modifiedAt": { "type": ["string", "null"], "format": "date-time" },
+          "readOnly": { "type": "boolean" }
+        }
+      },
+      "FileEntryResponse": {
+        "type": "object",
+        "required": ["entry"],
+        "properties": { "entry": { "$ref": "#/components/schemas/FileEntry" } }
+      },
+      "FileListing": {
+        "type": "object",
+        "required": ["path", "entries", "truncated", "canWrite"],
+        "properties": {
+          "path": { "type": "string" },
+          "entries": {
+            "type": "array",
+            "maxItems": 5000,
+            "items": { "$ref": "#/components/schemas/FileEntry" }
+          },
+          "truncated": { "type": "boolean" },
+          "canWrite": { "type": "boolean" }
+        }
+      },
+      "FileContent": {
+        "type": "object",
+        "required": ["path", "content", "etag", "size", "readOnly", "canWrite"],
+        "properties": {
+          "path": { "type": "string" },
+          "content": { "type": "string" },
+          "etag": { "type": "string" },
+          "size": { "type": "integer", "minimum": 0 },
+          "readOnly": { "type": "boolean" },
+          "canWrite": { "type": "boolean" }
+        }
+      },
+      "SavedFile": {
+        "type": "object",
+        "required": ["path", "etag", "size"],
+        "properties": {
+          "path": { "type": "string" },
+          "etag": { "type": "string" },
+          "size": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "FilePathRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path"],
+        "properties": { "path": { "type": "string", "minLength": 1 } }
+      },
+      "FileTransfer": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to"],
+        "properties": {
+          "from": { "type": "string", "minLength": 1 },
+          "to": { "type": "string", "minLength": 1 }
+        }
+      },
       "NetworkSettings": {
         "type": "object",
         "properties": {

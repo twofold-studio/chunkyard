@@ -73,6 +73,7 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
     );
     let state = AppState {
         software,
+        files: servers.clone(),
         servers,
         health: Arc::new(database.clone()),
         auth_enabled: config.auth.enabled,

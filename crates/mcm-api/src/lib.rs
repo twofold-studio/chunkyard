@@ -1,6 +1,7 @@
 //! HTTP transport. Services and configuration arrive through the composition root.
 mod auth;
 mod error;
+mod files;
 mod java;
 mod json;
 mod openapi;
@@ -27,6 +28,7 @@ pub fn secure_router(router: Router, state: AppState) -> Router {
 /// API routes without global middleware, for composition with a static SPA fallback.
 pub fn routes(state: AppState) -> Router {
     let protected = Router::new()
+        .merge(files::routes())
         .route(
             "/api/v1/servers/{id}/network",
             get(servers::network).patch(servers::set_network),
