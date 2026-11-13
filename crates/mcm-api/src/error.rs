@@ -162,6 +162,7 @@ impl From<mcm_core::server::ServerError> for ApiError {
                 StatusCode::CONFLICT
             }
             E::DockerUnavailable | E::MissingJar => StatusCode::FAILED_DEPENDENCY,
+            E::MetricsBusy => StatusCode::TOO_MANY_REQUESTS,
             E::Docker => StatusCode::BAD_GATEWAY,
             E::Filesystem | E::Storage(_) => return Self::internal(error),
         };
@@ -170,6 +171,7 @@ impl From<mcm_core::server::ServerError> for ApiError {
             E::Invalid(detail) => *detail,
             E::NotFound => "The server does not exist.",
             E::Busy => "Another operation for this server is running.",
+            E::MetricsBusy => "All metrics sampling slots are busy; retry shortly.",
             E::PortInUse => "That game port is already assigned.",
             E::AlreadyRunning => "The server is already running.",
             E::NotRunning => "The server is not running.",

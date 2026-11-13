@@ -44,6 +44,8 @@ async fn real_docker_start_console_restart_adoption_stop_and_kill() -> Result {
             "fixture jar placeholder",
         )?;
     }
+    let stopped_metrics = backend.state.servers.metrics(&id).await?;
+    assert!(stopped_metrics.cpu_percent.is_none());
     let started = backend.state.servers.start(&id).await?;
     assert_eq!(started.status.state, ServerState::Running);
     for _ in 0..100 {
@@ -68,6 +70,17 @@ async fn real_docker_start_console_restart_adoption_stop_and_kill() -> Result {
             .iter()
             .any(|l| l.text.contains("Done"))
     );
+    let metrics = backend.state.servers.metrics(&id).await?;
+    assert_eq!(metrics.status.state, ServerState::Running);
+    assert!(metrics.uptime_seconds.is_some());
+    assert!(metrics.memory_usage_bytes.is_some_and(|bytes| bytes > 0));
+    assert!(metrics.memory_limit_bytes.is_some_and(|bytes| bytes > 0));
+    assert!(
+        metrics
+            .cpu_percent
+            .is_some_and(|percent| percent.is_finite() && percent >= 0.0)
+    );
+    assert!(metrics.pids.is_some_and(|pids| pids > 0));
     backend.state.servers.command(&id, "say hello").await?;
     for _ in 0..100 {
         if std::fs::read_to_string(created.directory.join("last-command.txt"))
@@ -149,6 +162,10 @@ async fn foreign_container_ownership_is_rejected_without_starting_it() -> Result
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
+    assert!(matches!(
+        backend.state.servers.metrics(&created.server.id).await,
+        Err(mcm_core::server::ServerError::ContainerConflict)
+    ));
     assert!(matches!(
         backend.state.servers.start(&created.server.id).await,
         Err(mcm_core::server::ServerError::ContainerConflict)

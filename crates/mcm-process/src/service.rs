@@ -135,6 +135,9 @@ impl ServerService for ServerManager {
     async fn get(&self, id: &str) -> Result<ServerView, ServerError> {
         self.view(self.record(id).await?).await
     }
+    async fn metrics(&self, id: &str) -> Result<ServerMetrics, ServerError> {
+        self.runtime.metrics(&self.record(id).await?).await
+    }
     async fn set_eula(&self, id: &str, accepted: bool) -> Result<ServerView, ServerError> {
         let mut server = self.record(id).await?;
         let lock = self.lock(&server.id)?;

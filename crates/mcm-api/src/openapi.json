@@ -1,0 +1,2249 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Chunkyard API",
+    "version": "0.1.0",
+    "description": "Single-owner Minecraft manager. Cookie authentication is required unless MCM_AUTH__ENABLED=false. Authentication-disabled mode grants full access, with user:null. Host/origin and X-MCM-CSRF protections apply in both modes. JSON request bodies are limited to 1 MiB. API responses use no-store. Jobs are durable; console and resource metrics are snapshots."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "The current Chunkyard origin"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Authentication"
+    },
+    {
+      "name": "Servers"
+    },
+    {
+      "name": "Console"
+    },
+    {
+      "name": "Monitoring"
+    },
+    {
+      "name": "Java"
+    },
+    {
+      "name": "Jobs"
+    },
+    {
+      "name": "System"
+    },
+    {
+      "name": "Documentation"
+    }
+  ],
+  "security": [
+    {
+      "cookieAuth": []
+    }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "get_healthz",
+        "tags": [
+          "System"
+        ],
+        "summary": "Check database health",
+        "responses": {
+          "200": {
+            "description": "Check database health",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "db_unavailable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "db_unavailable"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/setup/status": {
+      "get": {
+        "operationId": "get_api_v1_setup_status",
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Read setup and authentication mode",
+        "responses": {
+          "200": {
+            "description": "Read setup and authentication mode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/setup": {
+      "post": {
+        "operationId": "post_api_v1_setup",
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Create the owner and session",
+        "responses": {
+          "201": {
+            "description": "Create the owner and session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "Requires the token from the local setup-token file. Succeeds once; returns 409 when authentication is disabled. Sets mcm_session cookie.",
+        "parameters": [
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "post_api_v1_auth_login",
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Sign in with email and password",
+        "responses": {
+          "200": {
+            "description": "Sign in with email and password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "Sets mcm_session cookie. Returns 409 when authentication is disabled.",
+        "parameters": [
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "get_api_v1_auth_me",
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Read the current principal",
+        "responses": {
+          "200": {
+            "description": "Read the current principal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "post_api_v1_auth_logout",
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Revoke session and clear cookie",
+        "responses": {
+          "204": {
+            "description": "Revoke session and clear cookie"
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ]
+      }
+    },
+    "/api/v1/servers": {
+      "get": {
+        "operationId": "get_api_v1_servers",
+        "tags": [
+          "Servers"
+        ],
+        "summary": "List managed servers",
+        "responses": {
+          "200": {
+            "description": "List managed servers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Up to 100 records. Status is container process state, not Minecraft readiness."
+      },
+      "post": {
+        "operationId": "post_api_v1_servers",
+        "tags": [
+          "Servers"
+        ],
+        "summary": "Create a Docker server",
+        "responses": {
+          "201": {
+            "description": "Create a Docker server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateServer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}": {
+      "get": {
+        "operationId": "get_api_v1_servers_id",
+        "tags": [
+          "Servers"
+        ],
+        "summary": "Read a managed server",
+        "responses": {
+          "200": {
+            "description": "Read a managed server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Server"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/servers/{id}/eula": {
+      "post": {
+        "operationId": "post_api_v1_servers_id_eula",
+        "tags": [
+          "Servers"
+        ],
+        "summary": "Accept or revoke the Minecraft EULA",
+        "responses": {
+          "200": {
+            "description": "Accept or revoke the Minecraft EULA",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Only while stopped.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EulaRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/start": {
+      "post": {
+        "operationId": "post_api_v1_servers_id_start",
+        "tags": [
+          "Servers"
+        ],
+        "summary": "Start a server",
+        "responses": {
+          "202": {
+            "description": "Start a server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns a durable job. Poll /api/v1/jobs/{id} for completion. Only one lifecycle action per server may run at a time.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ]
+      }
+    },
+    "/api/v1/servers/{id}/stop": {
+      "post": {
+        "operationId": "post_api_v1_servers_id_stop",
+        "tags": [
+          "Servers"
+        ],
+        "summary": "Stop a server",
+        "responses": {
+          "202": {
+            "description": "Stop a server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns a durable job. Poll /api/v1/jobs/{id} for completion. Only one lifecycle action per server may run at a time.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ]
+      }
+    },
+    "/api/v1/servers/{id}/restart": {
+      "post": {
+        "operationId": "post_api_v1_servers_id_restart",
+        "tags": [
+          "Servers"
+        ],
+        "summary": "Restart a server",
+        "responses": {
+          "202": {
+            "description": "Restart a server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns a durable job. Poll /api/v1/jobs/{id} for completion. Only one lifecycle action per server may run at a time.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ]
+      }
+    },
+    "/api/v1/servers/{id}/kill": {
+      "post": {
+        "operationId": "post_api_v1_servers_id_kill",
+        "tags": [
+          "Servers"
+        ],
+        "summary": "Kill a server",
+        "responses": {
+          "202": {
+            "description": "Kill a server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns a durable job. Poll /api/v1/jobs/{id} for completion. Only one lifecycle action per server may run at a time.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ]
+      }
+    },
+    "/api/v1/servers/{id}/console": {
+      "get": {
+        "operationId": "get_api_v1_servers_id_console",
+        "tags": [
+          "Console"
+        ],
+        "summary": "Read recent console output",
+        "responses": {
+          "200": {
+            "description": "Read recent console output",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Console"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Bounded snapshot, up to 4 MiB. Not a live stream.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "tail",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 200
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/servers/{id}/console/commands": {
+      "post": {
+        "operationId": "post_api_v1_servers_id_console_commands",
+        "tags": [
+          "Console"
+        ],
+        "summary": "Send one console command",
+        "responses": {
+          "204": {
+            "description": "Send one console command"
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/metrics": {
+      "get": {
+        "operationId": "get_api_v1_servers_id_metrics",
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Sample container resources",
+        "responses": {
+          "200": {
+            "description": "Sample container resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerMetrics"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "On demand, no background collector or history. Poll at most every five seconds. A running-container sample can take about one second; timeout is five seconds. At most four concurrent samples; excess returns 429 metrics.busy. Docker unavailability is an error, not zero usage.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/system/isolation": {
+      "get": {
+        "operationId": "get_api_v1_system_isolation",
+        "tags": [
+          "System"
+        ],
+        "summary": "Check Docker availability",
+        "responses": {
+          "200": {
+            "description": "Check Docker availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Isolation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/java/runtimes": {
+      "get": {
+        "operationId": "get_api_v1_java_runtimes",
+        "tags": [
+          "Java"
+        ],
+        "summary": "List Java runtimes",
+        "responses": {
+          "200": {
+            "description": "List Java runtimes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JavaInventory"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/java/runtimes/discover": {
+      "post": {
+        "operationId": "post_api_v1_java_runtimes_discover",
+        "tags": [
+          "Java"
+        ],
+        "summary": "Discover system Java installations",
+        "responses": {
+          "200": {
+            "description": "Discover system Java installations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JavaInventory"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Runs local JVM probes. Disabled when java.allow_system_java=false. Docker servers use the JVM in their image.",
+        "parameters": [
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ]
+      }
+    },
+    "/api/v1/java/available": {
+      "get": {
+        "operationId": "get_api_v1_java_available",
+        "tags": [
+          "Java"
+        ],
+        "summary": "List installable Java major versions",
+        "responses": {
+          "200": {
+            "description": "List installable Java major versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailableJava"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/java/runtimes/install": {
+      "post": {
+        "operationId": "post_api_v1_java_runtimes_install",
+        "tags": [
+          "Java"
+        ],
+        "summary": "Install a Temurin Java runtime",
+        "responses": {
+          "202": {
+            "description": "Install a Temurin Java runtime",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Downloads and verifies a runtime for this host platform. Poll the returned job.",
+        "parameters": [
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallJava"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs": {
+      "get": {
+        "operationId": "get_api_v1_jobs",
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "List durable background jobs",
+        "responses": {
+          "200": {
+            "description": "List durable background jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque nextCursor from a previous page."
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs/{id}": {
+      "get": {
+        "operationId": "get_api_v1_jobs_id",
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Read a background job",
+        "responses": {
+          "200": {
+            "description": "Read a background job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "operationId": "get_api_v1_openapi_json",
+        "tags": [
+          "Documentation"
+        ],
+        "summary": "Download the OpenAPI document",
+        "responses": {
+          "200": {
+            "description": "Download the OpenAPI document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "mcm_session",
+        "description": "HttpOnly SameSite=Lax session cookie issued by setup or login. Required by protected endpoints unless authentication is disabled by configuration."
+      }
+    },
+    "schemas": {
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "detail"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "role",
+          "createdAt"
+        ]
+      },
+      "Me": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "authEnabled": {
+                "const": true
+              },
+              "user": {
+                "$ref": "#/components/schemas/User"
+              },
+              "principal": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "session"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "isAdmin": {
+                "type": "boolean"
+              },
+              "mustChangePassword": {
+                "type": "boolean"
+              },
+              "totpEnabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "authEnabled",
+              "user",
+              "principal",
+              "isAdmin",
+              "mustChangePassword",
+              "totpEnabled"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "authEnabled": {
+                "const": false
+              },
+              "user": {
+                "type": "null"
+              },
+              "principal": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "auth_disabled"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "isAdmin": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "authEnabled",
+              "user",
+              "principal",
+              "isAdmin"
+            ]
+          }
+        ]
+      },
+      "SetupStatus": {
+        "type": "object",
+        "properties": {
+          "required": {
+            "type": "boolean"
+          },
+          "authEnabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "required",
+          "authEnabled"
+        ]
+      },
+      "SetupRequest": {
+        "type": "object",
+        "properties": {
+          "setupToken": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 10,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "setupToken",
+          "email",
+          "password"
+        ],
+        "additionalProperties": false
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "format": "password"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "additionalProperties": false
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "const": "session"
+          },
+          "me": {
+            "$ref": "#/components/schemas/Me"
+          }
+        },
+        "required": [
+          "kind",
+          "me"
+        ]
+      },
+      "RuntimeStatus": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "stopped",
+              "running",
+              "paused",
+              "unknown"
+            ]
+          },
+          "containerId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exitCode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "oomKilled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "state",
+          "containerId",
+          "exitCode",
+          "oomKilled"
+        ]
+      },
+      "Server": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "runtime": {
+            "const": "docker"
+          },
+          "jar": {
+            "type": "string"
+          },
+          "dockerImage": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "memoryMinMb": {
+            "type": "integer"
+          },
+          "memoryMaxMb": {
+            "type": "integer"
+          },
+          "cpus": {
+            "type": "number"
+          },
+          "acceptEula": {
+            "type": "boolean"
+          },
+          "directory": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RuntimeStatus"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "runtime",
+          "jar",
+          "dockerImage",
+          "port",
+          "memoryMinMb",
+          "memoryMaxMb",
+          "cpus",
+          "acceptEula",
+          "directory",
+          "status"
+        ]
+      },
+      "CreateServer": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "runtime": {
+            "type": "string",
+            "enum": [
+              "docker"
+            ],
+            "default": "docker"
+          },
+          "jar": {
+            "type": "string",
+            "default": "server.jar",
+            "description": "Relative .jar path confined to this server directory."
+          },
+          "dockerImage": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "memoryMinMb": {
+            "type": "integer",
+            "minimum": 128,
+            "maximum": 262144,
+            "default": 512
+          },
+          "memoryMaxMb": {
+            "type": "integer",
+            "minimum": 128,
+            "maximum": 262144,
+            "default": 2048
+          },
+          "cpus": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 256,
+            "default": 2
+          },
+          "acceptEula": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "name",
+          "port"
+        ],
+        "additionalProperties": false,
+        "description": "Creates a stopped Docker server record and initial files. Does not download a JAR. Min heap must not exceed max heap. Accept the EULA only if you agree to it."
+      },
+      "ServerResponse": {
+        "type": "object",
+        "properties": {
+          "server": {
+            "$ref": "#/components/schemas/Server"
+          }
+        },
+        "required": [
+          "server"
+        ]
+      },
+      "ServerList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Server"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "EulaRequest": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accepted"
+        ],
+        "additionalProperties": false
+      },
+      "CommandRequest": {
+        "type": "object",
+        "properties": {
+          "line": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "One command, at most 4096 UTF-8 bytes. CR, LF and NUL are rejected."
+          }
+        },
+        "required": [
+          "line"
+        ],
+        "additionalProperties": false
+      },
+      "ConsoleLine": {
+        "type": "object",
+        "properties": {
+          "stream": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "stream",
+          "text"
+        ]
+      },
+      "Console": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsoleLine"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "DockerInfo": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "available",
+          "version",
+          "reason"
+        ]
+      },
+      "Isolation": {
+        "type": "object",
+        "properties": {
+          "docker": {
+            "$ref": "#/components/schemas/DockerInfo"
+          }
+        },
+        "required": [
+          "docker"
+        ]
+      },
+      "JavaRuntime": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vendor": {
+            "type": "string"
+          },
+          "major": {
+            "type": "integer"
+          },
+          "fullVersion": {
+            "type": "string"
+          },
+          "os": {
+            "type": "string"
+          },
+          "arch": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "managed": {
+            "type": "boolean"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "vendor",
+          "major",
+          "fullVersion",
+          "os",
+          "arch",
+          "path",
+          "managed",
+          "sha256"
+        ]
+      },
+      "JavaInventory": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JavaRuntime"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "AvailableJava": {
+        "type": "object",
+        "properties": {
+          "lts": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "all": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "mostRecentLts": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lts",
+          "all",
+          "mostRecentLts"
+        ]
+      },
+      "InstallJava": {
+        "type": "object",
+        "properties": {
+          "major": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          }
+        },
+        "required": [
+          "major"
+        ],
+        "additionalProperties": false
+      },
+      "JobFailure": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "detail"
+        ]
+      },
+      "Job": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "serverId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobFailure"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result": {},
+          "createdBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "serverId",
+          "state",
+          "progress",
+          "message",
+          "error",
+          "result",
+          "createdBy",
+          "createdAt",
+          "startedAt",
+          "finishedAt"
+        ]
+      },
+      "JobResponse": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/Job"
+          }
+        },
+        "required": [
+          "job"
+        ]
+      },
+      "JobPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Job"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "ServerMetrics": {
+        "type": "object",
+        "properties": {
+          "serverId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RuntimeStatus"
+          },
+          "sampledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "uptimeSeconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cpuPercent": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "description": "Percent of one logical core; may exceed 100. Unknown when delta counters are missing or reset."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "memoryUsageBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "memoryWorkingSetBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "memoryLimitBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "networkRxBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "networkTxBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "blockReadBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "blockWriteBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pids": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "serverId",
+          "status",
+          "sampledAt",
+          "startedAt",
+          "uptimeSeconds",
+          "cpuPercent",
+          "memoryUsageBytes",
+          "memoryWorkingSetBytes",
+          "memoryLimitBytes",
+          "networkRxBytes",
+          "networkTxBytes",
+          "blockReadBytes",
+          "blockWriteBytes",
+          "pids"
+        ],
+        "description": "On-demand Docker snapshot. Stopped or paused containers return status and null measurements. Working-set memory subtracts inactive file cache; it is not JVM heap. Network and block I/O are cumulative counters, not rates or filesystem size. No TPS, player count, or game readiness claim."
+      }
+    }
+  }
+}

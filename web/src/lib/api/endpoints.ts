@@ -10,6 +10,7 @@ import type {
 	LoginResponse,
 	Me,
 	ServerAction,
+	ServerMetrics,
 	ServerView,
 	SessionMe,
 	SetupStatus
@@ -68,6 +69,9 @@ export const sendCommand = (id: string, line: string, o: Opts = {}) =>
 		method: 'POST',
 		body: { line }
 	});
+
+export const getServerMetrics = (id: string, o: Opts = {}) =>
+	request<ServerMetrics>(`/api/v1/servers/${enc(id)}/metrics`, o);
 
 export const getIsolation = (o: Opts = {}) => request<Isolation>('/api/v1/system/isolation', o);
 

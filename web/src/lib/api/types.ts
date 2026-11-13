@@ -75,6 +75,32 @@ export interface CreateServerRequest {
 	acceptEula?: boolean;
 }
 
+/**
+ * `GET /api/v1/servers/{id}/metrics`: one on-demand Docker stats sample.
+ * Resource fields are `null` when the container is stopped/paused or the value is unknown.
+ */
+export interface ServerMetrics {
+	serverId: string;
+	status: RuntimeStatus;
+	/** RFC 3339 time the sample was taken. */
+	sampledAt: string;
+	startedAt: string | null;
+	uptimeSeconds: number | null;
+	/** Relative to one logical core, so it can exceed 100. */
+	cpuPercent: number | null;
+	memoryUsageBytes: number | null;
+	/** Usage minus inactive file cache when available; not the JVM heap. */
+	memoryWorkingSetBytes: number | null;
+	memoryLimitBytes: number | null;
+	/** Cumulative counters since container start, not rates. */
+	networkRxBytes: number | null;
+	networkTxBytes: number | null;
+	/** Cumulative block I/O, not disk usage. */
+	blockReadBytes: number | null;
+	blockWriteBytes: number | null;
+	pids: number | null;
+}
+
 export interface ConsoleLine {
 	stream: string;
 	text: string;

@@ -1,0 +1,3 @@
+kind: Added
+body: 'REST API: GET /api/v1/servers/{id}/metrics samples Docker CPU, memory, uptime, PID, network and block-I/O counters on demand, with bounded concurrency and timeouts. Stopped or unavailable measurements are never presented as zero usage; container status does not imply Minecraft readiness.'
+time: 2026-11-13T19:20:13.673767661+02:00

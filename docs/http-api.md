@@ -43,7 +43,7 @@ When authentication is enabled, setup, login, health, and setup status are publi
 
 `Job` follows the phase 0 shape: `{id, kind, serverId, state, progress, message, error, result, createdBy, createdAt, startedAt, finishedAt}`. Java install success has `result: {runtime}`. Progress is indeterminate during work and becomes 1 on success. Poll a job while its state is `queued` or `running`. Jobs survive restarts; interrupted work becomes failed with `job.interrupted`. There are at most four active jobs; excess submissions return 429 `job.busy`. A panicking task becomes failed with `job.panicked`. SIGINT/SIGTERM interrupts active jobs and flushes their final states before closing the database. Only one daemon may own a data directory.
 
-This is a single-owner service. Email/password login and the optional authentication switch are the current auth scope; multi-user permissions, 2FA, and API tokens are deferred. WebSockets, OpenAPI generation, job cancellation/progress, and native process management remain pending. Initial Docker server lifecycle and console snapshots are implemented; see [Docker usage](docker.md). Older phase 0 specs describe a broader product than the current scope.
+This is a single-owner service. Email/password login and the optional authentication switch are the current auth scope; multi-user permissions, 2FA, and API tokens are deferred. WebSockets, job cancellation/progress, and native process management remain pending. Initial Docker server lifecycle and console snapshots are implemented; see [Docker usage](docker.md). Older phase 0 specs describe a broader product than the current scope.
 
 For an opt-in test with a real daemon and live Java 21 download:
 
@@ -55,3 +55,9 @@ python3 scripts/smoke-backend.py
 The smoke test uses temporary credentials/storage, checks owner setup and session authentication, installs Java through the HTTP job API, verifies the persisted inventory, and stops the daemon. Normal Rust tests use local fixtures and need no upstream downloads.
 
 Server lifecycle and console routes are documented in [docker.md](docker.md). They use the same authentication and origin rules as the routes above.
+
+## OpenAPI and monitoring
+
+`GET /api/v1/openapi.json` returns the current OpenAPI 3.1.1 document, including schemas, operations, cookie authentication and mutation CSRF requirements. It uses the normal owner-session/auth-disabled checks and `no-store`. The app's **API reference** page at `/api-docs` renders it locally with search, grouped operations, schema links and examples. It is read-only and sends no operation requests. Examples are illustrative, not recorded server data.
+
+`GET /api/v1/servers/{id}/metrics` returns a bounded, on-demand container resource snapshot. See [monitoring](monitoring.md) for units, missing measurements, sampling limits and readiness caveats.

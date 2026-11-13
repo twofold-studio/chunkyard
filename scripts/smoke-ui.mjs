@@ -102,6 +102,22 @@ async function test(enabled) {
     assert.equal(me.authEnabled, enabled);
     if (enabled) assert.equal(me.user.email, "owner@example.com");
     else assert.equal(me.user, null);
+    const server = await page.evaluate(async () => {
+      const response = await fetch("/api/v1/servers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-MCM-CSRF": "1" },
+        body: JSON.stringify({ name: "UI smoke", port: 25565 }),
+      });
+      if (!response.ok) throw new Error("Server record creation failed");
+      return (await response.json()).server;
+    });
+    await page.goto(`${base}/servers/${server.id}`);
+    await page
+      .getByRole("heading", { name: "Resources", exact: true })
+      .waitFor();
+    await page
+      .getByText("Docker unavailable; no measurements.", { exact: true })
+      .waitFor();
     await page
       .getByRole("link", { name: "Java runtimes", exact: true })
       .click();
@@ -112,6 +128,15 @@ async function test(enabled) {
     await page
       .getByRole("heading", { name: "Java runtimes", exact: true })
       .waitFor();
+    await page
+      .getByRole("link", { name: "API reference", exact: true })
+      .click();
+    await page
+      .getByRole("heading", { name: "API reference", exact: true })
+      .waitFor();
+    await page.getByText("Chunkyard API", { exact: true }).first().waitFor();
+    await page.reload();
+    await page.getByText("Chunkyard API", { exact: true }).first().waitFor();
     await sleep(150);
     assert.deepEqual(violations, [], "page violated its CSP");
     assert.deepEqual(errors, [], "page script errors");

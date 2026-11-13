@@ -7,6 +7,8 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 - **Authentication.** Reads `/api/v1/setup/status`. First-run owner setup (setup token, email, password) and email/password sign-in when authentication is enabled; sign-out from the sidebar. When the backend runs with `MCM_AUTH__ENABLED=false`, setup and login are skipped and the sidebar shows "Authentication disabled"; no user is shown or invented. An expired session on any request returns the browser to sign-in.
 - **Servers.** List with container status, refreshed every 10 s while the tab is visible. Create form for Docker servers (name, port, image, heap, CPUs, JAR path, EULA) with the backend's validation limits. Detail page with start, stop, restart and force kill (kill asks for confirmation), EULA accept/revoke while stopped, read-only configuration, the managed directory with a copy button, console snapshot and command entry.
 - **Java runtimes.** Inventory, system discovery, and Temurin install from `/api/v1/java/available` with job polling.
+- **API reference.** A searchable, locally rendered view of the live OpenAPI document, including request/response schemas and examples; no request execution.
+- **Resources.** A compact server-detail panel shows on-demand CPU, memory, uptime, PIDs and cumulative I/O; it polls every five seconds while running and visible, clears stale measurements on stop, and marks unknown values with a dash. See [monitoring](monitoring.md).
 - **Docker status** in the sidebar from `/api/v1/system/isolation`.
 
 ## Behaviour to know
@@ -21,7 +23,7 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 
 ## Not included
 
-There is no UI for deleting servers, editing resources after creation, file management, installers or modpacks, metrics/graphs, multiple users or roles, 2FA, or API tokens, because the backend does not provide them yet.
+There is no UI for deleting servers, editing resources after creation, file management, installers or modpacks, historical metrics/graphs, multiple users or roles, 2FA, or API tokens, because the backend does not provide them yet.
 
 ## Production hosting
 

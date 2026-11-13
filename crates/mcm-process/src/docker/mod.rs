@@ -2,6 +2,7 @@ mod definition;
 mod image;
 mod io;
 mod lifecycle;
+mod metrics;
 use crate::DockerConfig;
 use bollard::{Docker, errors::Error, models::ContainerInspectResponse};
 use mcm_core::server::{DockerInfo, RuntimeStatus, Server, ServerError, ServerState};
@@ -12,6 +13,7 @@ pub struct DockerRuntime {
     config: DockerConfig,
     instance: String,
     negotiated: tokio::sync::OnceCell<()>,
+    stats_slots: tokio::sync::Semaphore,
 }
 impl DockerRuntime {
     pub fn new(config: DockerConfig, instance: String) -> Self {
@@ -25,6 +27,7 @@ impl DockerRuntime {
             config,
             instance,
             negotiated: tokio::sync::OnceCell::new(),
+            stats_slots: tokio::sync::Semaphore::new(4),
         }
     }
     fn client(&self) -> Result<&Docker, ServerError> {

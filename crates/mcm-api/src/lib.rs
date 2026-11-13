@@ -3,6 +3,7 @@ mod auth;
 mod error;
 mod java;
 mod json;
+mod openapi;
 mod security;
 mod servers;
 mod state;
@@ -24,6 +25,8 @@ pub fn secure_router(router: Router, state: AppState) -> Router {
 /// API routes without global middleware, for composition with a static SPA fallback.
 pub fn routes(state: AppState) -> Router {
     let protected = Router::new()
+        .route("/api/v1/openapi.json", get(openapi::document))
+        .route("/api/v1/servers/{id}/metrics", get(servers::metrics))
         .route("/api/v1/servers", get(servers::list).post(servers::create))
         .route("/api/v1/servers/{id}", get(servers::get))
         .route("/api/v1/servers/{id}/eula", post(servers::eula))

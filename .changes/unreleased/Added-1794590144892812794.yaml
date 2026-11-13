@@ -1,0 +1,3 @@
+kind: Added
+body: 'Web UI: add an API reference page at /api-docs, linked from the sidebar, that renders the live GET /api/v1/openapi.json document as searchable, tag-grouped operations with parameters, request bodies, responses, schemas and generated examples; read-only, with raw JSON view and download links.'
+time: 2026-11-13T19:15:44.892812794+02:00

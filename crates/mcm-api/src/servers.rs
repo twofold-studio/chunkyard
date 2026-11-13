@@ -42,6 +42,12 @@ pub(crate) async fn get(
 ) -> Result<Json<Value>, ApiError> {
     Ok(Json(json!(state.servers.get(&id).await?)))
 }
+pub(crate) async fn metrics(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(json!(state.servers.metrics(&id).await?)))
+}
 pub(crate) async fn isolation(State(state): State<AppState>) -> Json<Value> {
     Json(json!({"docker":state.servers.runtime_info().await}))
 }

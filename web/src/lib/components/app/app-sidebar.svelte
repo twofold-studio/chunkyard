@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import CoffeeIcon from '@lucide/svelte/icons/coffee';
+	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import PanelLeftCloseIcon from '@lucide/svelte/icons/panel-left-close';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import ShieldOffIcon from '@lucide/svelte/icons/shield-off';
@@ -22,7 +23,8 @@
 
 	const nav = [
 		{ label: 'Servers', href: resolve('servers'), icon: ServerIcon },
-		{ label: 'Java runtimes', href: resolve('java'), icon: CoffeeIcon }
+		{ label: 'Java runtimes', href: resolve('java'), icon: CoffeeIcon },
+		{ label: 'API reference', href: resolve('api-docs'), icon: BookOpenIcon }
 	];
 
 	function isActive(href: string) {

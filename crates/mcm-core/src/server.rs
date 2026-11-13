@@ -93,6 +93,26 @@ pub struct ServerView {
     pub directory: PathBuf,
     pub status: RuntimeStatus,
 }
+/// Point-in-time container measurements. Missing measurements are null, never
+/// invented zeroes. CPU is percent of one logical core and may exceed 100.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerMetrics {
+    pub server_id: String,
+    pub status: RuntimeStatus,
+    pub sampled_at: String,
+    pub started_at: Option<String>,
+    pub uptime_seconds: Option<u64>,
+    pub cpu_percent: Option<f64>,
+    pub memory_usage_bytes: Option<u64>,
+    pub memory_working_set_bytes: Option<u64>,
+    pub memory_limit_bytes: Option<u64>,
+    pub network_rx_bytes: Option<u64>,
+    pub network_tx_bytes: Option<u64>,
+    pub block_read_bytes: Option<u64>,
+    pub block_write_bytes: Option<u64>,
+    pub pids: Option<u64>,
+}
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DockerInfo {
@@ -125,6 +145,8 @@ pub enum ServerError {
     EulaRequired,
     #[error("Docker is unavailable or is not a Linux container engine")]
     DockerUnavailable,
+    #[error("all metrics sampling slots are busy; retry shortly")]
+    MetricsBusy,
     #[error("container identity does not match this manager and server")]
     ContainerConflict,
     #[error("Docker operation failed")]
@@ -146,6 +168,7 @@ pub trait ServerRepo: Send + Sync {
 #[async_trait]
 pub trait ServerRuntime: Send + Sync {
     async fn info(&self) -> DockerInfo;
+    async fn metrics(&self, server: &Server) -> Result<ServerMetrics, ServerError>;
     async fn status(&self, server: &Server) -> Result<RuntimeStatus, ServerError>;
     async fn start(
         &self,
@@ -163,6 +186,7 @@ pub trait ServerService: Send + Sync {
     async fn list(&self) -> Result<Vec<ServerView>, ServerError>;
     async fn get(&self, id: &str) -> Result<ServerView, ServerError>;
     async fn set_eula(&self, id: &str, accepted: bool) -> Result<ServerView, ServerError>;
+    async fn metrics(&self, id: &str) -> Result<ServerMetrics, ServerError>;
     async fn start(&self, id: &str) -> Result<ServerView, ServerError>;
     async fn stop(&self, id: &str) -> Result<ServerView, ServerError>;
     async fn restart(&self, id: &str) -> Result<ServerView, ServerError>;
@@ -184,6 +208,7 @@ impl ServerError {
             Self::MissingJar => "server.jar_missing",
             Self::EulaRequired => "server.eula_required",
             Self::DockerUnavailable => "docker.unavailable",
+            Self::MetricsBusy => "metrics.busy",
             Self::ContainerConflict => "docker.identity_mismatch",
             Self::Docker => "docker.failed",
             Self::Filesystem | Self::Storage(_) => "internal",

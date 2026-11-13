@@ -11,6 +11,7 @@
 	import { CopyText, ErrorAlert, StatusBadge } from '#lib/components/app/index.js';
 	import ServerActions from '#lib/components/servers/server-actions.svelte';
 	import ServerConsole from '#lib/components/servers/server-console.svelte';
+	import ServerMetrics from '#lib/components/servers/server-metrics.svelte';
 	import ServerConfig from '#lib/components/servers/server-config.svelte';
 	import EulaDialog from '#lib/components/servers/eula-dialog.svelte';
 	import { errorCode, type ServerAction, type ServerView } from '#lib/api/index.js';
@@ -169,6 +170,8 @@
 		<ErrorAlert error={controller.error} />
 	{/if}
 {/if}
+
+<ServerMetrics serverId={server.id} serverState={server.status.state} cpus={server.cpus} />
 
 <Tabs.Root bind:value={tab} class="gap-6">
 	<Tabs.List variant="line" class="w-full justify-start gap-4 rounded-none border-b border-border">

@@ -1,0 +1,3 @@
+kind: Added
+body: 'Web UI: show a compact Resources panel on the server page from GET /api/v1/servers/{id}/metrics: CPU (relative to one core, may exceed 100%), memory working set against its limit, uptime, PIDs and cumulative network/disk I/O. It samples every 5 seconds only while running and the tab is visible, takes one snapshot when stopped, shows a dash for unavailable values instead of zero, and reports a busy sampler or missing Docker inline with a retry.'
+time: 2026-11-13T19:22:56.019436709+02:00

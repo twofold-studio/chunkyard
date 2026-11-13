@@ -48,6 +48,6 @@ describe('app sidebar', () => {
 			.getByRole('link')
 			.all()
 			.map((l) => l.element().textContent?.trim());
-		expect(links).toEqual(['Chunkyard', 'Servers', 'Java runtimes']);
+		expect(links).toEqual(['Chunkyard', 'Servers', 'Java runtimes', 'API reference']);
 	});
 });

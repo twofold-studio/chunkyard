@@ -25,6 +25,26 @@ impl ServerRuntime for FakeRuntime {
             reason: None,
         }
     }
+    async fn metrics(&self, server: &Server) -> Result<ServerMetrics, ServerError> {
+        let status = self.status(server).await?;
+        let running = status.state == ServerState::Running;
+        Ok(ServerMetrics {
+            server_id: server.id.clone(),
+            status,
+            sampled_at: "2026-01-01T00:00:00Z".into(),
+            started_at: running.then(|| "2025-12-31T23:59:00Z".into()),
+            uptime_seconds: running.then_some(60),
+            cpu_percent: running.then_some(12.5),
+            memory_usage_bytes: running.then_some(256_000_000),
+            memory_working_set_bytes: running.then_some(200_000_000),
+            memory_limit_bytes: running.then_some(512_000_000),
+            network_rx_bytes: None,
+            network_tx_bytes: None,
+            block_read_bytes: None,
+            block_write_bytes: None,
+            pids: None,
+        })
+    }
     async fn status(&self, server: &Server) -> Result<RuntimeStatus, ServerError> {
         let state = self
             .states

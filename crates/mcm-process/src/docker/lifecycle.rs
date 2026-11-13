@@ -9,6 +9,9 @@ impl ServerRuntime for DockerRuntime {
     async fn info(&self) -> DockerInfo {
         self.capability().await
     }
+    async fn metrics(&self, server: &Server) -> Result<ServerMetrics, ServerError> {
+        self.sample_metrics(server).await
+    }
     async fn status(&self, server: &Server) -> Result<RuntimeStatus, ServerError> {
         Ok(Self::status_of(self.inspect(server).await?))
     }
