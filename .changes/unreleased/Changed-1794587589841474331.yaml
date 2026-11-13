@@ -1,0 +1,3 @@
+kind: Changed
+body: 'Development: document the verified-milestone commit/push workflow and exclude local environment files and app databases from version control.'
+time: 2026-11-13T18:33:09.841474331+02:00

@@ -1,0 +1,3 @@
+kind: Added
+body: 'Frontend: proxy /api and /healthz to the backend from a fixed http://localhost:5173 dev origin (set MCM_HTTP__PUBLIC_URL to match) and build a static SPA bundle. The backend does not serve the bundle yet.'
+time: 2026-11-13T18:18:40.264843562+02:00

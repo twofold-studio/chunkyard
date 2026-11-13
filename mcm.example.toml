@@ -1,0 +1,23 @@
+data_dir = "data"
+
+[http]
+listen = "127.0.0.1:8420"
+# public_url = "https://minecraft.example.com"
+# Non-loopback HTTP requires this explicit opt-in; HTTPS reverse proxies do not.
+allow_insecure_http = false
+
+[java]
+allow_system_java = true
+
+[auth]
+# Override with MCM_AUTH__ENABLED=false for a trusted local/VPN environment.
+enabled = true
+
+[docker]
+enabled = true
+runtime_image = "eclipse-temurin:21-jre"
+publish_ip = "127.0.0.1"
+stop_timeout_s = 60
+# user = "1000:1000"
+# When mcm runs in Docker, set this to the host path mounted as its data_dir.
+# host_data_dir = "/srv/mcm"

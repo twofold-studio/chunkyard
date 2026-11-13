@@ -1,0 +1,3 @@
+kind: Added
+body: 'REST API: add owner setup, session login/logout, Java inventory and discovery, available releases, and asynchronous Java installs with persistent, pollable jobs and paginated history.'
+time: 2026-11-13T15:31:23.530572486+02:00

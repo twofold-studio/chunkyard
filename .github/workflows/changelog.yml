@@ -1,0 +1,20 @@
+name: Changelog
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Changie
+        uses: miniscruff/changie-action@v3
+        with:
+          version: v1.26.0
+      - name: Regenerate changelog from fragments
+        run: changie merge --include-unreleased '## Unreleased'
+      - name: Check changelog is current
+        run: git diff --exit-code -- CHANGELOG.md

@@ -1,0 +1,3 @@
+common-passwords.txt is the SecLists 10k-most-common list, downloaded 2026-11-13.
+Source: https://github.com/danielmiessler/SecLists/blob/master/Passwords/Common-Credentials/10k-most-common.txt
+License: MIT; retained in SecLists-LICENSE.

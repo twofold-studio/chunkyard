@@ -1,0 +1,10 @@
+/target/
+/data/
+*.db-shm
+*.db-wal
+
+# Local credentials and app databases
+.env
+.env.*
+!.env.example
+*.db

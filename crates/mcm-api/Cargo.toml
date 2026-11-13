@@ -1,0 +1,21 @@
+[package]
+name = "mcm-api"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mcm-core.workspace = true
+mcm-auth.workspace = true
+mcm-config.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+url.workspace = true

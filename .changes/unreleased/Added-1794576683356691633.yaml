@@ -1,0 +1,3 @@
+kind: Added
+body: 'Backend: establish a modular Rust workspace, SQLite migrations, configuration loading, and Linux/Windows CI checks.'
+time: 2026-11-13T15:31:23.356691633+02:00

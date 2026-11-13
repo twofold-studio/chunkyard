@@ -1,0 +1,38 @@
+# Changelog
+
+Implemented project changes are recorded here. Work in progress stays under Unreleased until a release is prepared.
+
+Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
+
+## Unreleased
+
+
+### Added
+
+- Tooling: track project changes in Changie fragments and generate this changelog, including backend, frontend, and REST API changes.
+- Backend: establish a modular Rust workspace, SQLite migrations, configuration loading, and Linux/Windows CI checks.
+- Java: discover system runtimes, download and verify managed Temurin JREs, install versions side by side, and select compatible installed runtimes through the CLI.
+- REST API: add owner setup, session login/logout, Java inventory and discovery, available releases, and asynchronous Java installs with persistent, pollable jobs and paginated history.
+- Frontend: initialize the SvelteKit, Tailwind, and shadcn-svelte scaffold.
+- Backend: allow trusted local/VPN operation without login through MCM_AUTH__ENABLED=false. Skip setup, expose auth mode to clients, and keep origin/CSRF protections active.
+- Backend: persist Docker server records and expose /api/v1/servers lifecycle jobs, console snapshots/commands, and /api/v1/system/isolation. Containers survive manager restarts and are checked against persistent ownership labels.
+- Packaging: add a backend Dockerfile, explicit host-data-path translation for a containerized manager, and opt-in Docker lifecycle tests using both a console fixture and a real Java 21 test JAR.
+- REST API: add POST /api/v1/servers/{id}/eula to explicitly accept or revoke EULA acceptance while stopped, replacing symlinked EULA files without following them.
+- Frontend: add the web UI shell with owner setup, email/password sign-in and sign-out, and an authentication-disabled mode that skips login without showing a user. Expired sessions return to sign-in.
+- Frontend: list, create and inspect Docker servers; start, stop, restart and confirmed force kill with job polling; accept or revoke the EULA while stopped; show the managed directory and actionable missing-JAR and EULA errors.
+- Frontend: show a refreshable console snapshot (last 200 lines, replaced rather than appended, polled only while visible) and send console commands to running servers.
+- Frontend: list host Java runtimes, run system discovery, and install Temurin versions with job status; the page states that Docker servers use their image JVM.
+- Frontend: proxy /api and /healthz to the backend from a fixed http://localhost:5173 dev origin (set MCM_HTTP__PUBLIC_URL to match) and build a static SPA bundle. The backend does not serve the bundle yet.
+
+### Changed
+
+- Development: document the verified-milestone commit/push workflow and exclude local environment files and app databases from version control.
+
+### Security
+
+- Protect API mutations with same-origin and CSRF checks; use salted Argon2id passwords, hashed session tokens, login throttling, private credential files, verified downloads, and bounded archive extraction.
+- Docker servers use one managed directory mount, loopback game-port publication by default, resource limits, a read-only root filesystem, dropped capabilities, and no-new-privileges. Reject escaping JAR paths and multi-line console commands.
+
+### Breaking
+
+- REST API: setup and login now accept email/password, and user.email replaces user.username. Update clients to send email; username request fields are no longer accepted. Authentication remains enabled by default.

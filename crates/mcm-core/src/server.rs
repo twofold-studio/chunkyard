@@ -1,0 +1,198 @@
+//! Server records and runtime boundaries shared by transport, storage and supervision.
+use crate::repository::RepositoryError;
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Server {
+    pub id: String,
+    pub name: String,
+    pub runtime: String,
+    pub jar: String,
+    pub docker_image: String,
+    pub port: u16,
+    pub memory_min_mb: u32,
+    pub memory_max_mb: u32,
+    pub cpus: f64,
+    pub accept_eula: bool,
+}
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CreateServer {
+    #[serde(default = "default_runtime")]
+    pub runtime: String,
+    pub name: String,
+    pub port: u16,
+    #[serde(default = "default_jar")]
+    pub jar: String,
+    #[serde(default)]
+    pub docker_image: Option<String>,
+    #[serde(default = "default_min")]
+    pub memory_min_mb: u32,
+    #[serde(default = "default_max")]
+    pub memory_max_mb: u32,
+    #[serde(default = "default_cpus")]
+    pub cpus: f64,
+    #[serde(default)]
+    pub accept_eula: bool,
+}
+fn default_runtime() -> String {
+    "docker".into()
+}
+fn default_jar() -> String {
+    "server.jar".into()
+}
+fn default_min() -> u32 {
+    512
+}
+fn default_max() -> u32 {
+    2048
+}
+fn default_cpus() -> f64 {
+    2.0
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ServerState {
+    Stopped,
+    Running,
+    Paused,
+    Unknown,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeStatus {
+    pub state: ServerState,
+    pub container_id: Option<String>,
+    pub exit_code: Option<i64>,
+    pub oom_killed: bool,
+}
+impl RuntimeStatus {
+    pub fn stopped() -> Self {
+        Self {
+            state: ServerState::Stopped,
+            container_id: None,
+            exit_code: None,
+            oom_killed: false,
+        }
+    }
+    pub fn unknown() -> Self {
+        Self {
+            state: ServerState::Unknown,
+            ..Self::stopped()
+        }
+    }
+}
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerView {
+    #[serde(flatten)]
+    pub server: Server,
+    pub directory: PathBuf,
+    pub status: RuntimeStatus,
+}
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DockerInfo {
+    pub available: bool,
+    pub version: Option<String>,
+    pub reason: Option<String>,
+}
+#[derive(Debug, Serialize)]
+pub struct ConsoleLine {
+    pub stream: String,
+    pub text: String,
+}
+#[derive(Debug, thiserror::Error)]
+pub enum ServerError {
+    #[error("{0}")]
+    Invalid(&'static str),
+    #[error("server not found")]
+    NotFound,
+    #[error("server operation already in progress")]
+    Busy,
+    #[error("game port is already assigned to another server")]
+    PortInUse,
+    #[error("server is already running")]
+    AlreadyRunning,
+    #[error("server is not running")]
+    NotRunning,
+    #[error("place the configured server JAR in the server directory before starting")]
+    MissingJar,
+    #[error("accept the Minecraft EULA before starting")]
+    EulaRequired,
+    #[error("Docker is unavailable or is not a Linux container engine")]
+    DockerUnavailable,
+    #[error("container identity does not match this manager and server")]
+    ContainerConflict,
+    #[error("Docker operation failed")]
+    Docker,
+    #[error("server filesystem operation failed")]
+    Filesystem,
+    #[error(transparent)]
+    Storage(#[from] RepositoryError),
+}
+#[async_trait]
+pub trait ServerRepo: Send + Sync {
+    async fn insert(&self, server: &Server) -> Result<(), ServerError>;
+    async fn set_eula(&self, id: &str, accepted: bool) -> Result<(), RepositoryError>;
+    async fn get(&self, id: &str) -> Result<Option<Server>, RepositoryError>;
+    async fn list(&self) -> Result<Vec<Server>, RepositoryError>;
+}
+/// Runtime implementations never choose arbitrary host paths; the service supplies
+/// the single managed directory belonging to the persisted server.
+#[async_trait]
+pub trait ServerRuntime: Send + Sync {
+    async fn info(&self) -> DockerInfo;
+    async fn status(&self, server: &Server) -> Result<RuntimeStatus, ServerError>;
+    async fn start(
+        &self,
+        server: &Server,
+        directory: PathBuf,
+    ) -> Result<RuntimeStatus, ServerError>;
+    async fn stop(&self, server: &Server) -> Result<RuntimeStatus, ServerError>;
+    async fn kill(&self, server: &Server) -> Result<RuntimeStatus, ServerError>;
+    async fn logs(&self, server: &Server, tail: u32) -> Result<Vec<ConsoleLine>, ServerError>;
+    async fn command(&self, server: &Server, line: &str) -> Result<(), ServerError>;
+}
+#[async_trait]
+pub trait ServerService: Send + Sync {
+    async fn create(&self, request: CreateServer) -> Result<ServerView, ServerError>;
+    async fn list(&self) -> Result<Vec<ServerView>, ServerError>;
+    async fn get(&self, id: &str) -> Result<ServerView, ServerError>;
+    async fn set_eula(&self, id: &str, accepted: bool) -> Result<ServerView, ServerError>;
+    async fn start(&self, id: &str) -> Result<ServerView, ServerError>;
+    async fn stop(&self, id: &str) -> Result<ServerView, ServerError>;
+    async fn restart(&self, id: &str) -> Result<ServerView, ServerError>;
+    async fn kill(&self, id: &str) -> Result<ServerView, ServerError>;
+    async fn logs(&self, id: &str, tail: u32) -> Result<Vec<ConsoleLine>, ServerError>;
+    async fn command(&self, id: &str, line: &str) -> Result<(), ServerError>;
+    async fn runtime_info(&self) -> DockerInfo;
+}
+
+impl ServerError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::Invalid(_) => "validation",
+            Self::NotFound => "server.not_found",
+            Self::Busy => "server.busy",
+            Self::PortInUse => "server.port_in_use",
+            Self::AlreadyRunning => "server.running",
+            Self::NotRunning => "server.not_running",
+            Self::MissingJar => "server.jar_missing",
+            Self::EulaRequired => "server.eula_required",
+            Self::DockerUnavailable => "docker.unavailable",
+            Self::ContainerConflict => "docker.identity_mismatch",
+            Self::Docker => "docker.failed",
+            Self::Filesystem | Self::Storage(_) => "internal",
+        }
+    }
+    pub fn public_detail(&self) -> String {
+        match self {
+            Self::Storage(_) => "The server record could not be saved or loaded.".into(),
+            _ => self.to_string(),
+        }
+    }
+}

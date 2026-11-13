@@ -1,0 +1,21 @@
+[package]
+name = "mcm-auth"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mcm-core.workspace = true
+argon2.workspace = true
+base64.workspace = true
+rand.workspace = true
+sha2.workspace = true
+subtle.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+time.workspace = true
+email_address = "0.2"

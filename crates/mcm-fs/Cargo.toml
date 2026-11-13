@@ -1,0 +1,17 @@
+[package]
+name = "mcm-fs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+flate2.workspace = true
+tar.workspace = true
+thiserror.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

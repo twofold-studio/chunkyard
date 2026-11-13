@@ -1,0 +1,3 @@
+kind: Added
+body: 'Packaging: add a backend Dockerfile, explicit host-data-path translation for a containerized manager, and opt-in Docker lifecycle tests using both a console fixture and a real Java 21 test JAR.'
+time: 2026-11-13T17:26:30.679959851+02:00

@@ -1,0 +1,11 @@
+#!/bin/sh
+# A console fixture, not Minecraft or a Java implementation.
+echo 'fixture started' >> /data/starts.txt
+echo 'Done (0.1s)! For help, type "help"'
+while IFS= read -r line; do
+  case "$line" in
+    stop) echo 'Stopping server'; exit 0 ;;
+    crash) echo 'simulated crash' >&2; exit 42 ;;
+    *) printf '%s\n' "$line" > /data/last-command.txt; printf 'command: %s\n' "$line" ;;
+  esac
+done

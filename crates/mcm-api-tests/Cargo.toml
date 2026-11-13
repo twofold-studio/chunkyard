@@ -1,0 +1,24 @@
+[package]
+name = "mcm-api-tests"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+[lints]
+workspace = true
+[dev-dependencies]
+mcm-process.workspace = true
+async-trait.workspace = true
+axum.workspace = true
+mcm-api.workspace = true
+mcm-auth.workspace = true
+mcm-config.workspace = true
+mcm-core.workspace = true
+mcm-db.workspace = true
+mcm-jobs.workspace = true
+mcm-server = { path = "../mcm-server" }
+reqwest = { workspace = true, features = ["cookies"] }
+serde_json.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+uuid.workspace = true

@@ -1,0 +1,31 @@
+changesDir: .changes
+unreleasedDir: unreleased
+headerPath: header.tpl.md
+changelogPath: CHANGELOG.md
+versionExt: md
+fragmentFileFormat: '{{.Kind}}-{{.Time.UnixNano}}'
+versionFormat: '## {{.Version}} - {{.Time.Format "2006-01-02"}}'
+kindFormat: "\n### {{.Kind}}"
+changeFormat: '- {{.Body}}'
+kinds:
+  - label: Added
+    auto: minor
+  - label: Changed
+    auto: minor
+  - label: Deprecated
+    auto: minor
+  - label: Removed
+    auto: major
+  - label: Fixed
+    auto: patch
+  - label: Security
+    auto: patch
+  - label: Breaking
+    auto: major
+newlines:
+  afterChangelogHeader: 1
+  beforeChangelogVersion: 0
+  afterKind: 1
+  afterVersion: 1
+  endOfVersion: 1
+envPrefix: CHANGIE_

@@ -1,0 +1,3 @@
+kind: Added
+body: 'Backend: allow trusted local/VPN operation without login through MCM_AUTH__ENABLED=false. Skip setup, expose auth mode to clients, and keep origin/CSRF protections active.'
+time: 2026-11-13T15:54:11.791874463+02:00
