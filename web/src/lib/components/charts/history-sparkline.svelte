@@ -17,6 +17,10 @@
 		format: (value: number) => string;
 		/** Spoken description of the time window, e.g. "the last 4 minutes". */
 		windowText: string;
+		/** Current reading shown next to the label (already formatted; "—" when unknown). */
+		current?: string;
+		/** Test hook for the current reading. */
+		currentTestId?: string;
 	}
 
 	let {
@@ -28,7 +32,9 @@
 		ceilingLabel = 'limit',
 		stats,
 		format,
-		windowText
+		windowText,
+		current,
+		currentTestId
 	}: Props = $props();
 
 	const W = 240;
@@ -64,7 +70,15 @@
 
 <figure class="flex min-w-0 flex-col gap-1.5">
 	<figcaption class="flex items-baseline justify-between gap-2 text-xs">
-		<span class="text-muted-foreground">{label}</span>
+		<span class="flex min-w-0 items-baseline gap-2">
+			<span class="text-muted-foreground">{label}</span>
+			{#if current !== undefined}
+				<span
+					class="font-mono text-sm font-medium text-foreground tabular-nums"
+					data-testid={currentTestId}>{current}</span
+				>
+			{/if}
+		</span>
 		<span class="font-mono text-muted-foreground tabular-nums">
 			{#if stats.count > 0}
 				<span class="sr-only">Range </span>{show(stats.min)} – {show(stats.max)}

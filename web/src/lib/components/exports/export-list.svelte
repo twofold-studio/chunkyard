@@ -1,5 +1,7 @@
 <script lang="ts">
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
+	import ArchiveRestoreIcon from '@lucide/svelte/icons/archive-restore';
+	import PinIcon from '@lucide/svelte/icons/pin';
 	import CloudIcon from '@lucide/svelte/icons/cloud';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
@@ -23,6 +25,7 @@
 		formatExportTime,
 		shortHash
 	} from '#lib/exports/exports.js';
+	import { canRestoreFrom } from '#lib/exports/backups.js';
 	import { formatBytes } from '#lib/metrics.js';
 	import { fadeIn, rise, stagger } from '#lib/motion/index.js';
 	import { resolve } from '$app/paths';
@@ -35,6 +38,14 @@
 		serverIds?: string[] | null;
 		emptyText?: string;
 		ondeleted: (id: string) => void;
+		/** Restore points of archived servers: marked, and their deletion is not offered. */
+		pinnedIds?: readonly string[];
+		/** Offers Restore on full archives only; partial archives stay download-only. */
+		onrestore?: (record: ExportRecord) => void;
+		/** Restore is temporarily unavailable (another operation runs). */
+		restoreDisabled?: boolean;
+		/** Per-row eligibility beyond the full scope (e.g. no local instance would be overwritten). */
+		restorable?: (record: ExportRecord) => boolean;
 	}
 
 	let {
@@ -42,7 +53,11 @@
 		showServer = false,
 		serverIds = null,
 		emptyText = 'No archives yet.',
-		ondeleted
+		ondeleted,
+		pinnedIds = [],
+		onrestore,
+		restoreDisabled = false,
+		restorable = () => true
 	}: Props = $props();
 
 	let target = $state.raw<ExportRecord | null>(null);
@@ -107,6 +122,11 @@
 						<span class="truncate font-mono text-xs" title={record.fileName}>{record.fileName}</span
 						>
 						<Badge variant="outline">{SCOPE_LABELS[record.scope]}</Badge>
+						{#if pinnedIds.includes(record.id)}
+							<Badge variant="secondary" title="Restore point of the archived server">
+								<PinIcon aria-hidden="true" />Restore point
+							</Badge>
+						{/if}
 					</div>
 					<p
 						class="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-muted-foreground"
@@ -119,9 +139,11 @@
 									>{record.serverName}</a
 								>
 							{:else}
-								<span class="truncate" title="This server was deleted; its archive remains."
+								<span
+									class="truncate"
+									title="No record in the manager. Host files may still exist from an earlier deletion."
 									>{record.serverName}
-									<span class="text-muted-foreground/70">(deleted)</span></span
+									<span class="text-muted-foreground/70">(removed from manager)</span></span
 								>
 							{/if}
 						{/if}
@@ -139,6 +161,17 @@
 					</p>
 				</div>
 				<div class="flex shrink-0 items-center gap-1">
+					{#if onrestore && canRestoreFrom(record) && restorable(record)}
+						<Button
+							variant="outline"
+							size="xs"
+							disabled={restoreDisabled}
+							aria-label={`Restore from ${record.fileName}`}
+							onclick={() => onrestore(record)}
+						>
+							<ArchiveRestoreIcon data-icon="inline-start" />Restore
+						</Button>
+					{/if}
 					<Button
 						href={exportDownloadUrl(record.id)}
 						download={record.fileName}
@@ -149,16 +182,26 @@
 					>
 						<DownloadIcon />
 					</Button>
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						class="text-destructive hover:text-destructive"
-						aria-label={`Delete ${record.fileName}`}
-						title="Delete"
-						onclick={() => ask(record)}
-					>
-						<TrashIcon />
-					</Button>
+					{#if pinnedIds.includes(record.id)}
+						<span
+							class="inline-flex size-8 items-center justify-center text-muted-foreground/60"
+							title="Restore the server before deleting its only restore point"
+						>
+							<TrashIcon class="size-4" aria-hidden="true" />
+							<span class="sr-only">Deletion unavailable: restore point of an archived server</span>
+						</span>
+					{:else}
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							class="text-destructive hover:text-destructive"
+							aria-label={`Delete ${record.fileName}`}
+							title="Delete"
+							onclick={() => ask(record)}
+						>
+							<TrashIcon />
+						</Button>
+					{/if}
 				</div>
 			</li>
 		{/each}

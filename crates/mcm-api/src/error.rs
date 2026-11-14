@@ -159,6 +159,12 @@ impl From<mcm_core::server::ServerError> for ApiError {
             return error.into();
         }
         let status = match &error {
+            E::Archived => StatusCode::CONFLICT,
+            E::IconInvalid => StatusCode::UNPROCESSABLE_ENTITY,
+            E::IconUnsupported => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            E::IconTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
+            E::IconNotFound => StatusCode::NOT_FOUND,
+            E::IconStorage => StatusCode::INTERNAL_SERVER_ERROR,
             E::Invalid(_) | E::EulaRequired => StatusCode::UNPROCESSABLE_ENTITY,
             E::NotFound => StatusCode::NOT_FOUND,
             E::Busy | E::PortInUse | E::AlreadyRunning | E::NotRunning | E::ContainerConflict => {
@@ -174,6 +180,14 @@ impl From<mcm_core::server::ServerError> for ApiError {
         };
         // Domain messages contain only fixed text and never host paths.
         let detail = match &error {
+            E::Archived => {
+                "Restore this archived instance before using its local files or runtime."
+            }
+            E::IconInvalid => "The image is invalid or exceeds decoding limits.",
+            E::IconUnsupported => "Use a PNG, JPEG, WebP or ICO image.",
+            E::IconTooLarge => "The icon exceeds 2 MiB.",
+            E::IconNotFound => "No icon is available.",
+            E::IconStorage => "The display icon could not be saved or loaded.",
             E::Invalid(detail) => *detail,
             E::NotInstalled => "Install the selected software before starting the server.",
             E::AlreadyInstalled => "Server software is already installed.",

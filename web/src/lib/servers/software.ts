@@ -212,16 +212,22 @@ export function installedLoader(server: Pick<ServerView, 'software' | 'launch'>)
  * One-line software summary for headers. Installed CurseForge packs show their detected
  * Minecraft version and loader instead of raw IDs.
  */
-export function softwareHeadline(server: Pick<ServerView, 'software' | 'launch'>): string | null {
+export function softwareHeadline(
+	server: Pick<ServerView, 'software' | 'launch'>,
+	packName: string | null = null
+): string | null {
 	const software = server.software ?? null;
 	if (!software) return null;
 	const launch = server.launch ?? null;
 	const summary = describeSoftware(software, launch);
-	if (software.type === 'curseforge' && launch) {
+	if (software.type === 'curseforge') {
+		// The real pack name when known; never raw project/file IDs.
+		const name = packName?.trim() || summary.kind;
+		if (!launch) return name;
 		const loader = launch.loader?.type
 			? `${loaderLabel(launch.loader.type)} ${launch.loader.version}`.trim()
 			: null;
-		return [summary.kind, launch.version && `Minecraft ${launch.version}`, loader]
+		return [name, launch.version && `Minecraft ${launch.version}`, loader]
 			.filter(Boolean)
 			.join(' · ');
 	}

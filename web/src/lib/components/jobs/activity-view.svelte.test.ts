@@ -176,6 +176,31 @@ describe('JobDetail', () => {
 		expect(page.getByRole('link', { name: /Open/ }).elements()).toHaveLength(0);
 	});
 
+	it('shows observed export steps while running and where a job stopped', async () => {
+		const work = {
+			stage: 'compress' as const,
+			completedBytes: 3 * 1024 * 1024,
+			totalBytes: null,
+			completedStages: ['scan' as const]
+		};
+		const running = at('w', 1, { kind: 'server.export', state: 'running', finishedAt: null, work });
+		const getJob = vi.fn().mockResolvedValue({
+			...running,
+			state: 'failed',
+			error: { code: 'job.interrupted', detail: 'Restarted.' }
+		});
+		render(JobDetail, { job: running, servers, getJob, intervalMs: 5 });
+		await expect.element(page.getByTestId('job-progress')).toHaveTextContent('3.0 MiB written');
+		await expect.element(page.getByText('Interrupted during compressing')).toBeVisible();
+		expect(document.body.textContent).not.toMatch(/\d+\s*%/);
+	});
+
+	it('shows no step list for an old finished job without observations', async () => {
+		render(JobDetail, { job: at('o', 1, { kind: 'server.install', work: null }), servers });
+		await expect.element(page.getByText('Succeeded')).toBeVisible();
+		expect(page.getByTestId('work-progress').elements()).toHaveLength(0);
+	});
+
 	it('polls a running job until it finishes, then stops', async () => {
 		const running = at('r', 1, { state: 'running', finishedAt: null, message: 'Downloading' });
 		const getJob = vi

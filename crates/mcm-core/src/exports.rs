@@ -24,6 +24,13 @@ pub struct ExportRequest {
     pub paths: Vec<String>,
     pub destination: ExportDestination,
 }
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ArchiveRequest {
+    pub export_id: String,
+    #[serde(default)]
+    pub confirm_discard_changes: bool,
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Export {
@@ -69,6 +76,12 @@ pub struct ExportDownload {
 }
 #[derive(Debug, thiserror::Error)]
 pub enum ExportError {
+    #[error("A matching verified full S3 backup and explicit confirmation are required.")]
+    BackupRequired,
+    #[error("Restore is available only for full backups with no local instance files.")]
+    RestoreConflict,
+    #[error("The backup is corrupt, incompatible or contains unsafe entries.")]
+    InvalidArchive,
     #[error("Invalid export selection or storage connection.")]
     Invalid,
     #[error("Export not found.")]
@@ -91,6 +104,9 @@ pub enum ExportError {
 impl ExportError {
     pub fn code(&self) -> &'static str {
         match self {
+            Self::BackupRequired => "exports.backup_required",
+            Self::RestoreConflict => "exports.restore_conflict",
+            Self::InvalidArchive => "exports.invalid_archive",
             Self::Server(e) => e.code(),
             Self::Files(crate::files::FileError::Running) => "files.server_running",
             Self::Files(crate::files::FileError::TooLarge) => "exports.limit",
@@ -104,6 +120,15 @@ impl ExportError {
     }
     pub fn public_detail(&self) -> &'static str {
         match self {
+            Self::BackupRequired => {
+                "A matching verified full S3 backup and explicit confirmation are required. The pinned backup cannot be deleted while the instance is archived."
+            }
+            Self::RestoreConflict => {
+                "Restore requires a full backup and no local instance files. Archive or retain existing files before retrying."
+            }
+            Self::InvalidArchive => {
+                "The backup is corrupt, incompatible or contains unsafe entries. Local files have not been replaced."
+            }
             Self::Invalid => "Invalid export selection or storage connection.",
             Self::NotFound => "Export not found.",
             Self::Limit => "Export exceeds the archive size or entry limit.",
@@ -122,6 +147,26 @@ impl ExportError {
 }
 #[async_trait]
 pub trait ExportService: Send + Sync {
+    async fn get(&self, id: &str) -> Result<Export, ExportError>;
+    async fn archive_instance(
+        &self,
+        server_id: &str,
+        request: ArchiveRequest,
+        progress: crate::progress::ProgressReporter,
+    ) -> Result<crate::server::ServerView, ExportError>;
+    async fn restore_instance(
+        &self,
+        export_id: &str,
+        progress: crate::progress::ProgressReporter,
+    ) -> Result<crate::server::ServerView, ExportError>;
+    async fn create_with_progress(
+        &self,
+        server_id: &str,
+        request: ExportRequest,
+        _progress: crate::progress::ProgressReporter,
+    ) -> Result<Export, ExportError> {
+        self.create(server_id, request).await
+    }
     async fn storage(&self) -> Result<StorageView, ExportError>;
     async fn set_storage(&self, connection: StorageConnection) -> Result<StorageView, ExportError>;
     async fn test_storage(&self) -> Result<(), ExportError>;

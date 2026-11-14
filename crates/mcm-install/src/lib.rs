@@ -12,6 +12,11 @@ pub struct Installers {
     http: SafeHttp,
     curseforge_http: SafeHttp,
     curseforge_key: Option<String>,
+    projects: tokio::sync::Mutex<std::collections::HashMap<u64, (std::time::Instant, Value)>>,
+    logos: tokio::sync::Mutex<std::collections::HashMap<u64, (std::time::Instant, Vec<u8>)>>,
+    logo_http: SafeHttp,
+    logo_slots: tokio::sync::Semaphore,
+    progress: mcm_core::progress::ProgressReporter,
 }
 impl Installers {
     pub fn new() -> Result<Self, mcm_download::DownloadError> {
@@ -19,11 +24,38 @@ impl Installers {
             http: SafeHttp::minecraft()?,
             curseforge_http: SafeHttp::modpacks()?,
             curseforge_key: None,
+            projects: Default::default(),
+            logos: Default::default(),
+            logo_http: SafeHttp::logos()?,
+            logo_slots: tokio::sync::Semaphore::new(4),
+            progress: Default::default(),
         })
     }
     pub fn with_curseforge(mut self, key: Option<String>) -> Self {
         self.curseforge_key = key;
         self
+    }
+    fn reporting(&self, progress: mcm_core::progress::ProgressReporter) -> Self {
+        let report = progress.clone();
+        let callback = std::sync::Arc::new(move |event| {
+            use mcm_core::progress::Stage;
+            match event {
+                mcm_download::ArtifactProgress::Bytes { completed, total } => {
+                    report.bytes(Stage::Download, Some(completed), Some(total))
+                }
+                mcm_download::ArtifactProgress::Verify => report.stage(Stage::Verify),
+            }
+        });
+        Self {
+            http: self.http.clone().with_progress(callback.clone()),
+            curseforge_http: self.curseforge_http.clone().with_progress(callback),
+            curseforge_key: self.curseforge_key.clone(),
+            logo_http: self.logo_http.clone(),
+            logo_slots: tokio::sync::Semaphore::new(4),
+            projects: Default::default(),
+            logos: Default::default(),
+            progress,
+        }
     }
     async fn json(&self, url: &str) -> Result<Value, SoftwareError> {
         tokio::time::timeout(

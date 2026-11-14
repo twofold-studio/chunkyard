@@ -31,14 +31,14 @@ impl ServerManager {
         id: &str,
         write: bool,
     ) -> Result<Context, PropertiesError> {
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let lock = self.lock(&server.id)?;
         let guard = Arc::new(if write {
             lock.try_lock_owned().map_err(|_| ServerError::Busy)?
         } else {
             lock.lock_owned().await
         });
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let status = match self.runtime.status(&server).await {
             Ok(status) => status,
             Err(ServerError::DockerUnavailable) => RuntimeStatus::unknown(),

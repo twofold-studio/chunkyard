@@ -12,6 +12,9 @@ struct LostAck {
 }
 #[async_trait]
 impl ServerRepo for LostAck {
+    async fn save(&self, server: &Server) -> Result<(), RepositoryError> {
+        self.repo.save(server).await
+    }
     async fn set_launch(
         &self,
         id: &str,

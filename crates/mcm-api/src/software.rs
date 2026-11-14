@@ -4,6 +4,18 @@ use axum::{
     extract::{Path, Query, State},
 };
 use serde_json::Value;
+pub(crate) async fn modpack(
+    State(s): State<AppState>,
+    Path(id): Path<u64>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(s.software.modpack(id).await?))
+}
+pub(crate) async fn modpack_logo(
+    State(s): State<AppState>,
+    Path(id): Path<u64>,
+) -> Result<axum::response::Response, ApiError> {
+    Ok(crate::icons::png(s.software.modpack_logo(id).await?))
+}
 #[derive(serde::Deserialize, Default)]
 #[serde(default, deny_unknown_fields)]
 pub(crate) struct Search {

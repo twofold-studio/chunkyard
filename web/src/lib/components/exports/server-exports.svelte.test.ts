@@ -285,6 +285,63 @@ describe('ServerExports recovered export', () => {
 		expect(calls.some((c) => c.method === 'POST')).toBe(false);
 	});
 
+	it('shows recovered export upload and read-back verification as separate steps', async () => {
+		reply('GET', '/api/v1/storage', { status: 200, body: storage(true) });
+		reply('GET', '/api/v1/exports', { status: 200, body: { items: [] } });
+		const MiB = 1024 * 1024;
+		const upload = job('running', {
+			id: 'job-u',
+			work: {
+				stage: 'upload',
+				completedBytes: 19 * MiB,
+				totalBytes: 95 * MiB,
+				completedStages: ['scan', 'compress']
+			}
+		});
+		const view = render(ServerExports, {
+			serverId: 'srv-1',
+			serverState: 'stopped',
+			busy: true,
+			recoveredJob: upload,
+			archivesVersion: 0
+		});
+		await expect.element(page.getByText('Uploading to storage')).toBeVisible();
+		await expect.element(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '20');
+		await view.rerender({
+			recoveredJob: job('running', {
+				id: 'job-u',
+				work: {
+					stage: 'verify_upload',
+					completedBytes: null,
+					totalBytes: 95 * MiB,
+					completedStages: ['scan', 'compress', 'upload']
+				}
+			})
+		});
+		await expect.element(page.getByText('Verifying upload (checksum read-back)')).toBeVisible();
+		await expect.element(page.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow');
+		// Rendering progress adds no job polling or mutations; the page owns job tracking.
+		expect(calls.every((c) => c.method === 'GET' && !c.path.includes('/jobs'))).toBe(true);
+	});
+
+	it('shows the step a recovered export stopped at', async () => {
+		reply('GET', '/api/v1/storage', { status: 200, body: storage(true) });
+		reply('GET', '/api/v1/exports', { status: 200, body: { items: [] } });
+		const failure = { code: 'job.interrupted', detail: 'The manager restarted during the export.' };
+		render(ServerExports, {
+			serverId: 'srv-1',
+			serverState: 'stopped',
+			recoveredJob: job('failed', {
+				id: 'job-f',
+				error: failure,
+				work: { stage: 'upload', completedBytes: 1, totalBytes: 2, completedStages: ['scan'] }
+			}),
+			recoveredError: failure
+		});
+		await expect.element(page.getByText('Interrupted during uploading to storage')).toBeVisible();
+		expect(page.getByRole('progressbar').elements()).toHaveLength(0);
+	});
+
 	it('shows a recovered failure with its Activity link', async () => {
 		reply('GET', '/api/v1/storage', { status: 200, body: storage(false) });
 		reply('GET', '/api/v1/exports', { status: 200, body: { items: [] } });
@@ -298,5 +355,127 @@ describe('ServerExports recovered export', () => {
 		await expect.element(page.getByText('The manager restarted during the export.')).toBeVisible();
 		const link = page.getByRole('link', { name: 'Job details in Activity' });
 		expect(link.element().getAttribute('href')).toMatch(/\/activity\/job-f$/);
+	});
+	describe('archive and restore', () => {
+		const full = (id: string, destination = 's3', createdAt = '2026-11-14T10:00:00Z') => ({
+			...archive(id, 'srv-1', destination),
+			scope: 'all',
+			createdAt
+		});
+
+		it('removes local files only after choosing a full S3 backup and acknowledging data loss', async () => {
+			reply('GET', '/api/v1/storage', { status: 200, body: storage(true) });
+			reply('GET', '/api/v1/exports', {
+				status: 200,
+				body: {
+					items: [
+						full('new', 's3', '2026-11-14T10:00:00Z'),
+						full('old', 's3', '2026-11-01T10:00:00Z'),
+						full('local-full', 'local'),
+						{ ...archive('world-s3', 'srv-1', 's3') }
+					]
+				}
+			});
+			const onRemoveLocal = vi.fn();
+			render(ServerExports, {
+				serverId: 'srv-1',
+				serverName: 'Survival',
+				serverState: 'stopped',
+				onRemoveLocal
+			});
+			const select = page.getByRole('combobox', { name: 'Backup' });
+			await expect.element(select).toBeVisible();
+			// Only full S3 backups are offered.
+			expect(select.element().querySelectorAll('option')).toHaveLength(2);
+			await select.selectOptions('old');
+			await page.getByRole('button', { name: 'Remove local files…' }).click();
+			const confirm = page.getByRole('button', { name: 'Remove local files', exact: true });
+			await expect.element(confirm).toBeDisabled();
+			await page.getByRole('checkbox').click();
+			await confirm.click();
+			expect(onRemoveLocal).toHaveBeenCalledWith('old');
+			// The component never submits by itself: the page controller owns the request.
+			expect(calls.filter((c) => c.method !== 'GET')).toHaveLength(0);
+		});
+
+		it('blocks removal while running, with unsaved edits or without a full S3 backup', async () => {
+			reply(
+				'GET',
+				'/api/v1/storage',
+				{ status: 200, body: storage(true) },
+				{ status: 200, body: storage(true) }
+			);
+			reply('GET', '/api/v1/exports', { status: 200, body: { items: [full('a')] } });
+			const screen = render(ServerExports, {
+				serverId: 'srv-1',
+				serverState: 'running',
+				onRemoveLocal: vi.fn()
+			});
+			await expect
+				.element(page.getByText('Stop the server first. Nothing is stopped for you.'))
+				.toBeVisible();
+			await expect
+				.element(page.getByRole('button', { name: 'Remove local files…' }))
+				.toBeDisabled();
+			screen.unmount();
+			reply('GET', '/api/v1/exports', { status: 200, body: { items: [full('a')] } });
+			render(ServerExports, {
+				serverId: 'srv-1',
+				serverState: 'stopped',
+				removeBlocked: 'Save or discard the unsaved file edits in Files first.',
+				onRemoveLocal: vi.fn()
+			});
+			await expect
+				.element(page.getByText('Save or discard the unsaved file edits in Files first.'))
+				.toBeVisible();
+			await expect
+				.element(page.getByRole('button', { name: 'Remove local files…' }))
+				.toBeDisabled();
+		});
+
+		it('explains that a full S3 export is needed when none exists', async () => {
+			reply('GET', '/api/v1/storage', { status: 200, body: storage(true) });
+			reply('GET', '/api/v1/exports', { status: 200, body: { items: [full('l', 'local')] } });
+			render(ServerExports, { serverId: 'srv-1', serverState: 'stopped', onRemoveLocal: vi.fn() });
+			await expect.element(page.getByText(/Needs a/)).toBeVisible();
+			expect(page.getByRole('button', { name: 'Remove local files…' }).elements()).toHaveLength(0);
+		});
+
+		it('hides new exports while archived, protects the pinned backup and restores full archives only', async () => {
+			reply('GET', '/api/v1/storage', { status: 200, body: storage(true) });
+			reply('GET', '/api/v1/exports', {
+				status: 200,
+				body: { items: [full('pinned'), full('other', 'local'), archive('world')] }
+			});
+			const onRestore = vi.fn();
+			render(ServerExports, {
+				serverId: 'srv-1',
+				serverName: 'Survival',
+				serverState: 'stopped',
+				archive: { exportId: 'pinned', archivedAt: '2026-11-14T11:00:00Z' },
+				onRemoveLocal: vi.fn(),
+				onRestore
+			});
+			await expect.element(page.getByText('survival-pinned.tar.gz')).toBeVisible();
+			expect(exportButton().elements()).toHaveLength(0);
+			expect(page.getByRole('button', { name: 'Remove local files…' }).elements()).toHaveLength(0);
+			await expect.element(page.getByText('Restore point', { exact: true })).toBeVisible();
+			expect(
+				page.getByRole('button', { name: 'Delete survival-pinned.tar.gz' }).elements()
+			).toHaveLength(0);
+			await expect
+				.element(page.getByRole('button', { name: 'Delete survival-other.tar.gz' }))
+				.toBeVisible();
+			// World archives are download-only.
+			expect(
+				page.getByRole('button', { name: 'Restore from survival-world.tar.gz' }).elements()
+			).toHaveLength(0);
+			await page.getByRole('button', { name: 'Restore from survival-pinned.tar.gz' }).click();
+			await expect.element(page.getByRole('alertdialog')).toHaveTextContent('Restore Survival?');
+			expect(onRestore).not.toHaveBeenCalled();
+			await page.getByRole('button', { name: 'Restore', exact: true }).click();
+			expect(onRestore).toHaveBeenCalledWith('pinned');
+			expect(calls.filter((c) => c.method !== 'GET')).toHaveLength(0);
+		});
 	});
 });

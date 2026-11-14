@@ -27,6 +27,8 @@ pub struct Job {
     pub server_id: Option<String>,
     pub state: JobState,
     pub progress: Option<f64>,
+    #[serde(default)]
+    pub work: Option<crate::progress::WorkProgress>,
     pub message: Option<String>,
     pub error: Option<JobFailure>,
     pub result: Option<Value>,
@@ -74,6 +76,16 @@ pub enum JobError {
 }
 #[async_trait]
 pub trait JobService: Send + Sync {
+    async fn submit_progress_for_server(
+        &self,
+        kind: &str,
+        server_id: &str,
+        actor: Option<&str>,
+        task: JobTask,
+        _progress: crate::progress::ProgressReporter,
+    ) -> Result<Job, JobError> {
+        self.submit_for_server(kind, server_id, actor, task).await
+    }
     async fn submit(&self, kind: &str, actor: Option<&str>, task: JobTask)
     -> Result<Job, JobError>;
     async fn submit_for_server(

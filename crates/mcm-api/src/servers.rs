@@ -157,10 +157,12 @@ async fn action(
         Action::Kill => "server.kill",
     };
     let servers = state.servers.clone();
+    let progress = mcm_core::progress::ProgressReporter::default();
+    let worker_progress = progress.clone();
     let job_server_id = id.clone();
     let job = state
         .jobs
-        .submit_for_server(
+        .submit_progress_for_server(
             kind,
             &job_server_id,
             actor.user_id(),
@@ -173,7 +175,11 @@ async fn action(
                             .map(|deleted| json!({"deleted":deleted}))
                             .map_err(job_failure);
                     }
-                    Action::Install(options) => servers.install_with_options(&id, options).await,
+                    Action::Install(options) => {
+                        servers
+                            .install_with_progress(&id, options, worker_progress)
+                            .await
+                    }
                     Action::Start => servers.start(&id).await,
                     Action::Stop => servers.stop(&id).await,
                     Action::Restart => servers.restart(&id).await,
@@ -186,6 +192,7 @@ async fn action(
                         detail: error.public_detail(),
                     })
             }),
+            progress,
         )
         .await?;
     Ok((StatusCode::ACCEPTED, Json(json!({"job":job}))))

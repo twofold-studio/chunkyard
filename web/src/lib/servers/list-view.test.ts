@@ -69,6 +69,22 @@ describe('server list view', () => {
 		expect(softwareOptions(servers)).toEqual(['custom', 'paper', 'vanilla']);
 	});
 
+	it('filters local and archived instances and finds archived ones by search', () => {
+		const list = [
+			server('local-a'),
+			server('arch', { archive: { exportId: 'e', archivedAt: '2026-11-14T00:00:00Z' } }),
+			server('legacy', { archive: undefined })
+		];
+		const ids = (location: 'all' | 'local' | 'archived') =>
+			applyView(list, { ...DEFAULT_VIEW, location }).map((s) => s.id);
+		expect(ids('archived')).toEqual(['arch']);
+		expect(ids('local')).toEqual(['legacy', 'local-a']);
+		expect(ids('all')).toHaveLength(3);
+		expect(isFiltered({ ...DEFAULT_VIEW, location: 'archived' })).toBe(true);
+		expect(matchesQuery(list[1], 'archived')).toBe(true);
+		expect(matchesQuery(list[0], 'archived')).toBe(false);
+	});
+
 	it('labels counts relative to the loaded records only', () => {
 		expect(countLabel(3, 3, false)).toBe('3 servers');
 		expect(countLabel(1, 1, false)).toBe('1 server');

@@ -16,7 +16,7 @@ pub struct ServerManager {
     pub(crate) repo: Arc<dyn ServerRepo>,
     pub(crate) runtime: Arc<dyn ServerRuntime>,
     locks: Mutex<HashMap<String, Arc<AsyncMutex<()>>>>,
-    create_lock: AsyncMutex<()>,
+    pub(crate) create_lock: AsyncMutex<()>,
     port_locks: Mutex<HashMap<u16, Arc<AsyncMutex<()>>>>,
     pub(crate) installers: Option<Arc<dyn mcm_core::software::SoftwareService>>,
     pub(crate) install_tasks: tokio_util::task::TaskTracker,
@@ -59,17 +59,35 @@ impl ServerManager {
             .to_string();
         self.repo.get(&id).await?.ok_or(ServerError::NotFound)
     }
+    pub(crate) async fn local_record(&self, id: &str) -> Result<Server, ServerError> {
+        let server = self.record(id).await?;
+        if tokio::fs::symlink_metadata(crate::transitions::journal_path(&self.root, &server.id))
+            .await
+            .is_ok()
+        {
+            return Err(ServerError::Busy);
+        }
+        if server.archive.is_some() {
+            return Err(ServerError::Archived);
+        }
+        Ok(server)
+    }
     pub(crate) fn lock(&self, id: &str) -> Result<Arc<AsyncMutex<()>>, ServerError> {
         let mut locks = self.locks.lock().map_err(|_| ServerError::Busy)?;
         Ok(locks.entry(id.into()).or_default().clone())
     }
     pub(crate) async fn view(&self, server: Server) -> Result<ServerView, ServerError> {
-        let status = match self.runtime.status(&server).await {
+        let status = match if server.archive.is_some() {
+            Ok(RuntimeStatus::stopped())
+        } else {
+            self.runtime.status(&server).await
+        } {
             Ok(status) => status,
             Err(ServerError::DockerUnavailable) => RuntimeStatus::unknown(),
             Err(error) => return Err(error),
         };
         Ok(ServerView {
+            icon: self.display_icon(&server).await,
             directory: self.root.join(&server.id),
             server,
             status,
@@ -154,6 +172,15 @@ impl ServerManager {
 }
 #[async_trait]
 impl ServerService for ServerManager {
+    async fn icon(&self, id: &str) -> Result<Vec<u8>, ServerError> {
+        self.icon_content(id).await
+    }
+    async fn set_icon(&self, id: &str, bytes: Vec<u8>) -> Result<ServerView, ServerError> {
+        self.upload_icon(id, bytes).await
+    }
+    async fn reset_icon(&self, id: &str) -> Result<ServerView, ServerError> {
+        self.remove_icon(id).await
+    }
     async fn launch_settings(&self, id: &str) -> Result<LaunchSettings, ServerError> {
         self.read_launch(id).await
     }
@@ -170,13 +197,22 @@ impl ServerService for ServerManager {
         id: &str,
         options: mcm_core::software::InstallOptions,
     ) -> Result<ServerView, ServerError> {
+        self.install_with_progress(id, options, Default::default())
+            .await
+    }
+    async fn install_with_progress(
+        &self,
+        id: &str,
+        options: mcm_core::software::InstallOptions,
+        progress: mcm_core::progress::ProgressReporter,
+    ) -> Result<ServerView, ServerError> {
         if matches!(
-            self.record(id).await?.software,
+            self.local_record(id).await?.software,
             Some(mcm_core::software::Software::CurseForge { .. })
         ) {
-            self.install_pack(id, options).await
+            self.install_pack(id, options, progress).await
         } else {
-            self.install(id).await
+            self.install_managed(id, progress).await
         }
     }
     async fn set_resources(
@@ -185,10 +221,10 @@ impl ServerService for ServerManager {
         request: ResourceUpdate,
     ) -> Result<ServerView, ServerError> {
         validation::resources(request.memory_min_mb, request.memory_max_mb, request.cpus)?;
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let lock = self.lock(&server.id)?;
         let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
-        let mut server = self.record(id).await?;
+        let mut server = self.local_record(id).await?;
         if self.runtime.status(&server).await?.state != ServerState::Stopped {
             return Err(ServerError::AlreadyRunning);
         }
@@ -200,14 +236,14 @@ impl ServerService for ServerManager {
         self.view(server).await
     }
     async fn console_stream(&self, id: &str) -> Result<ConsoleStream, ServerError> {
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         if self.runtime.status(&server).await?.state != ServerState::Running {
             return Err(ServerError::NotRunning);
         }
         self.runtime.stream_logs(&server, 200).await
     }
     async fn network(&self, id: &str) -> Result<NetworkSettings, ServerError> {
-        self.runtime.network(&self.record(id).await?).await
+        self.runtime.network(&self.local_record(id).await?).await
     }
     async fn set_network(
         &self,
@@ -217,10 +253,10 @@ impl ServerService for ServerManager {
         if request.port == 0 {
             return Err(ServerError::Invalid("port must be between 1 and 65535"));
         }
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let lock = self.lock(&server.id)?;
         let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
-        let mut server = self.record(id).await?;
+        let mut server = self.local_record(id).await?;
         if self.runtime.status(&server).await?.state != ServerState::Stopped {
             return Err(ServerError::AlreadyRunning);
         }
@@ -233,10 +269,10 @@ impl ServerService for ServerManager {
         self.view(server).await
     }
     async fn delete(&self, id: &str, delete_files: bool) -> Result<DeletedServer, ServerError> {
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let lock = self.lock(&server.id)?;
         let guard = Arc::new(lock.try_lock_owned().map_err(|_| ServerError::Busy)?);
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let status = self.runtime.status(&server).await?;
         if status.state != ServerState::Stopped {
             return Err(ServerError::AlreadyRunning);
@@ -288,6 +324,11 @@ impl ServerService for ServerManager {
             }
         }
         self.repo.delete(&server.id).await?;
+        if let Err(error) = tokio::fs::remove_file(self.icon_path(&server.id)).await
+            && error.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!("A deleted server's display icon could not be removed");
+        }
         Ok(DeletedServer {
             id: server.id,
             files_deleted: delete_files,
@@ -296,100 +337,9 @@ impl ServerService for ServerManager {
     }
 
     async fn install(&self, id: &str) -> Result<ServerView, ServerError> {
-        if matches!(
-            self.record(id).await?.software,
-            Some(mcm_core::software::Software::CurseForge { .. })
-        ) {
-            return self.install_pack(id, Default::default()).await;
-        }
-        let server = self.record(id).await?;
-        let lock = self.lock(&server.id)?;
-        let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
-        let mut server = self.record(id).await?;
-        if server.launch.is_some() {
-            return Err(ServerError::AlreadyInstalled);
-        }
-        let software = server.software.as_ref().ok_or(ServerError::Invalid(
-            "Custom servers use a manually supplied JAR.",
-        ))?;
-        let status = self.runtime.status(&server).await?;
-        if status.state != ServerState::Stopped {
-            return Err(ServerError::AlreadyRunning);
-        }
-        // An old game container would retain its original command/image across starts.
-        if status.container_id.is_some() {
-            return Err(ServerError::Invalid(
-                "Install software before creating a game container.",
-            ));
-        }
-        let directory = tokio::fs::canonicalize(self.root.join(&server.id))
+        self.install_with_progress(id, Default::default(), Default::default())
             .await
-            .map_err(fs_error)?;
-        let root = tokio::fs::canonicalize(&self.root)
-            .await
-            .map_err(fs_error)?;
-        if !directory.starts_with(root) {
-            return Err(ServerError::Filesystem);
-        }
-        let staging = tempfile::Builder::new()
-            .prefix(".chunkyard-software-")
-            .tempdir_in(&directory)
-            .map_err(fs_error)?;
-        let installers = self.installers.as_ref().ok_or(ServerError::Invalid(
-            "Server software installers are unavailable.",
-        ))?;
-        let mut launch = installers.prepare(software, staging.path()).await?;
-        if !tokio::fs::metadata(staging.path().join("server.jar"))
-            .await
-            .map_err(fs_error)?
-            .is_file()
-        {
-            return Err(ServerError::MissingJar);
-        }
-        // Keep the complete artifact before persisting its reference. Interrupted DB work
-        // can leave an unused directory, but never a record pointing at a deleted staging file.
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            tokio::fs::set_permissions(
-                staging.path().join("server.jar"),
-                std::fs::Permissions::from_mode(0o644),
-            )
-            .await
-            .map_err(fs_error)?;
-            tokio::fs::set_permissions(staging.path(), std::fs::Permissions::from_mode(0o755))
-                .await
-                .map_err(fs_error)?;
-        }
-        let artifact = staging.keep();
-        let relative = artifact
-            .strip_prefix(&directory)
-            .map_err(|_| ServerError::Filesystem)?
-            .join("server.jar");
-        launch.path = relative
-            .to_str()
-            .ok_or(ServerError::Filesystem)?
-            .replace('\\', "/");
-        if server.auto_java {
-            server.docker_image = format!("eclipse-temurin:{}-jre", launch.java_major)
-        }
-        if let Err(error) = self
-            .repo
-            .set_installation(&server.id, &launch, &server.docker_image)
-            .await
-        {
-            let _ = tokio::fs::remove_dir_all(artifact).await;
-            return Err(error.into());
-        }
-        server.jar = launch.path.clone();
-        server.launch = Some(launch);
-        Ok(ServerView {
-            server,
-            directory,
-            status,
-        })
     }
-
     async fn create(&self, request: CreateServer) -> Result<ServerView, ServerError> {
         validation::validate(&request)?;
         if let Some(software) = &request.software {
@@ -409,6 +359,7 @@ impl ServerService for ServerManager {
         };
         let auto_java = request.software.is_some() && request.docker_image.is_none();
         let server = Server {
+            archive: None,
             id: Uuid::new_v4().to_string(),
             name: request.name.trim().into(),
             runtime: "docker".into(),
@@ -441,6 +392,7 @@ impl ServerService for ServerManager {
             return Err(error);
         }
         Ok(ServerView {
+            icon: self.display_icon(&server).await,
             server,
             directory,
             status: RuntimeStatus::stopped(),
@@ -457,13 +409,13 @@ impl ServerService for ServerManager {
         self.view(self.record(id).await?).await
     }
     async fn metrics(&self, id: &str) -> Result<ServerMetrics, ServerError> {
-        self.runtime.metrics(&self.record(id).await?).await
+        self.runtime.metrics(&self.local_record(id).await?).await
     }
     async fn set_eula(&self, id: &str, accepted: bool) -> Result<ServerView, ServerError> {
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let lock = self.lock(&server.id)?;
         let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
-        let mut server = self.record(id).await?;
+        let mut server = self.local_record(id).await?;
         let status = self.runtime.status(&server).await?;
         if status.state != ServerState::Stopped {
             return Err(ServerError::AlreadyRunning);
@@ -482,55 +434,60 @@ impl ServerService for ServerManager {
         self.repo.set_eula(&server.id, accepted).await?;
         server.accept_eula = accepted;
         Ok(ServerView {
+            icon: self.display_icon(&server).await,
             server,
             directory,
             status,
         })
     }
     async fn start(&self, id: &str) -> Result<ServerView, ServerError> {
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let lock = self.lock(&server.id)?;
         let guard = Arc::new(lock.try_lock_owned().map_err(|_| ServerError::Busy)?);
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let status = self.start_inner(&server, guard).await?;
         Ok(ServerView {
+            icon: self.display_icon(&server).await,
             directory: self.root.join(&server.id),
             server,
             status,
         })
     }
     async fn stop(&self, id: &str) -> Result<ServerView, ServerError> {
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let lock = self.lock(&server.id)?;
         let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let status = self.runtime.stop(&server).await?;
         Ok(ServerView {
+            icon: self.display_icon(&server).await,
             directory: self.root.join(&server.id),
             server,
             status,
         })
     }
     async fn restart(&self, id: &str) -> Result<ServerView, ServerError> {
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let lock = self.lock(&server.id)?;
         let guard = Arc::new(lock.try_lock_owned().map_err(|_| ServerError::Busy)?);
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         self.runtime.stop(&server).await?;
         let status = self.start_inner(&server, guard).await?;
         Ok(ServerView {
+            icon: self.display_icon(&server).await,
             directory: self.root.join(&server.id),
             server,
             status,
         })
     }
     async fn kill(&self, id: &str) -> Result<ServerView, ServerError> {
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let lock = self.lock(&server.id)?;
         let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let status = self.runtime.kill(&server).await?;
         Ok(ServerView {
+            icon: self.display_icon(&server).await,
             directory: self.root.join(&server.id),
             server,
             status,
@@ -540,7 +497,7 @@ impl ServerService for ServerManager {
         if !(1..=1000).contains(&tail) {
             return Err(ServerError::Invalid("tail must be between 1 and 1000"));
         }
-        self.runtime.logs(&self.record(id).await?, tail).await
+        self.runtime.logs(&self.local_record(id).await?, tail).await
     }
     async fn command(&self, id: &str, line: &str) -> Result<(), ServerError> {
         if line.is_empty() || line.len() > 4096 || line.contains(['\r', '\n', '\0']) {
@@ -548,7 +505,9 @@ impl ServerService for ServerManager {
                 "command must be a single line of 1–4096 bytes",
             ));
         }
-        self.runtime.command(&self.record(id).await?, line).await
+        self.runtime
+            .command(&self.local_record(id).await?, line)
+            .await
     }
     async fn runtime_info(&self) -> DockerInfo {
         self.runtime.info().await
@@ -573,4 +532,103 @@ fn fs_error(error: std::io::Error) -> ServerError {
 fn configuration_error(error: mcm_core::properties::PropertiesError) -> ServerError {
     tracing::error!(%error, "saved properties could not be applied or recorded");
     ServerError::Filesystem
+}
+
+impl ServerManager {
+    async fn install_managed(
+        &self,
+        id: &str,
+        progress: mcm_core::progress::ProgressReporter,
+    ) -> Result<ServerView, ServerError> {
+        let server = self.local_record(id).await?;
+        let lock = self.lock(&server.id)?;
+        let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
+        let mut server = self.local_record(id).await?;
+        if server.launch.is_some() {
+            return Err(ServerError::AlreadyInstalled);
+        }
+        let software = server.software.as_ref().ok_or(ServerError::Invalid(
+            "Custom servers use a manually supplied JAR.",
+        ))?;
+        let status = self.runtime.status(&server).await?;
+        if status.state != ServerState::Stopped {
+            return Err(ServerError::AlreadyRunning);
+        }
+        // An old game container would retain its original command/image across starts.
+        if status.container_id.is_some() {
+            return Err(ServerError::Invalid(
+                "Install software before creating a game container.",
+            ));
+        }
+        let directory = tokio::fs::canonicalize(self.root.join(&server.id))
+            .await
+            .map_err(fs_error)?;
+        let root = tokio::fs::canonicalize(&self.root)
+            .await
+            .map_err(fs_error)?;
+        if !directory.starts_with(root) {
+            return Err(ServerError::Filesystem);
+        }
+        let staging = tempfile::Builder::new()
+            .prefix(".chunkyard-software-")
+            .tempdir_in(&directory)
+            .map_err(fs_error)?;
+        let installers = self.installers.as_ref().ok_or(ServerError::Invalid(
+            "Server software installers are unavailable.",
+        ))?;
+        let mut launch = installers
+            .prepare_with_progress(software, staging.path(), progress.clone())
+            .await?;
+        if !tokio::fs::metadata(staging.path().join("server.jar"))
+            .await
+            .map_err(fs_error)?
+            .is_file()
+        {
+            return Err(ServerError::MissingJar);
+        }
+        // Keep the complete artifact before persisting its reference. Interrupted DB work
+        // can leave an unused directory, but never a record pointing at a deleted staging file.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            tokio::fs::set_permissions(
+                staging.path().join("server.jar"),
+                std::fs::Permissions::from_mode(0o644),
+            )
+            .await
+            .map_err(fs_error)?;
+            tokio::fs::set_permissions(staging.path(), std::fs::Permissions::from_mode(0o755))
+                .await
+                .map_err(fs_error)?;
+        }
+        progress.stage(mcm_core::progress::Stage::Finalize);
+        let artifact = staging.keep();
+        let relative = artifact
+            .strip_prefix(&directory)
+            .map_err(|_| ServerError::Filesystem)?
+            .join("server.jar");
+        launch.path = relative
+            .to_str()
+            .ok_or(ServerError::Filesystem)?
+            .replace('\\', "/");
+        if server.auto_java {
+            server.docker_image = format!("eclipse-temurin:{}-jre", launch.java_major)
+        }
+        if let Err(error) = self
+            .repo
+            .set_installation(&server.id, &launch, &server.docker_image)
+            .await
+        {
+            let _ = tokio::fs::remove_dir_all(artifact).await;
+            return Err(error.into());
+        }
+        server.jar = launch.path.clone();
+        server.launch = Some(launch);
+        Ok(ServerView {
+            icon: self.display_icon(&server).await,
+            server,
+            directory,
+            status,
+        })
+    }
 }

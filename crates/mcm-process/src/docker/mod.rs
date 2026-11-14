@@ -7,7 +7,7 @@ mod metrics;
 use crate::DockerConfig;
 use bollard::{Docker, errors::Error, models::ContainerInspectResponse};
 use mcm_core::server::{
-    DockerInfo, NetworkSettings, RuntimeStatus, Server, ServerError, ServerState,
+    DockerInfo, HostCapacity, NetworkSettings, RuntimeStatus, Server, ServerError, ServerState,
 };
 use std::time::Duration;
 
@@ -158,6 +158,7 @@ impl DockerRuntime {
                 available: true,
                 version: version.version,
                 reason: None,
+                capacity: Some(host_capacity(info)),
             },
             _ => unavailable("A reachable Linux Docker engine is required."),
         }
@@ -168,6 +169,20 @@ fn unavailable(reason: &str) -> DockerInfo {
         available: false,
         version: None,
         reason: Some(reason.into()),
+        capacity: None,
+    }
+}
+fn host_capacity(info: bollard::models::SystemInfo) -> HostCapacity {
+    let positive = |value: Option<i64>| {
+        value
+            .and_then(|value| u64::try_from(value).ok())
+            .filter(|value| *value > 0)
+    };
+    HostCapacity {
+        logical_cpus: positive(info.ncpu),
+        memory_total_bytes: positive(info.mem_total),
+        architecture: info.architecture,
+        operating_system: info.operating_system,
     }
 }
 fn docker_error(error: Error) -> ServerError {

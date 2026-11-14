@@ -16,7 +16,7 @@
 	} from '#lib/components/app/index.js';
 	import ServerActions from '#lib/components/servers/server-actions.svelte';
 	import ServerConsole from '#lib/components/servers/server-console.svelte';
-	import ServerMetrics from '#lib/components/servers/server-metrics.svelte';
+	import ServerAvatar from '#lib/components/servers/server-avatar.svelte';
 	import ServerOverview from '#lib/components/servers/server-overview.svelte';
 	import ServerSettings from '#lib/components/servers/server-settings.svelte';
 	import ServerFiles from '#lib/components/files/server-files.svelte';
@@ -34,17 +34,28 @@
 	import EulaDialog from '#lib/components/servers/eula-dialog.svelte';
 	import DeleteServerDialog from '#lib/components/servers/delete-server-dialog.svelte';
 	import ServerInstallPanel from '#lib/components/servers/server-install-panel.svelte';
+	import ServerArchivedPanel from '#lib/components/servers/server-archived-panel.svelte';
+	import RestoreDialog from '#lib/components/exports/restore-dialog.svelte';
+	import CloudIcon from '@lucide/svelte/icons/cloud';
+	import ArchiveRestoreIcon from '@lucide/svelte/icons/archive-restore';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { isArchived } from '#lib/exports/backups.js';
 	import { needsInstall, softwareHeadline } from '#lib/servers/software.js';
 	import {
 		errorCode,
+		isAbortError,
+		listExports,
 		type DeletedServer,
+		type ExportRecord,
 		type InstallOptions,
 		type ServerAction,
 		type ServerView
 	} from '#lib/api/index.js';
 	import { ServerController } from '#lib/servers/server-controller.svelte.js';
 	import { poll } from '#lib/polling.js';
-	import { formatMemoryRange } from '#lib/format.js';
+	import { formatBytes, formatCpu } from '#lib/metrics.js';
+	import { useServerMetrics } from '#lib/servers/metrics-source.svelte.js';
+	import { usePackMetadata } from '#lib/servers/pack-metadata.svelte.js';
 	import { afterNavigate, beforeNavigate, goto } from '$app/navigation';
 	import { LeaveGuard } from '#lib/navigation/leave-guard.svelte.js';
 	import { page } from '$app/state';
@@ -91,11 +102,24 @@
 	});
 
 	const server = $derived(controller.server);
-	const running = $derived(server.status.state === 'running');
+	/** Local files removed: only metadata, Activity, Exports and restore remain available. */
+	const archived = $derived(isArchived(server));
+	const running = $derived(!archived && server.status.state === 'running');
 	const created = $derived(page.url.searchParams.has('created'));
 	const software = $derived(server.software ?? null);
 	const notInstalled = $derived(needsInstall(server));
-	const softwareSummary = $derived(softwareHeadline(server));
+	// CurseForge pack name/link by project ID (works for records created before metadata existed).
+	const packInfo = usePackMetadata(() =>
+		software?.type === 'curseforge' ? software.projectId : null
+	);
+	const softwareSummary = $derived(softwareHeadline(server, packInfo.pack?.name ?? null));
+	// The page's only metrics sampler: the header readout and the Overview charts share it.
+	const metrics = useServerMetrics(() => ({
+		serverId: server.id,
+		running,
+		active: !removed && !deleting && !archived
+	}));
+	const liveUsage = $derived(metrics.live);
 
 	const TABS = [
 		{ value: 'overview', label: 'Overview', icon: LayoutDashboardIcon },
@@ -108,6 +132,9 @@
 	] as const;
 	type TabValue = (typeof TABS)[number]['value'];
 	const isTab = (value: string | null): value is TabValue => TABS.some((t) => t.value === value);
+	/** Tabs that read or change local instance files; hidden while archived. */
+	const LOCAL_TABS: readonly TabValue[] = ['console', 'properties', 'files'];
+	const visibleTabs = $derived(archived ? TABS.filter((t) => !LOCAL_TABS.includes(t.value)) : TABS);
 
 	const initialTab = page.url.searchParams.get('tab');
 	let tab = $state<TabValue>(isTab(initialTab) ? initialTab : 'overview');
@@ -136,6 +163,8 @@
 	let networkFocus = $state(0);
 	/** Bumped to expand and scroll to Settings → Launch. */
 	let launchFocus = $state(0);
+	/** Bumped to expand and scroll to Settings → Resources. */
+	let resourcesFocus = $state(0);
 	let tabDirection = $state<1 | -1>(1);
 
 	// Full navigation (palette/history) and shallow tab changes share one source.
@@ -184,8 +213,10 @@
 		}
 	});
 
-	function selectTab(next: string, updateUrl = true) {
-		if (!isTab(next)) return;
+	function selectTab(requested: string, updateUrl = true) {
+		if (!isTab(requested)) return;
+		const next: TabValue =
+			isArchived(controller.server) && LOCAL_TABS.includes(requested) ? 'overview' : requested;
 		if (next !== tab) {
 			const from = TABS.findIndex((t) => t.value === tab);
 			const to = TABS.findIndex((t) => t.value === next);
@@ -208,6 +239,76 @@
 		}
 	}
 
+	// Becoming archived (here or elsewhere) leaves local tabs; their components unmount.
+	$effect(() => {
+		if (archived && LOCAL_TABS.includes(tab)) untrack(() => selectTab('overview'));
+	});
+
+	/** Archive catalog for the archived overview (pinned restore point details). */
+	let catalog = $state.raw<ExportRecord[] | null>(null);
+	let catalogError = $state.raw<unknown>(null);
+	let catalogAbort: AbortController | null = null;
+	async function loadCatalog() {
+		catalogAbort?.abort();
+		const abort = (catalogAbort = new AbortController());
+		catalogError = null;
+		try {
+			const id = controller.server.id;
+			const { items } = await listExports({ signal: abort.signal });
+			if (!abort.signal.aborted) catalog = items.filter((e) => e.serverId === id);
+		} catch (error) {
+			if (!isAbortError(error) && !abort.signal.aborted) catalogError = error;
+		}
+	}
+	$effect(() => () => catalogAbort?.abort());
+	// Loaded on entry while archived and after each observed export/archive/restore.
+	$effect(() => {
+		void serverId;
+		void controller.exportsVersion;
+		if (!archived) return;
+		untrack(() => {
+			catalog = null;
+			void loadCatalog();
+		});
+	});
+	const pinned = $derived(
+		catalogError || catalog === null
+			? undefined
+			: (catalog.find((e) => e.id === server.archive?.exportId) ?? null)
+	);
+
+	let restoreOpen = $state(false);
+	async function onRestore(exportId: string) {
+		restoreOpen = false;
+		const job = await controller.restore(exportId);
+		if (job?.state === 'succeeded') {
+			toast.success(`Restored ${controller.server.name}`, {
+				description: controller.server.acceptEula
+					? 'It stays stopped until you start it.'
+					: 'It stays stopped. Accept the Minecraft EULA before starting.'
+			});
+		}
+	}
+
+	async function onRemoveLocal(exportId: string) {
+		// Unsaved browser edits would be lost with the local files.
+		if (filesDirty || propertiesPending) return;
+		const job = await controller.archive(exportId);
+		if (job?.state === 'succeeded') {
+			toast.success(`Removed local files of ${controller.server.name}`, {
+				description: 'It stays listed and can be restored from its S3 backup.'
+			});
+		}
+	}
+
+	const removeBlocked = $derived(
+		filesDirty
+			? 'Save or discard the unsaved file edits in Files first.'
+			: propertiesPending
+				? 'Wait for the pending properties to save.'
+				: null
+	);
+
 	function exportSelected() {
 		selectionFocus += 1;
 		selectTab('exports');
@@ -215,6 +316,11 @@
 
 	function editNetwork() {
 		networkFocus += 1;
+		selectTab('settings');
+	}
+
+	function editResources() {
+		resourcesFocus += 1;
 		selectTab('settings');
 	}
 
@@ -247,7 +353,8 @@
 					if (removed || deleting) return;
 					if (!controller.busy && controller.server.id === id) {
 						await controller.refresh();
-						if (tab === 'properties') await propertiesEditor?.refreshMetadata();
+						if (tab === 'properties' && !isArchived(controller.server))
+							await propertiesEditor?.refreshMetadata();
 					}
 				},
 				{ intervalMs: 5000, immediate: false, signal: abort.signal }
@@ -320,10 +427,17 @@
 {#snippet header()}
 	<div class="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
 		<div class="flex min-w-0 items-center gap-2">
+			<ServerAvatar {server} class="size-6 rounded-md max-sm:hidden" iconClass="size-3.5" />
 			<h1 class="truncate text-base font-semibold tracking-tight" title={server.name}>
 				{server.name}
 			</h1>
-			<StatusBadge state={server.status.state} compact />
+			{#if archived}
+				<Badge variant="secondary" title="Local files removed; restorable from its S3 backup">
+					<CloudIcon aria-hidden="true" />Archived
+				</Badge>
+			{:else}
+				<StatusBadge state={server.status.state} compact />
+			{/if}
 		</div>
 		<p
 			class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground max-md:hidden"
@@ -341,34 +455,65 @@
 			{:else if controller.exportActive}
 				<Spinner class="size-3" />
 				<span class="truncate">Exporting… job {controller.exportJob?.state}</span>
+			{:else if controller.backupActive}
+				<Spinner class="size-3" />
+				<span class="truncate"
+					>{controller.backupOp === 'restore' ? 'Restoring' : 'Removing local files'}… job {controller
+						.backupJob?.state ?? 'requested'}</span
+				>
 			{:else}
-				<span class="truncate">
-					{#if softwareSummary}{softwareSummary} ·
-					{/if}Port {server.port} · {formatMemoryRange(server.memoryMinMb, server.memoryMaxMb)}
-				</span>
+				{#if softwareSummary}<span class="truncate">{softwareSummary}</span>{/if}
+				{#if liveUsage}
+					<!-- Live readings only: hidden when stopped, paused, hidden-tab stale or failed. -->
+					<span
+						class="shrink-0 font-mono tabular-nums"
+						data-testid="header-usage"
+						title="Current CPU (of one core) and container memory working set"
+					>
+						{softwareSummary ? '· ' : ''}CPU {formatCpu(liveUsage.cpuPercent)} · RAM {formatBytes(
+							liveUsage.memoryBytes
+						)}
+					</span>
+				{/if}
 			{/if}
 		</p>
 	</div>
 	<div class="flex shrink-0 items-center gap-1.5">
-		<ServerActions
-			compact
-			serverState={server.status.state}
-			busy={controller.busy || deleting || removed || exportBusy}
-			pending={controller.action}
-			startBlocked={notInstalled}
-			{onAction}
-		/>
-		<DeleteServerDialog
-			compact
-			{server}
-			disabled={controller.busy || removed || propertiesPending || exportBusy}
-			bind:deleting
-			ondeleted={onDeleted}
-		/>
+		{#if archived}
+			<Button
+				size="sm"
+				disabled={controller.busy || removed}
+				onclick={() => (restoreOpen = true)}
+				aria-label={`Restore ${server.name}`}
+			>
+				{#if controller.backupActive}<Spinner data-icon="inline-start" />{:else}<ArchiveRestoreIcon
+						data-icon="inline-start"
+					/>{/if}
+				<span class="max-sm:hidden">Restore</span>
+			</Button>
+		{:else}
+			<ServerActions
+				compact
+				serverState={server.status.state}
+				busy={controller.busy || deleting || removed || exportBusy}
+				pending={controller.action}
+				startBlocked={notInstalled}
+				{onAction}
+			/>
+			<DeleteServerDialog
+				compact
+				{server}
+				disabled={controller.busy || removed || propertiesPending || exportBusy}
+				bind:deleting
+				ondeleted={onDeleted}
+			/>
+		{/if}
 	</div>
 {/snippet}
 
-{#if created && software}
+{#if archived}
+	<!-- No creation/install notices for an archived record: nothing local exists. -->
+{:else if created && software}
 	<Alert.Root>
 		<InfoIcon />
 		<Alert.Title>{notInstalled ? 'Server created' : 'Server installed'}</Alert.Title>
@@ -423,7 +568,7 @@
 	</Alert.Root>
 {/if}
 
-{#if software && (notInstalled || controller.installJob)}
+{#if !archived && software && (notInstalled || controller.installJob)}
 	<ServerInstallPanel
 		{software}
 		job={controller.installJob}
@@ -432,6 +577,7 @@
 		installed={!notInstalled}
 		disabled={controller.busy || server.status.state === 'running'}
 		onInstall={notInstalled ? onInstall : undefined}
+		packName={packInfo.pack?.name ?? null}
 	/>
 {/if}
 
@@ -448,7 +594,7 @@
 {#if controller.recoveryError}
 	<ErrorAlert
 		error={controller.recoveryError}
-		hint="Running installs, starts, stops or exports of this server could not be checked. They may still be running."
+		hint="Running installs, starts, stops, exports, archives or restores of this server could not be checked. They may still be running."
 	>
 		<div class="mt-2 flex flex-wrap items-center gap-3">
 			<Button
@@ -497,7 +643,7 @@
 		variant="line"
 		class="scrollbar-none w-full justify-start gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-none border-b border-border"
 	>
-		{#each TABS as item (item.value)}
+		{#each visibleTabs as item (item.value)}
 			<Tabs.Trigger
 				value={item.value}
 				class="flex-none px-1 group-data-horizontal/tabs:after:bottom-[-4px]"
@@ -506,7 +652,7 @@
 				{item.label}
 				{#if (item.value === 'files' && filesDirty) || (item.value === 'properties' && propertiesPending)}
 					<span class="size-1.5 rounded-full bg-warning" aria-label="Unsaved changes"></span>
-				{:else if item.value === 'exports' && exportBusy}
+				{:else if item.value === 'exports' && (exportBusy || controller.backupActive)}
 					<Spinner class="size-3" aria-label="Export running" />
 				{/if}
 			</Tabs.Trigger>
@@ -515,13 +661,35 @@
 	<Tabs.Content value="overview">
 		{#if tab === 'overview'}
 			<Reveal preset="step" direction={tabDirection} class="flex flex-col gap-6">
-				<ServerMetrics serverId={server.id} serverState={server.status.state} cpus={server.cpus} />
-				<ServerOverview {server} onEditNetwork={editNetwork} />
+				{#if archived}
+					<ServerArchivedPanel
+						{server}
+						{pinned}
+						{catalogError}
+						onRetryCatalog={loadCatalog}
+						working={controller.backupActive && controller.backupOp === 'restore'}
+						disabled={controller.busy}
+						job={controller.backupOp === 'restore' ? controller.backupJob : null}
+						error={controller.backupOp === 'restore' ? controller.backupError : null}
+						onRestore={() => (restoreOpen = true)}
+						onOpenExports={() => selectTab('exports')}
+					/>
+				{:else}
+					<ServerOverview
+						{server}
+						{metrics}
+						pack={packInfo.pack}
+						busy={controller.busy || deleting || removed}
+						onRequestEula={() => (eulaOpen = true)}
+						onOpenConsole={() => selectTab('console')}
+						onOpenResources={editResources}
+					/>
+				{/if}
 			</Reveal>
 		{/if}
 	</Tabs.Content>
 	<Tabs.Content value="console">
-		{#if tab === 'console'}
+		{#if tab === 'console' && !archived}
 			<Reveal preset="step" direction={tabDirection}>
 				<ServerConsole
 					serverId={server.id}
@@ -533,7 +701,7 @@
 		{/if}
 	</Tabs.Content>
 	<Tabs.Content value="properties">
-		{#if propertiesVisited}
+		{#if propertiesVisited && !archived}
 			{#key server.id}
 				<ServerProperties
 					bind:this={propertiesEditor}
@@ -546,7 +714,7 @@
 		{/if}
 	</Tabs.Content>
 	<Tabs.Content value="files">
-		{#if filesVisited}
+		{#if filesVisited && !archived}
 			{#key server.id}
 				<ServerFiles
 					serverId={server.id}
@@ -570,7 +738,16 @@
 					recoveredError={controller.exportError}
 					archivesVersion={controller.exportsVersion}
 					{selectionFocus}
-					onChooseFiles={() => selectTab('files')}
+					onChooseFiles={archived ? undefined : () => selectTab('files')}
+					serverName={server.name}
+					archive={server.archive ?? null}
+					{removeBlocked}
+					backupJob={controller.backupJob}
+					backupWorking={controller.backupActive}
+					backupError={controller.backupError}
+					backupOp={controller.backupOp}
+					{onRemoveLocal}
+					onRestore={(id) => void onRestore(id)}
 				/>
 			{/key}
 		{/if}
@@ -598,6 +775,9 @@
 					onNetworkFocused={() => (networkFocus = 0)}
 					{launchFocus}
 					onLaunchFocused={() => (launchFocus = 0)}
+					{resourcesFocus}
+					onResourcesFocused={() => (resourcesFocus = 0)}
+					{archived}
 				/>
 			</Reveal>
 		{/if}
@@ -605,6 +785,15 @@
 </Tabs.Root>
 
 <EulaDialog bind:open={eulaOpen} onAccept={() => setEula(true)} />
+
+<RestoreDialog
+	exportId={restoreOpen ? (server.archive?.exportId ?? null) : null}
+	record={pinned ?? null}
+	name={server.name}
+	state="archived"
+	onConfirm={(id) => void onRestore(id)}
+	onCancel={() => (restoreOpen = false)}
+/>
 
 <UnsavedChangesDialog
 	open={leaveGuard.pending !== null}

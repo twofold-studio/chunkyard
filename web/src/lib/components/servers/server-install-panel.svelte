@@ -14,6 +14,7 @@
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { ErrorAlert } from '#lib/components/app/index.js';
 	import LaunchProfileFields from './launch-profile-fields.svelte';
+	import JobWorkProgress from '#lib/components/jobs/job-work-progress.svelte';
 	import type { InstallOptions, Job, ModLoader, ServerSoftware } from '#lib/api/index.js';
 	import { describeSoftware } from '#lib/servers/software.js';
 	import {
@@ -45,6 +46,12 @@
 		 * everything should be detected (the normal path).
 		 */
 		onInstall?: (options: InstallOptions | null) => void;
+		/**
+		 * Resolved CurseForge pack name (and release), shown instead of project/file IDs. Leave
+		 * unset while metadata is loading or unavailable; the IDs remain the fallback.
+		 */
+		packName?: string | null;
+		releaseName?: string | null;
 		/** Extra actions shown next to the install button. */
 		actions?: Snippet;
 	}
@@ -57,11 +64,21 @@
 		installed = false,
 		disabled = false,
 		onInstall,
+		packName = null,
+		releaseName = null,
 		actions
 	}: Props = $props();
 
-	const summary = $derived(describeSoftware(software));
+	const summary = $derived.by(() => {
+		const base = describeSoftware(software);
+		const name = packName?.trim();
+		if (software.type !== 'curseforge' || !name) return base;
+		const release = releaseName?.trim();
+		return { kind: base.kind, detail: release ? `${name} · ${release}` : name };
+	});
 	const failed = $derived(!working && !installed && error != null);
+	/** Stage progress while working, or the last observed step of a failed attempt. */
+	const showWork = $derived(job !== null && !installed && (working || failed));
 	const formId = $props.id();
 
 	/** Overrides are for unusual server packs; normal installs never show them. */
@@ -106,7 +123,7 @@
 	aria-labelledby="install-heading"
 >
 	<div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-		<div class="flex min-w-0 gap-3">
+		<div class="flex min-w-0 flex-1 gap-3">
 			<span
 				class="flex size-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground"
 			>
@@ -118,7 +135,7 @@
 					<CircleDashedIcon class="size-4" aria-hidden="true" />
 				{/if}
 			</span>
-			<div class="flex min-w-0 flex-col gap-1">
+			<div class="flex min-w-0 flex-1 flex-col gap-1">
 				<h2 id="install-heading" class="text-sm font-medium">
 					{summary.kind}
 					{#if summary.detail}<span class="font-normal text-muted-foreground">
@@ -128,6 +145,9 @@
 				<p class="text-sm text-muted-foreground" role="status" aria-live="polite">{status}</p>
 				{#if working && job?.message}
 					<p class="truncate font-mono text-xs text-muted-foreground">{job.message}</p>
+				{/if}
+				{#if showWork && job && job.state !== 'succeeded'}
+					<JobWorkProgress {job} fallback="Installing" class="mt-1 sm:max-w-md" />
 				{/if}
 			</div>
 		</div>
@@ -307,8 +327,8 @@
 
 	{#if !installed}
 		<p class="text-xs text-muted-foreground">
-			Downloads run on the manager host and report no percentage. Installing never starts the server
-			or accepts the Minecraft EULA.
+			Downloads run on the manager host. A step shows a percentage only when its size is known.
+			Installing never starts the server or accepts the Minecraft EULA.
 		</p>
 	{/if}
 </section>

@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import ServerGrid from './server-grid.svelte';
-import type { ServerView } from '#lib/api/index.js';
+import type { ExportRecord, Job, ServerView } from '#lib/api/index.js';
+import { BackupOperations } from '#lib/exports/backup-operations.svelte.js';
 
 const server = (extra: Partial<ServerView>): ServerView => ({
 	id: 'srv-1',
@@ -98,5 +99,109 @@ describe('ServerGrid', () => {
 		await expect.element(manual).toHaveTextContent('Custom');
 		await expect.element(manual).toHaveTextContent('Unknown version');
 		await expect.element(manual).toHaveTextContent('Port 25570');
+	});
+	describe('backups and archived servers', () => {
+		const now = Date.parse('2026-11-14T12:00:00Z');
+		const backup = (serverId: string, createdAt: string): ExportRecord => ({
+			id: `b-${serverId}`,
+			serverId,
+			serverName: serverId,
+			scope: 'all',
+			destination: 's3',
+			createdAt,
+			size: 1,
+			sha256: 'a'.repeat(64),
+			fileName: 'x.tar.gz',
+			objectKey: 'x'
+		});
+		const archived = server({
+			id: 'arch',
+			name: 'Old world',
+			port: 25580,
+			status: { state: 'stopped', containerId: null, exitCode: null, oomKilled: false },
+			software: { type: 'paper', version: '1.21.1' },
+			archive: { exportId: 'b-arch', archivedAt: '2026-11-13T00:00:00Z' }
+		});
+		const local = server({ id: 'local', name: 'Live' });
+
+		it('shows local vs archived state and the newest full S3 backup age', async () => {
+			const onRestore = vi.fn();
+			render(ServerGrid, {
+				...props([local, archived]),
+				backups: new Map([['arch', backup('arch', '2026-11-11T12:00:00Z')]]),
+				onRestore,
+				now
+			});
+			const items = page.getByRole('listitem');
+			await expect.element(items.first()).toHaveTextContent('Create server');
+			const live = items.nth(1);
+			await expect.element(live).toHaveTextContent('Container running');
+			await expect.element(live).toHaveTextContent('No full S3 backup');
+			expect(live.getByRole('button').elements()).toHaveLength(0);
+
+			const arch = items.nth(2);
+			await expect.element(arch).toHaveTextContent('Archived');
+			await expect.element(arch).not.toHaveTextContent('Stopped');
+			await expect.element(arch).toHaveTextContent('Full S3 backup 3 d ago');
+			// Resource metadata and the port stay visible.
+			await expect.element(arch).toHaveTextContent('Paper');
+			await expect.element(arch).toHaveTextContent('Port 25580');
+			await expect.element(arch.getByRole('link')).toHaveAttribute('href', '/servers/arch');
+			const restore = arch.getByRole('button', { name: 'Restore Old world' });
+			// No interactive control is nested inside the card link.
+			expect(restore.element().closest('a')).toBeNull();
+			await restore.click();
+			expect(onRestore).toHaveBeenCalledWith(archived);
+		});
+
+		it('never presents a loading or failed catalog as "no backup"', async () => {
+			const first = render(ServerGrid, { ...props([local]), backups: null, now });
+			await expect.element(page.getByTestId('backup-age')).toHaveTextContent('Checking backups');
+			first.unmount();
+			render(ServerGrid, { ...props([local]), backups: 'error', now });
+			await expect.element(page.getByTestId('backup-age')).toHaveTextContent('Backups unavailable');
+			expect(page.getByText('No full S3 backup').elements()).toHaveLength(0);
+		});
+
+		it('shows restore progress and failures from the shared tracker', async () => {
+			const operations = new BackupOperations();
+			const running: Job = {
+				id: 'r1',
+				kind: 'server.restore',
+				serverId: 'arch',
+				state: 'running',
+				progress: null,
+				message: null,
+				error: null,
+				result: null,
+				createdBy: null,
+				createdAt: '',
+				startedAt: null,
+				finishedAt: null,
+				work: { stage: 'fetch_archive', completedBytes: 10, totalBytes: 100, completedStages: [] }
+			};
+			operations.jobs.set('arch', running);
+			const screen = render(ServerGrid, {
+				...props([archived]),
+				backups: new Map(),
+				operations,
+				onRestore: vi.fn(),
+				now
+			});
+			await expect.element(page.getByRole('button', { name: 'Restore Old world' })).toBeDisabled();
+			await expect.element(page.getByTestId('work-progress')).toBeVisible();
+			operations.jobs.set('arch', {
+				...running,
+				state: 'failed',
+				error: { code: 'exports.restore_conflict', detail: 'exists' }
+			});
+			operations.errors.set('arch', { code: 'exports.restore_conflict', detail: 'exists' });
+			await expect
+				.element(page.getByRole('alert'))
+				.toHaveTextContent('Restore would overwrite files');
+			await expect.element(page.getByRole('button', { name: 'Restore Old world' })).toBeEnabled();
+			screen.unmount();
+			operations.destroy();
+		});
 	});
 });

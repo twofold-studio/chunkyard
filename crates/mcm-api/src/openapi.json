@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Chunkyard API",
-    "version": "0.9.1",
+    "version": "0.10.0",
     "description": "Single-owner Minecraft manager. Cookie authentication is required unless CHUNKYARD_AUTH__ENABLED=false. Host/origin and X-MCM-CSRF protections apply in both modes. JSON bodies are limited to 1 MiB, except file/properties editors' 8 MiB envelopes for escaped text up to 1 MiB. Raw uploads stream up to 128 MiB. Properties revisions can be saved while running and apply on the next explicit start/restart. Console supports snapshots and same-origin WebSocket streaming; metrics are snapshots."
   },
   "servers": [
@@ -3160,6 +3160,425 @@
           }
         }
       }
+    },
+    "/api/v1/modpacks/curseforge/{id}": {
+      "get": {
+        "operationId": "get_curseforge_pack",
+        "tags": [
+          "Software"
+        ],
+        "summary": "Get a Minecraft modpack name, website and same-origin logo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Modpack metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurseForgePack"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modpacks/curseforge/{id}/logo": {
+      "get": {
+        "operationId": "get_curseforge_logo",
+        "tags": [
+          "Software"
+        ],
+        "summary": "Get a bounded normalized pack logo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PNG logo; private API key is never forwarded",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/icon": {
+      "get": {
+        "operationId": "get_server_display_icon",
+        "tags": [
+          "Servers"
+        ],
+        "summary": "Get the custom icon or CurseForge pack logo",
+        "responses": {
+          "200": {
+            "description": "Normalized display icon",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Independent of Minecraft server-icon.png. May be changed while running. PNG/JPEG/WebP/ICO uploads are decoded with bounded dimensions and normalized to PNG; maximum 2 MiB.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "put": {
+        "operationId": "put_server_display_icon",
+        "tags": [
+          "Servers"
+        ],
+        "summary": "Upload a Chunkyard display icon",
+        "responses": {
+          "200": {
+            "description": "Accept or revoke the Minecraft EULA",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Independent of Minecraft server-icon.png. May be changed while running. PNG/JPEG/WebP/ICO uploads are decoded with bounded dimensions and normalized to PNG; maximum 2 MiB.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 2097152
+              }
+            },
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 2097152
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 2097152
+              }
+            },
+            "image/x-icon": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 2097152
+              }
+            },
+            "image/vnd.microsoft.icon": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 2097152
+              }
+            },
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 2097152
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete_server_display_icon",
+        "tags": [
+          "Servers"
+        ],
+        "summary": "Reset the custom display icon",
+        "responses": {
+          "200": {
+            "description": "Accept or revoke the Minecraft EULA",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Independent of Minecraft server-icon.png. May be changed while running. PNG/JPEG/WebP/ICO uploads are decoded with bounded dimensions and normalized to PNG; maximum 2 MiB.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required in both authentication modes."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must match the configured public origin; a same-origin Referer may substitute."
+          }
+        ]
+      }
+    },
+    "/api/v1/servers/{id}/archive": {
+      "post": {
+        "operationId": "archive_server_local_files",
+        "tags": [
+          "Exports"
+        ],
+        "summary": "Remove local files after verifying a full S3 backup; retain the instance identity",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/FileCsrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "exportId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "confirmDiscardChanges": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "exportId",
+                  "confirmDiscardChanges"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Compress a stopped instance; optionally upload and SHA-256 verify on S3",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Requires stopped instance and explicit acknowledgement that changes since the backup can be lost. Success job.result is {server}. Never stops or starts the game automatically."
+      }
+    },
+    "/api/v1/exports/{id}/restore": {
+      "post": {
+        "operationId": "restore_full_instance_archive",
+        "tags": [
+          "Exports"
+        ],
+        "summary": "Restore a verified full backup into its retained or recreated identity",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/FileCsrf"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Compress a stopped instance; optionally upload and SHA-256 verify on S3",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Refuses existing local files. Preserves current resources/network/EULA for retained records; recreated records require new EULA acceptance. Staged, bounded extraction and journaled publication; game stays stopped. Success job.result is {server}."
+      }
     }
   },
   "components": {
@@ -3920,6 +4339,27 @@
                 "type": "null"
               }
             ]
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DisplayIcon"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archive": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArchiveReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null while local. Archived records stay in the inventory; local operations require restoration."
           }
         },
         "required": [
@@ -3938,7 +4378,9 @@
           "software",
           "launch",
           "autoJava",
-          "publishIp"
+          "publishIp",
+          "icon",
+          "archive"
         ]
       },
       "CreateServer": {
@@ -4118,12 +4560,23 @@
                 "type": "null"
               }
             ]
+          },
+          "capacity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HostCapacity"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "available",
           "version",
-          "reason"
+          "reason",
+          "capacity"
         ]
       },
       "Isolation": {
@@ -4349,6 +4802,16 @@
               {
                 "type": "string",
                 "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "work": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkProgress"
               },
               {
                 "type": "null"
@@ -5253,7 +5716,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Same-origin normalized logo route, or null. Never a remote CDN URL."
           },
           "downloads": {
             "type": "integer"
@@ -5295,6 +5759,147 @@
           "serverPackFileId"
         ],
         "additionalProperties": false
+      },
+      "HostCapacity": {
+        "type": "object",
+        "description": "Docker engine-visible totals, not free memory or the manager container limits. Nested engine constraints may be narrower.",
+        "properties": {
+          "logicalCpus": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "memoryTotalBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "architecture": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "operatingSystem": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "logicalCpus",
+          "memoryTotalBytes",
+          "architecture",
+          "operatingSystem"
+        ]
+      },
+      "DisplayIcon": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Same-origin image URL with content version"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "custom",
+              "modpack"
+            ]
+          }
+        },
+        "required": [
+          "url",
+          "source"
+        ]
+      },
+      "WorkProgress": {
+        "type": "object",
+        "description": "Observed stage progress; totals are null when unknown. Compression counts output bytes; upload counts bytes read into HTTP, followed by separate S3 verification.",
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "resolve",
+              "download",
+              "verify",
+              "extract",
+              "prepare_loader",
+              "finalize",
+              "scan",
+              "compress",
+              "upload",
+              "verify_upload",
+              "fetch_archive",
+              "verify_archive",
+              "restore"
+            ]
+          },
+          "completedBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "totalBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "completedStages": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "enum": [
+                "resolve",
+                "download",
+                "verify",
+                "extract",
+                "prepare_loader",
+                "finalize",
+                "scan",
+                "compress",
+                "upload",
+                "verify_upload",
+                "fetch_archive",
+                "verify_archive",
+                "restore"
+              ]
+            }
+          }
+        },
+        "required": [
+          "stage",
+          "completedBytes",
+          "totalBytes",
+          "completedStages"
+        ]
+      },
+      "ArchiveReference": {
+        "type": "object",
+        "properties": {
+          "exportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "archivedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "exportId",
+          "archivedAt"
+        ]
       }
     }
   }

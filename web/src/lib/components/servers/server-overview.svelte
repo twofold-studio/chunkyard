@@ -1,133 +1,186 @@
 <script lang="ts">
-	import ContainerIcon from '@lucide/svelte/icons/container';
-	import CpuIcon from '@lucide/svelte/icons/cpu';
-	import FolderIcon from '@lucide/svelte/icons/folder';
-	import ActivityIcon from '@lucide/svelte/icons/activity';
-	import BlocksIcon from '@lucide/svelte/icons/blocks';
-	import NetworkIcon from '@lucide/svelte/icons/network';
+	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
+	import OctagonAlertIcon from '@lucide/svelte/icons/octagon-alert';
+	import InfoIcon from '@lucide/svelte/icons/info';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { cn } from '#lib/utils.js';
 	import {
-		CopyText,
-		SettingsPanel,
-		SettingsSection,
-		StatusBadge
-	} from '#lib/components/app/index.js';
-	import { formatCpus, formatMemory } from '#lib/format.js';
-	import { describeSoftware, installedDetails, needsInstall } from '#lib/servers/software.js';
-	import type { ServerView } from '#lib/api/index.js';
+		describeSoftware,
+		installedDetails,
+		needsInstall,
+		safeCurseForgeUrl
+	} from '#lib/servers/software.js';
+	import type { CurseForgeModpack, ServerView } from '#lib/api/index.js';
+	import type { MetricsSource } from '#lib/servers/metrics-source.svelte.js';
+	import ServerAvatar from './server-avatar.svelte';
+	import ServerMetrics from './server-metrics.svelte';
 
 	interface Props {
 		server: ServerView;
-		/** Jump to Settings → Network. */
-		onEditNetwork?: () => void;
+		/** The page's single metrics sampler. */
+		metrics: MetricsSource;
+		/** CurseForge metadata for this server's pack, when known. */
+		pack?: CurseForgeModpack | null;
+		onRequestEula?: () => void;
+		onOpenConsole?: () => void;
+		onOpenResources?: () => void;
+		/** Another operation is running. */
+		busy?: boolean;
 	}
 
-	let { server, onEditNetwork }: Props = $props();
+	let {
+		server,
+		metrics,
+		pack = null,
+		onRequestEula,
+		onOpenConsole,
+		onOpenResources,
+		busy = false
+	}: Props = $props();
+
+	const software = $derived(server.software ?? null);
 	const launch = $derived(server.launch ?? null);
-	const software = $derived(server.software ? describeSoftware(server.software, launch) : null);
-	const details = $derived(installedDetails(server));
+	const isPack = $derived(software?.type === 'curseforge');
+	const notInstalled = $derived(needsInstall(server));
+	const state = $derived(server.status.state);
+	const stopped = $derived(state === 'stopped');
+
+	const title = $derived.by(() => {
+		if (!software) return 'Custom JAR';
+		if (isPack) return pack?.name?.trim() || 'CurseForge modpack';
+		return describeSoftware(software, launch).kind;
+	});
+	const packHref = $derived(isPack && pack ? safeCurseForgeUrl(pack.websiteUrl) : null);
+
+	/** Minecraft, loader, Paper build and Java; launch details live in Settings. */
+	const facts = $derived.by(() => {
+		const rows = installedDetails(server).filter((row) => row.label !== 'Launch');
+		if (rows.length > 0 || !software || isPack) return rows;
+		// Not installed yet: the requested selection is still meaningful (never pack IDs).
+		const detail = describeSoftware(software, launch).detail;
+		return detail ? [{ label: 'Selected', value: detail }] : [];
+	});
+
+	const exitCode = $derived(server.status.exitCode);
+	const failedExit = $derived(state !== 'running' && exitCode !== null && exitCode !== 0);
 </script>
 
-{#snippet value(label: string, text: string, mono = false)}
-	<div class="flex flex-col gap-0.5">
-		<span class="text-xs text-muted-foreground">{label}</span>
-		<span class={mono ? 'font-mono text-sm break-all' : 'text-sm'}>{text}</span>
+{#snippet caveat(
+	tone: 'danger' | 'warning' | 'info',
+	text: string,
+	action?: () => void,
+	label?: string
+)}
+	<div
+		class={cn(
+			'flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border px-4 py-2.5 text-sm',
+			tone === 'danger' && 'border-destructive/30 bg-destructive/10',
+			tone === 'warning' && 'border-warning/30 bg-warning/10',
+			tone === 'info' && 'border-border bg-card/40 text-muted-foreground'
+		)}
+		role={tone === 'info' ? undefined : 'status'}
+	>
+		{#if tone === 'danger'}
+			<OctagonAlertIcon class="size-4 shrink-0 text-destructive" aria-hidden="true" />
+		{:else if tone === 'warning'}
+			<TriangleAlertIcon class="size-4 shrink-0 text-warning" aria-hidden="true" />
+		{:else}
+			<InfoIcon class="size-4 shrink-0" aria-hidden="true" />
+		{/if}
+		<span class="min-w-0 flex-1">{text}</span>
+		{#if action && label}
+			<Button size="xs" variant="outline" onclick={action}>{label}</Button>
+		{/if}
 	</div>
 {/snippet}
 
-<SettingsPanel>
-	<SettingsSection
-		title="Status"
-		description="Docker container state. A running container does not mean Minecraft has finished starting."
-		icon={ActivityIcon}
-	>
-		<div class="flex flex-wrap items-center gap-3">
-			<StatusBadge state={server.status.state} />
-			{#if server.status.exitCode !== null}
-				<span class="text-sm text-muted-foreground">Last exit code {server.status.exitCode}</span>
-			{/if}
-			{#if server.status.oomKilled}
-				<span class="text-sm text-destructive">Killed: out of memory</span>
-			{/if}
-		</div>
-		{#if server.status.containerId}
-			{@render value('Container', server.status.containerId.slice(0, 12), true)}
-		{/if}
-	</SettingsSection>
-
-	{#if software}
-		<SettingsSection
-			title="Software"
-			description="Installed and verified by the manager. Reinstalling is not supported."
-			icon={BlocksIcon}
-		>
-			<div class="grid gap-4 sm:grid-cols-3">
-				{@render value('Type', software.kind)}
-				{#if software.detail}{@render value('Selection', software.detail)}{/if}
-				{@render value('Status', needsInstall(server) ? 'Not installed' : 'Installed')}
-			</div>
-			{#if launch}
-				<div class="grid gap-4 sm:grid-cols-3">
-					{#each details as row (row.label)}{@render value(row.label, row.value)}{/each}
-				</div>
-				{@render value('Launch file', server.launchOverride?.path ?? launch.path, true)}
-				{@render value(
-					server.software?.type === 'curseforge' ? 'Server pack SHA-256' : 'SHA-256',
-					launch.checksum,
-					true
-				)}
-			{/if}
-		</SettingsSection>
+<div class="flex flex-col gap-4" data-testid="server-overview">
+	<!-- Only conditions that need attention; routine details live in Settings. -->
+	{#if server.status.oomKilled}
+		{@render caveat(
+			'danger',
+			'The container was killed for running out of memory. Give it more Server RAM while it is stopped.',
+			onOpenResources,
+			'Resources'
+		)}
+	{/if}
+	{#if failedExit}
+		{@render caveat(
+			'danger',
+			`The last run exited with code ${exitCode}. Check the console output for the cause.`,
+			onOpenConsole,
+			'Open console'
+		)}
+	{/if}
+	{#if state === 'unknown'}
+		{@render caveat(
+			'warning',
+			'Container state unknown. Docker may be unavailable; actions can fail until it responds.'
+		)}
+	{/if}
+	{#if !server.acceptEula}
+		{@render caveat(
+			'warning',
+			'The server cannot start until the Minecraft EULA is accepted.',
+			stopped && !busy ? onRequestEula : undefined,
+			'Review EULA'
+		)}
+	{/if}
+	{#if state === 'running'}
+		{@render caveat(
+			'info',
+			'The container is running. Minecraft may still be loading; the console shows when it is ready.'
+		)}
 	{/if}
 
-	<SettingsSection
-		title="Network"
-		description="Host port published for the game. Change it, or the bind address, in Settings."
-		icon={NetworkIcon}
+	<section
+		class="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-lg border border-border bg-card p-4"
+		aria-label="Software"
 	>
-		<div class="flex flex-wrap items-end gap-4">
-			{@render value('Game port', String(server.port))}
-			{#if onEditNetwork}
-				<button
-					type="button"
-					class="text-sm underline underline-offset-4 hover:text-foreground"
-					onclick={onEditNetwork}
-				>
-					Network settings
-				</button>
+		<ServerAvatar {server} class="size-12 rounded-md" iconClass="size-5" />
+		<div class="flex min-w-0 flex-1 flex-col gap-1.5">
+			<div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+				<h2 class="min-w-0 text-base leading-snug font-semibold break-words">{title}</h2>
+				{#if packHref}
+					<!-- External https CurseForge link vetted by safeCurseForgeUrl, not an app route. -->
+					<!-- eslint-disable svelte/no-navigation-without-resolve -->
+					<a
+						href={packHref}
+						target="_blank"
+						rel="noreferrer noopener"
+						class="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+					>
+						CurseForge <ExternalLinkIcon class="size-3" aria-hidden="true" />
+						<span class="sr-only">page for {title} (opens in a new tab)</span>
+					</a>
+					<!-- eslint-enable svelte/no-navigation-without-resolve -->
+				{/if}
+				{#if software}
+					<Badge variant={notInstalled ? 'warning' : 'success'}>
+						{notInstalled ? 'Not installed' : 'Installed'}
+					</Badge>
+				{/if}
+			</div>
+			{#if facts.length > 0 || !software}
+				<dl class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+					{#each facts as row (row.label)}
+						<div class="flex gap-1.5">
+							<dt class="text-muted-foreground">{row.label}</dt>
+							<dd>{row.value}</dd>
+						</div>
+					{/each}
+					{#if !software}
+						<div class="flex min-w-0 gap-1.5">
+							<dt class="text-muted-foreground">JAR</dt>
+							<dd class="truncate font-mono">{server.jar}</dd>
+						</div>
+					{/if}
+				</dl>
 			{/if}
 		</div>
-	</SettingsSection>
+	</section>
 
-	<SettingsSection
-		title="Directory"
-		description={software
-			? 'Managed directory on the manager host, mounted at /data in the container. Browse it in Files.'
-			: 'Managed directory on the manager host, mounted at /data in the container. Upload the server JAR in Files or copy it here.'}
-		icon={FolderIcon}
-	>
-		<CopyText value={server.directory} label="Copy directory path" />
-		{#if !software}{@render value('Server JAR', server.jar, true)}{/if}
-	</SettingsSection>
-
-	<SettingsSection
-		title="Runtime"
-		description="Docker runtime. Java comes from the image; host Java runtimes are not used by Docker servers."
-		icon={ContainerIcon}
-	>
-		{@render value('Image', server.dockerImage, true)}
-		{#if server.autoJava}
-			<p class="text-xs text-muted-foreground">Chosen automatically to match the required Java.</p>
-		{/if}
-	</SettingsSection>
-
-	<SettingsSection title="Resources" description="Java heap bounds and CPU limit." icon={CpuIcon}>
-		<div class="grid gap-4 sm:grid-cols-3">
-			{@render value('Min heap', formatMemory(server.memoryMinMb))}
-			{@render value('Max heap', formatMemory(server.memoryMaxMb))}
-			{@render value('CPU limit', formatCpus(server.cpus))}
-		</div>
-		<p class="text-xs text-muted-foreground">
-			Change these in Settings → Resources while the server is stopped.
-		</p>
-	</SettingsSection>
-</SettingsPanel>
+	<ServerMetrics source={metrics} cpus={server.cpus} />
+</div>

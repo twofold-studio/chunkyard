@@ -82,6 +82,11 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
         .with_installers(software.clone())
         .with_properties(Arc::new(mcm_db::SqlitePropertiesRepo::new(&database))),
     );
+    servers.recover_transitions().await.map_err(|_| {
+        std::io::Error::other(
+            "Instance transition recovery failed; original files and journals were retained.",
+        )
+    })?;
     let state = AppState {
         exports: Arc::new(mcm_process::ExportManager::new(
             config.data_dir.join("exports"),

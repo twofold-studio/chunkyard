@@ -5,6 +5,25 @@ use std::collections::HashSet;
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[tokio::test]
+async fn engine_capacity_requires_setup_and_reports_totals_in_bytes() -> Result {
+    let app = TestApp::new().await?;
+    let url = format!("{}/api/v1/system/isolation", app.base);
+    assert_eq!(app.client.get(&url).send().await?.status(), 503);
+    app.setup().await?;
+    let response = app.client.get(&url).send().await?;
+    assert_eq!(response.status(), 200);
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    let body: Value = response.json().await?;
+    assert_eq!(body["docker"]["capacity"]["logicalCpus"], 4);
+    assert_eq!(
+        body["docker"]["capacity"]["memoryTotalBytes"],
+        24_u64 * 1024 * 1024 * 1024
+    );
+    assert_eq!(body["docker"]["capacity"]["architecture"], "aarch64");
+    Ok(())
+}
+
+#[tokio::test]
 async fn schema_is_protected_and_references_only_local_resolvable_components() -> Result {
     let app = TestApp::new().await?;
     let url = format!("{}/api/v1/openapi.json", app.base);

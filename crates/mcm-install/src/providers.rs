@@ -6,6 +6,34 @@ const MANIFEST: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_
 const PAPER: &str = "https://fill.papermc.io/v3/projects/paper";
 #[async_trait]
 impl SoftwareService for Installers {
+    async fn prepare_with_progress(
+        &self,
+        software: &Software,
+        directory: &Path,
+        progress: mcm_core::progress::ProgressReporter,
+    ) -> Result<Launch, SoftwareError> {
+        progress.stage(mcm_core::progress::Stage::Resolve);
+        self.reporting(progress).prepare(software, directory).await
+    }
+    async fn prepare_plan_with_progress(
+        &self,
+        software: &Software,
+        directory: &Path,
+        options: &mcm_core::software::InstallOptions,
+        lease: std::sync::Arc<dyn Send + Sync>,
+        progress: mcm_core::progress::ProgressReporter,
+    ) -> Result<mcm_core::software::PreparedSoftware, SoftwareError> {
+        progress.stage(mcm_core::progress::Stage::Resolve);
+        self.reporting(progress)
+            .prepare_plan(software, directory, options, lease)
+            .await
+    }
+    async fn modpack(&self, id: u64) -> Result<Value, SoftwareError> {
+        Ok(super::curseforge::project_view(&self.cf_project(id).await?))
+    }
+    async fn modpack_logo(&self, id: u64) -> Result<Vec<u8>, SoftwareError> {
+        self.cf_logo(id).await
+    }
     fn catalog(&self) -> Value {
         let enabled = self.curseforge_key.is_some();
         json!({"items":[{"id":"vanilla","name":"Vanilla","available":true,"reason":null},{"id":"paper","name":"Paper","available":true,"reason":null},{"id":"curseforge","name":"CurseForge modpack","available":enabled,"reason":if enabled{None}else{Some("Configure CHUNKYARD_CURSEFORGE__API_KEY on the manager.")}},{"id":"custom","name":"Custom JAR","available":true,"reason":null}]})

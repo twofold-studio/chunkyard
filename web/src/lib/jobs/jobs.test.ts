@@ -135,6 +135,50 @@ describe('jobResultSummary', () => {
 		]);
 	});
 
+	it('summarizes archive and restore results without paths or raw payloads', () => {
+		expect(jobKindLabel('server.archive')).toBe('Remove local files');
+		expect(jobKindLabel('server.restore')).toBe('Restore from backup');
+		const archived = jobResultSummary(
+			job('a', {
+				kind: 'server.archive',
+				result: {
+					server: {
+						name: 'Survival',
+						directory: '/srv/secret/path',
+						status: { state: 'stopped' },
+						archive: { exportId: 'e1', archivedAt: '2026-11-14T00:00:00Z' }
+					}
+				}
+			})
+		);
+		expect(archived.map((r) => r.label)).toEqual([
+			'Server',
+			'Instance',
+			'Restore point',
+			'Status after'
+		]);
+		expect(JSON.stringify(archived)).not.toContain('/srv/secret');
+		const restored = jobResultSummary(
+			job('a', {
+				kind: 'server.restore',
+				result: {
+					server: {
+						name: 'Survival',
+						archive: null,
+						acceptEula: false,
+						status: { state: 'stopped' }
+					}
+				}
+			})
+		);
+		expect(restored).toContainEqual({
+			label: 'Instance',
+			value: 'Local · files restored',
+			mono: false
+		});
+		expect(restored).toContainEqual({ label: 'EULA', value: 'Not accepted', mono: false });
+	});
+
 	it('renders nothing for unknown kinds, odd shapes or unfinished jobs', () => {
 		expect(jobResultSummary(job('a', { kind: 'mystery', result: { token: 'x' } }))).toEqual([]);
 		expect(jobResultSummary(job('a', { kind: 'server.export', result: [1, 2] }))).toEqual([]);

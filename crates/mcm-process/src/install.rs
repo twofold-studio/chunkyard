@@ -42,6 +42,7 @@ impl ServerManager {
         &self,
         id: &str,
         options: InstallOptions,
+        progress: mcm_core::progress::ProgressReporter,
     ) -> Result<ServerView, ServerError> {
         if let Some(profile) = &options.launch {
             profile.validate()?;
@@ -55,12 +56,12 @@ impl ServerManager {
         if options.java_major.is_some_and(|n| !(8..=99).contains(&n)) {
             return Err(SoftwareError::Invalid.into());
         }
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let guard = self
             .lock(&server.id)?
             .try_lock_owned()
             .map_err(|_| ServerError::Busy)?;
-        let mut server = self.record(id).await?;
+        let mut server = self.local_record(id).await?;
         if server.launch.is_some() {
             return Err(ServerError::AlreadyInstalled);
         }
@@ -94,13 +95,20 @@ impl ServerManager {
         let software = server.software.as_ref().ok_or(SoftwareError::Invalid)?;
         let installers = self.installers.as_ref().ok_or(SoftwareError::Invalid)?;
         let mut prepared = installers
-            .prepare_plan(software, lease.staging.path(), &options, lease.clone())
+            .prepare_plan_with_progress(
+                software,
+                lease.staging.path(),
+                &options,
+                lease.clone(),
+                progress.clone(),
+            )
             .await?;
         if !prepared.instance_files {
             return Err(SoftwareError::PackUnsupported.into());
         }
         let pack = lease.staging.path().join("pack");
         if let Some(command) = prepared.installer.take() {
+            progress.stage(mcm_core::progress::Stage::PrepareLoader);
             self.runtime
                 .run_installer(&server, pack.clone(), command, lease.clone())
                 .await?;
@@ -142,6 +150,7 @@ impl ServerManager {
         if !metadata.is_file() {
             return Err(SoftwareError::InstallFailed.into());
         }
+        progress.stage(mcm_core::progress::Stage::Finalize);
         let pack_properties = read_properties(&pack.join("server.properties")).await?;
         let owner = if let Some(repo) = &self.properties_repo {
             repo.state(&server.id)
@@ -202,6 +211,7 @@ impl ServerManager {
         server.jar = prepared.launch.path.clone();
         server.launch = Some(prepared.launch);
         Ok(ServerView {
+            icon: self.display_icon(&server).await,
             server,
             directory,
             status,

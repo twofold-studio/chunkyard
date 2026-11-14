@@ -33,6 +33,12 @@ impl ServerRuntime for FakeRuntime {
             available: true,
             version: Some("fixture".into()),
             reason: None,
+            capacity: Some(HostCapacity {
+                logical_cpus: Some(4),
+                memory_total_bytes: Some(24 * 1024 * 1024 * 1024),
+                architecture: Some("aarch64".into()),
+                operating_system: Some("fixture".into()),
+            }),
         }
     }
     async fn metrics(&self, server: &Server) -> Result<ServerMetrics, ServerError> {

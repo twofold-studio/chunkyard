@@ -124,6 +124,7 @@ mod tests {
     }
     fn server() -> Server {
         Server {
+            archive: None,
             launch_override: None,
             id: "test-server".into(),
             name: "Test".into(),
@@ -238,6 +239,7 @@ mod tests {
 #[cfg(test)]
 mod disabled_tests {
     use super::*;
+    use crate::docker::host_capacity;
     use mcm_core::server::ServerRuntime;
     #[tokio::test]
     async fn disabled_runtime_reports_unavailable_without_connecting() {
@@ -248,6 +250,30 @@ mod disabled_tests {
             },
             "instance".into(),
         );
-        assert!(!runtime.info().await.available);
+        let info = runtime.info().await;
+        assert!(!info.available);
+        assert!(info.capacity.is_none());
+    }
+
+    #[test]
+    fn capacity_uses_engine_values_and_does_not_invent_missing_totals() {
+        let capacity = host_capacity(bollard::models::SystemInfo {
+            ncpu: Some(4),
+            mem_total: Some(24 * 1024 * 1024 * 1024),
+            architecture: Some("aarch64".into()),
+            ..Default::default()
+        });
+        assert_eq!(capacity.logical_cpus, Some(4));
+        assert_eq!(capacity.memory_total_bytes, Some(24 * 1024 * 1024 * 1024));
+        assert_eq!(capacity.architecture.as_deref(), Some("aarch64"));
+        for value in [None, Some(0), Some(-1)] {
+            let capacity = host_capacity(bollard::models::SystemInfo {
+                ncpu: value,
+                mem_total: value,
+                ..Default::default()
+            });
+            assert!(capacity.logical_cpus.is_none());
+            assert!(capacity.memory_total_bytes.is_none());
+        }
     }
 }

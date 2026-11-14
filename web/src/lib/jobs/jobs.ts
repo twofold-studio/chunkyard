@@ -14,7 +14,9 @@ export const JOB_KIND_LABELS: Record<string, string> = {
 	'server.restart': 'Restart server',
 	'server.kill': 'Kill server',
 	'server.delete': 'Delete server',
-	'server.export': 'Export server'
+	'server.export': 'Export server',
+	'server.archive': 'Remove local files',
+	'server.restore': 'Restore from backup'
 };
 
 export const JOB_STATE_LABELS: Record<JobState, string> = {
@@ -219,6 +221,20 @@ export function jobResultSummary(job: Job): SummaryRow[] {
 				push('Files', deleted.filesDeleted ? 'Deleted' : 'Kept on the manager host');
 			}
 			push('Kept at', str(deleted.retainedDirectory, 240), true);
+			break;
+		}
+		case 'server.archive':
+		case 'server.restore': {
+			const server = obj(result.server);
+			if (!server) break;
+			push('Server', str(server.name, 80));
+			const archive = obj(server.archive);
+			push('Instance', archive ? 'Archived · local files removed' : 'Local · files restored');
+			if (archive) push('Restore point', str(archive.exportId, 64), true);
+			push('Status after', str(obj(server.status)?.state, 30));
+			if (job.kind === 'server.restore' && typeof server.acceptEula === 'boolean') {
+				push('EULA', server.acceptEula ? 'Accepted' : 'Not accepted');
+			}
 			break;
 		}
 		case 'server.export': {

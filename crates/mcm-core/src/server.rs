@@ -7,6 +7,8 @@ use std::{net::IpAddr, path::PathBuf};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Server {
+    #[serde(default)]
+    pub archive: Option<ArchiveReference>,
     pub id: String,
     pub name: String,
     pub runtime: String,
@@ -27,6 +29,12 @@ pub struct Server {
     pub publish_ip: Option<IpAddr>,
     #[serde(default)]
     pub launch_override: Option<crate::software::LaunchProfile>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveReference {
+    pub export_id: String,
+    pub archived_at: String,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -159,6 +167,12 @@ pub struct ServerView {
     pub server: Server,
     pub directory: PathBuf,
     pub status: RuntimeStatus,
+    pub icon: Option<DisplayIcon>,
+}
+#[derive(Debug, Clone, Serialize)]
+pub struct DisplayIcon {
+    pub url: String,
+    pub source: &'static str,
 }
 /// Completed deletion. Retained files are never implicitly adopted by a new instance.
 #[derive(Debug, Serialize)]
@@ -194,6 +208,16 @@ pub struct DockerInfo {
     pub available: bool,
     pub version: Option<String>,
     pub reason: Option<String>,
+    pub capacity: Option<HostCapacity>,
+}
+/// Docker engine totals, not free resources or the manager container's limits.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostCapacity {
+    pub logical_cpus: Option<u64>,
+    pub memory_total_bytes: Option<u64>,
+    pub architecture: Option<String>,
+    pub operating_system: Option<String>,
 }
 #[derive(Debug, Serialize)]
 pub struct ConsoleLine {
@@ -203,6 +227,18 @@ pub struct ConsoleLine {
 pub type ConsoleStream = futures_util::stream::BoxStream<'static, Result<ConsoleLine, ServerError>>;
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
+    #[error("Restore this archived instance before using its local files or runtime.")]
+    Archived,
+    #[error("The image is invalid or exceeds decoding limits.")]
+    IconInvalid,
+    #[error("Use a PNG, JPEG, WebP or ICO image.")]
+    IconUnsupported,
+    #[error("The icon exceeds 2 MiB.")]
+    IconTooLarge,
+    #[error("No icon is available.")]
+    IconNotFound,
+    #[error("The display icon could not be saved or loaded.")]
+    IconStorage,
     #[error("The configured launch file is missing. Check the launch settings and Files.")]
     MissingLaunch,
     #[error("{0}")]
@@ -242,6 +278,7 @@ pub enum ServerError {
 }
 #[async_trait]
 pub trait ServerRepo: Send + Sync {
+    async fn save(&self, server: &Server) -> Result<(), RepositoryError>;
     async fn set_launch(
         &self,
         id: &str,
@@ -329,6 +366,17 @@ pub trait ServerRuntime: Send + Sync {
 }
 #[async_trait]
 pub trait ServerService: Send + Sync {
+    async fn install_with_progress(
+        &self,
+        id: &str,
+        options: crate::software::InstallOptions,
+        _progress: crate::progress::ProgressReporter,
+    ) -> Result<ServerView, ServerError> {
+        self.install_with_options(id, options).await
+    }
+    async fn icon(&self, id: &str) -> Result<Vec<u8>, ServerError>;
+    async fn set_icon(&self, id: &str, bytes: Vec<u8>) -> Result<ServerView, ServerError>;
+    async fn reset_icon(&self, id: &str) -> Result<ServerView, ServerError>;
     async fn launch_settings(&self, id: &str) -> Result<LaunchSettings, ServerError>;
     async fn set_launch(&self, id: &str, request: LaunchUpdate) -> Result<ServerView, ServerError>;
     async fn install_with_options(
@@ -370,6 +418,12 @@ pub trait ServerService: Send + Sync {
 impl ServerError {
     pub fn code(&self) -> &'static str {
         match self {
+            Self::Archived => "server.archived",
+            Self::IconInvalid => "icons.invalid",
+            Self::IconUnsupported => "icons.unsupported",
+            Self::IconTooLarge => "icons.too_large",
+            Self::IconNotFound => "icons.not_found",
+            Self::IconStorage => "icons.storage",
             Self::MissingLaunch => "server.launch_missing",
             Self::Invalid(_) => "validation",
             Self::NotFound => "server.not_found",

@@ -8,16 +8,21 @@
 		applyView,
 		countLabel,
 		isFiltered,
+		LOCATION_LABELS,
 		loadSortPreference,
 		saveSortPreference,
 		softwareFilterLabel,
 		softwareOptions,
 		SORT_LABELS,
 		STATE_LABELS,
+		type LocationFilter,
 		type SortKey,
 		type StateFilter
 	} from '#lib/servers/list-view.js';
 	import type { ServerView } from '#lib/api/index.js';
+	import type { BackupIndex } from '#lib/exports/backups.js';
+	import { isArchived } from '#lib/exports/backups.js';
+	import type { BackupOperations } from '#lib/exports/backup-operations.svelte.js';
 
 	interface Props {
 		/** The records returned by the current `GET /servers` response. */
@@ -25,18 +30,25 @@
 		createHref: string;
 		/** Injected in tests; defaults to `localStorage` when available. */
 		storage?: Storage;
+		/** Newest full S3 backups (`null` loading, `'error'` failed); omit to hide backup ages. */
+		backups?: BackupIndex | null | 'error';
+		operations?: BackupOperations;
+		onRestore?: (server: ServerView) => void;
+		now?: number;
 	}
 
-	let { servers, createHref, storage }: Props = $props();
+	let { servers, createHref, storage, backups, operations, onRestore, now }: Props = $props();
 
 	const store = () => storage ?? (typeof localStorage === 'undefined' ? undefined : localStorage);
 
 	let query = $state('');
 	let stateFilter = $state<StateFilter>('all');
 	let software = $state('all');
+	let location = $state<LocationFilter>('all');
+	const anyArchived = $derived(servers.some(isArchived));
 	let sort = $state<SortKey>(loadSortPreference(store()));
 
-	const view = $derived({ query, state: stateFilter, software, sort });
+	const view = $derived({ query, state: stateFilter, software, sort, location });
 	const filtered = $derived(isFiltered(view));
 	const visible = $derived(applyView(servers, view));
 	const softwareChoices = $derived(softwareOptions(servers));
@@ -51,6 +63,7 @@
 		query = '';
 		stateFilter = 'all';
 		software = 'all';
+		location = 'all';
 	}
 
 	const selectClass =
@@ -85,6 +98,14 @@
 					<option {value}>{label}</option>
 				{/each}
 			</select>
+			{#if anyArchived || location !== 'all'}
+				<select class={selectClass} aria-label="Filter by location" bind:value={location}>
+					<option value="all">Local and archived</option>
+					{#each Object.entries(LOCATION_LABELS) as [value, label] (value)}
+						<option {value}>{label}</option>
+					{/each}
+				</select>
+			{/if}
 			<select class={selectClass} aria-label="Filter by software" bind:value={software}>
 				<option value="all">All software</option>
 				{#each softwareChoices as value (value)}
@@ -123,4 +144,4 @@
 	</div>
 {/if}
 
-<ServerGrid servers={visible} {createHref} />
+<ServerGrid servers={visible} {createHref} {backups} {operations} {onRestore} {now} />

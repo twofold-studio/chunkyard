@@ -4,6 +4,7 @@ mod console_stream;
 mod error;
 mod exports;
 mod files;
+mod icons;
 mod java;
 mod json;
 mod openapi;
@@ -31,6 +32,7 @@ pub fn secure_router(router: Router, state: AppState) -> Router {
 /// API routes without global middleware, for composition with a static SPA fallback.
 pub fn routes(state: AppState) -> Router {
     let protected = Router::new()
+        .merge(icons::routes())
         .merge(files::routes())
         .merge(exports::routes())
         .route(
@@ -48,6 +50,11 @@ pub fn routes(state: AppState) -> Router {
         )
         .route("/api/v1/software", get(software::catalog))
         .route("/api/v1/modpacks/curseforge", get(software::modpacks))
+        .route("/api/v1/modpacks/curseforge/{id}", get(software::modpack))
+        .route(
+            "/api/v1/modpacks/curseforge/{id}/logo",
+            get(software::modpack_logo),
+        )
         .route(
             "/api/v1/modpacks/curseforge/{id}/files",
             get(software::modpack_files),

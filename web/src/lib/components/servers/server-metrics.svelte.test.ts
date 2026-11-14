@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
-import ServerMetrics from './server-metrics.svelte';
+import ServerMetrics from '../../../tests/metrics-harness.svelte';
 import { METRICS_INTERVAL_KEY, metricsInterval } from '#lib/metrics-interval.svelte.js';
 
 const GiB = 1024 ** 3;
@@ -62,10 +62,12 @@ describe('ServerMetrics', () => {
 		await expect.element(page.getByText('Not running')).toBeVisible();
 		await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
 		expect(fetch.mock.calls[0][0]).toBe('/api/v1/servers/s1/metrics');
-		for (const id of ['metric-cpu', 'metric-memory', 'metric-uptime']) {
+		for (const id of ['metric-cpu', 'metric-memory']) {
 			await expect.element(page.getByTestId(id)).toHaveTextContent('—');
 		}
-		const section = page.getByRole('region', { name: 'Resources' }).element();
+		await expect.element(page.getByTestId('metric-uptime')).not.toBeInTheDocument();
+		await expect.element(page.getByTestId('header-usage')).toHaveTextContent('no live usage');
+		const section = page.getByRole('region', { name: 'Usage' }).element();
 		expect(section.textContent).not.toMatch(/\b0(\.0)?\s?(%|B)\b/);
 		await new Promise((r) => setTimeout(r, 300));
 		expect(fetch).toHaveBeenCalledTimes(1);
@@ -82,12 +84,14 @@ describe('ServerMetrics', () => {
 			cpus: 2
 		});
 		await expect.element(page.getByTestId('metric-cpu')).toHaveTextContent('250%');
-		await expect.element(page.getByText('of one core · limit 2 cores')).toBeVisible();
+		await expect.element(page.getByText(/relative to one core \(can exceed 100%\)/)).toBeVisible();
 		await expect.element(page.getByTestId('metric-memory')).toHaveTextContent('1.5 GiB');
 		await expect.element(page.getByTestId('metric-uptime')).toHaveTextContent('1h 2m');
+		// Redundant usage bars are gone; the two charts carry the readings.
+		expect(document.querySelector('[role="meter"]')).toBeNull();
 		await expect
-			.element(page.getByRole('meter', { name: 'CPU of limit' }))
-			.toHaveAttribute('aria-valuenow', '100');
+			.element(page.getByTestId('header-usage'))
+			.toHaveTextContent('CPU 250% · RAM 1.5 GiB');
 		unmount();
 	});
 
@@ -209,8 +213,10 @@ describe('ServerMetrics', () => {
 				cpus: 2
 			});
 			const history = page.getByTestId('metrics-history');
-			await expect.element(history).toHaveTextContent('History collected while this view is open');
-			await expect.element(history).toHaveTextContent('not stored');
+			await expect
+				.element(history.element().parentElement!)
+				.toHaveTextContent('History collected while this page is open');
+			await expect.element(history.element().parentElement!).toHaveTextContent(/not\s+stored/);
 			await vi.waitFor(() => expect(fetch.mock.calls.length).toBeGreaterThanOrEqual(2), {
 				timeout: 4000
 			});
@@ -254,6 +260,92 @@ describe('ServerMetrics', () => {
 			await expect
 				.element(page.getByRole('img', { name: /^CPU over/ }))
 				.toHaveAttribute('aria-label', expect.stringContaining('1 sample,'));
+			unmount();
+		});
+	});
+
+	describe('single shared source', () => {
+		it('keeps one polling loop for the header when the charts panel unmounts', async () => {
+			metricsInterval.set(1);
+			const fetch = vi.fn().mockImplementation(async () => json(sample()));
+			vi.stubGlobal('fetch', fetch);
+			const { rerender, unmount } = render(ServerMetrics, {
+				serverId: 's1',
+				serverState: 'running',
+				showPanel: true
+			});
+			await expect.element(page.getByTestId('header-usage')).toHaveTextContent('CPU 12.5%');
+			// Another tab: the panel goes away, the header keeps updating from the same loop.
+			await rerender({ serverId: 's1', serverState: 'running', showPanel: false });
+			await expect.element(page.getByTestId('metric-cpu')).not.toBeInTheDocument();
+			const before = fetch.mock.calls.length;
+			await new Promise((r) => setTimeout(r, 2300));
+			const during = fetch.mock.calls.length - before;
+			// One request per second at most: a second loop would double this.
+			expect(during).toBeGreaterThanOrEqual(1);
+			expect(during).toBeLessThanOrEqual(3);
+			await expect.element(page.getByTestId('header-usage')).toHaveTextContent('CPU 12.5%');
+			unmount();
+		});
+
+		it('never presents a paused, hidden or failed sample as live', async () => {
+			const fetch = vi
+				.fn()
+				.mockResolvedValueOnce(json(sample({ cpuPercent: 20 })))
+				.mockResolvedValueOnce(json(sample({ cpuPercent: 30 })))
+				.mockImplementation(async () =>
+					json({ code: 'docker.unavailable', detail: 'Docker is not reachable.' }, 424)
+				);
+			vi.stubGlobal('fetch', fetch);
+			const { unmount } = render(ServerMetrics, { serverId: 's1', serverState: 'running' });
+			const header = page.getByTestId('header-usage');
+			await expect.element(header).toHaveTextContent('CPU 20.0%');
+
+			// Hidden tab: the last sample is no longer current.
+			const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+			document.dispatchEvent(new Event('visibilitychange'));
+			await expect.element(header).toHaveTextContent('no live usage');
+			visibility.mockRestore();
+			document.dispatchEvent(new Event('visibilitychange'));
+			// A fresh sample makes it live again.
+			await page.getByRole('button', { name: 'Refresh metrics' }).click();
+			await expect.element(header).toHaveTextContent('CPU 30.0%');
+
+			// Refresh off: the chart keeps the snapshot, the header does not claim it is live.
+			await page.getByRole('combobox', { name: 'Metrics refresh interval' }).click();
+			await page.getByRole('option', { name: 'Off' }).click();
+			await expect.element(header).toHaveTextContent('no live usage');
+			await expect.element(page.getByTestId('metric-cpu')).toHaveTextContent('30.0%');
+
+			// A failed sample clears the readings everywhere.
+			await page.getByRole('button', { name: 'Refresh metrics' }).click();
+			await expect.element(page.getByText('Docker unavailable; no measurements.')).toBeVisible();
+			await expect.element(page.getByTestId('metric-cpu')).toHaveTextContent('—');
+			await expect.element(header).toHaveTextContent('no live usage');
+			unmount();
+		});
+
+		it('drops the previous server reading on switch and stops when inactive', async () => {
+			const fetch = vi
+				.fn()
+				.mockResolvedValueOnce(json(sample({ cpuPercent: 70 })))
+				.mockImplementation(
+					() => new Promise<Response>(() => {}) // the next server's sample is pending
+				);
+			vi.stubGlobal('fetch', fetch);
+			const { rerender, unmount } = render(ServerMetrics, {
+				serverId: 's1',
+				serverState: 'running'
+			});
+			await expect.element(page.getByTestId('header-usage')).toHaveTextContent('CPU 70.0%');
+			await rerender({ serverId: 's2', serverState: 'running' });
+			// Never show s1's numbers for s2 while its first sample is pending.
+			await expect.element(page.getByTestId('header-usage')).toHaveTextContent('no live usage');
+			await expect.element(page.getByTestId('metric-cpu')).toHaveTextContent('—');
+			const calls = fetch.mock.calls.length;
+			await rerender({ serverId: 's2', serverState: 'running', active: false });
+			await new Promise((r) => setTimeout(r, 200));
+			expect(fetch.mock.calls.length).toBe(calls);
 			unmount();
 		});
 	});

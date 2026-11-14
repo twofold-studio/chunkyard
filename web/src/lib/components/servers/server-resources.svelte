@@ -4,14 +4,13 @@
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import * as Field from '#lib/components/ui/field/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { Input } from '#lib/components/ui/input/index.js';
+	import ResourcePicker from './resource-picker.svelte';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { ErrorAlert } from '#lib/components/app/index.js';
 	import { isAbortError, updateServerResources, type ServerView } from '#lib/api/index.js';
 	import { validateResources, type ResourceValues } from '#lib/servers/validate.js';
-	import { formatCpus, formatMemoryRange } from '#lib/format.js';
+	import { formatCpus, formatMemory } from '#lib/format.js';
 	import { collapse } from '#lib/motion/index.js';
 
 	interface Props {
@@ -116,9 +115,8 @@
 		<CpuIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
 		<span class="text-sm font-medium">Resources</span>
 		<span class="text-xs text-muted-foreground">
-			Heap <span class="text-foreground"
-				>{formatMemoryRange(server.memoryMinMb, server.memoryMaxMb)}</span
-			>
+			RAM <span class="text-foreground">{formatMemory(server.memoryMaxMb)}</span>
+			<span class="max-sm:hidden">(initial {formatMemory(server.memoryMinMb)})</span>
 			· <span class="text-foreground">{formatCpus(server.cpus)}</span>
 		</span>
 		<Button
@@ -140,58 +138,19 @@
 	{#if open}
 		<div id={formId} transition:collapse class="border-t border-border px-4 py-4">
 			<form class="flex flex-col gap-4" {onsubmit} novalidate aria-label="Resources">
-				<div class="grid gap-3 sm:grid-cols-3">
-					<Field.Field data-invalid={errors.memoryMinMb ? true : undefined}>
-						<Field.Label for={`${formId}-min`}>Min heap (MiB)</Field.Label>
-						<Input
-							id={`${formId}-min`}
-							type="number"
-							min={128}
-							max={262144}
-							step={128}
-							bind:value={form.memoryMinMb}
-							aria-invalid={errors.memoryMinMb ? true : undefined}
-							disabled={locked}
-							class="h-8"
-						/>
-						{#if errors.memoryMinMb}<Field.Error>{errors.memoryMinMb}</Field.Error>{/if}
-					</Field.Field>
-					<Field.Field data-invalid={errors.memoryMaxMb ? true : undefined}>
-						<Field.Label for={`${formId}-max`}>Max heap (MiB)</Field.Label>
-						<Input
-							id={`${formId}-max`}
-							type="number"
-							min={128}
-							max={262144}
-							step={128}
-							bind:value={form.memoryMaxMb}
-							aria-invalid={errors.memoryMaxMb ? true : undefined}
-							disabled={locked}
-							class="h-8"
-						/>
-						{#if errors.memoryMaxMb}<Field.Error>{errors.memoryMaxMb}</Field.Error>{/if}
-					</Field.Field>
-					<Field.Field data-invalid={errors.cpus ? true : undefined}>
-						<Field.Label for={`${formId}-cpus`}>CPU limit</Field.Label>
-						<Input
-							id={`${formId}-cpus`}
-							type="number"
-							min={0.1}
-							max={256}
-							step={0.1}
-							bind:value={form.cpus}
-							aria-invalid={errors.cpus ? true : undefined}
-							disabled={locked}
-							class="h-8"
-						/>
-						{#if errors.cpus}<Field.Error>{errors.cpus}</Field.Error>{/if}
-					</Field.Field>
-				</div>
+				<ResourcePicker
+					id={formId}
+					bind:memoryMaxMb={form.memoryMaxMb}
+					bind:memoryMinMb={form.memoryMinMb}
+					bind:cpus={form.cpus}
+					{errors}
+					disabled={locked}
+				/>
 
 				<p class="text-xs text-muted-foreground">
-					Heap bounds are passed to Java (-Xms/-Xmx); the CPU limit caps the container. The stopped
-					container is replaced on save and the next start uses the new limits. Files and worlds are
-					kept.
+					Server RAM and initial heap are passed to Java (-Xmx/-Xms); the CPU limit caps the
+					container. The stopped container is replaced on save and the next start uses the new
+					limits. Files and worlds are kept.
 				</p>
 
 				{#if saveError}

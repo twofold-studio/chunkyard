@@ -19,6 +19,8 @@
 	import { poll } from '#lib/polling.js';
 	import { resolve } from '$app/paths';
 	import JobStateBadge from './job-state-badge.svelte';
+	import JobWorkProgress from './job-work-progress.svelte';
+	import { readJobWork } from '#lib/jobs/work.js';
 
 	interface Props {
 		job: Job;
@@ -84,6 +86,8 @@
 	);
 	const linkable = $derived(canLinkServer(job, knownIds));
 	const message = $derived(job.message ? sanitizeText(job.message, 300) : null);
+	/** Finished jobs show their observed steps only when the backend recorded any. */
+	const hasWork = $derived(readJobWork(job.work) !== null);
 </script>
 
 {#snippet field(label: string, value: string, mono = false)}
@@ -124,13 +128,23 @@
 		</div>
 
 		{#if active}
-			<p class="px-4 py-2.5 text-sm text-muted-foreground" data-testid="job-progress">
-				{job.state === 'queued' ? 'Waiting for a free worker' : 'Working'}{message
-					? ` · ${message}`
-					: ''}. Progress is not reported as a percentage, and jobs cannot be cancelled from here.
-			</p>
-		{:else if message}
-			<p class="px-4 py-2.5 text-sm text-muted-foreground">{message}</p>
+			<div class="flex flex-col gap-2 px-4 py-2.5" data-testid="job-progress">
+				<JobWorkProgress {job} class="sm:max-w-lg" />
+				<p class="text-xs text-muted-foreground">
+					{#if message}{message} ·
+					{/if}Steps show a percentage only when their size is known. Jobs cannot be cancelled from
+					here.
+				</p>
+			</div>
+		{:else}
+			{#if hasWork}
+				<div class="px-4 py-2.5" data-testid="job-progress">
+					<JobWorkProgress {job} class="sm:max-w-lg" />
+				</div>
+			{/if}
+			{#if message}
+				<p class="px-4 py-2.5 text-sm text-muted-foreground">{message}</p>
+			{/if}
 		{/if}
 
 		<dl class="grid gap-4 px-4 py-3 sm:grid-cols-3">

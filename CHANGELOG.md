@@ -4,6 +4,32 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## 0.10.0 - 2026-11-14
+
+
+### Added
+
+- REST API: GET /api/v1/system/isolation reports Docker engine CPU, memory, architecture and operating system for resource allocation guidance; unavailable capacity remains null.
+- REST API: add CurseForge pack metadata and same-origin normalized logos, plus GET/PUT/DELETE /api/v1/servers/{id}/icon for validated custom display icons independent of Minecraft game files.
+- Backend and REST API: install/export jobs expose persisted work stages and observed download, compressed-output, S3 upload and read-back verification bytes without inventing an overall percentage.
+- Backend and REST API: POST /servers/{id}/archive retains server identities after verified S3 backup checks; POST /exports/{id}/restore safely restores full archives without starting games. Journaled publication recovers interrupted moves, preserves properties history and protects pinned restore points.
+- Web UI: resource controls show Docker host totals from `GET /api/v1/system/isolation` (`docker.capacity`), fetched once when the controls open, and warn when Server RAM plus JVM overhead exceeds or crowds host memory or the CPU limit exceeds logical CPUs. Warnings never block saving or change values; unknown capacity is shown as unknown.
+- Web UI: Settings → Display uploads, changes or resets a Chunkyard display icon (PNG/JPEG/WebP/ICO up to 2 MiB, checked before sending) via `PUT`/`DELETE /api/v1/servers/{id}/icon`, applying the returned server. Server cards and the page header share one icon component: custom icon, then CurseForge pack logo, then a generic icon; only same-origin icon routes are loaded. The Minecraft `server-icon.png` is not changed. Pack names and links come from `GET /api/v1/modpacks/curseforge/{projectId}`, including for older servers.
+- Frontend: install, export and Activity views show the stage a job is in, its byte counts, observed completed steps and a per-step percentage only when the step size is known (from optional `Job.work`); compression shows bytes written, upload and read-back verification are separate steps, and failed or interrupted jobs show where they stopped.
+- Web UI: archived servers stay on the Servers page with an Archived badge, newest full S3 backup age, a local/archived filter and a confirmed Restore from the pinned backup. Server pages offer an explicit, stopped-only "Remove local files" action against a chosen full S3 backup (blocked by unsaved file edits), hide local console/files/properties/lifecycle/metrics while archived, and track `server.archive`/`server.restore` jobs with recovery, stage progress and Activity summaries. Storage & exports adds a Servers tab grouping backups by server (local, archived, removed from manager) with Restore for full archives only; pinned restore points cannot be deleted from the UI. Uses `POST /api/v1/servers/{id}/archive` and `POST /api/v1/exports/{id}/restore`.
+
+### Changed
+
+- Web UI: the new-server wizard keeps Back/Next and step progress in a sticky top bar, and a plain click on a managed software type or a modpack release continues to the next step (keyboard selection, modified clicks and edits of earlier steps never advance; creation, install, start and EULA acceptance still need explicit confirmation).
+- Web UI: the modpack step uses the full content width with responsive pack cards (logo, name, two-line summary, downloads, CurseForge link) that select as a whole, and lists server-pack releases as a selectable list. Pack logos load only from the same-origin `/api/v1/modpacks/curseforge/{id}/logo` route and fall back to a monogram.
+- Web UI: create and Settings → Resources share one resource control: a Server RAM (maximum heap) slider from 1–16 GB with 2/4/6/8/12/16 GB presets and an exact-MiB custom field, the initial heap under Advanced, and a compact CPU row (1/2/4/8 or exact decimals). Existing non-preset values such as 512 or 8048 MiB stay exact as Custom.
+- Web UI: the server Overview is compact: a software summary (real CurseForge pack name and link, Minecraft, loader, Java, install status), only attention-needing caveats (failed exit code, out-of-memory kill, EULA, unknown state, startup readiness) and the CPU/memory charts. IDs, paths, checksum, container ID and exit code moved to Settings → Advanced diagnostics with copy buttons; limits stay in Settings.
+- Web UI: a server page runs a single metrics sampler shared by the Overview charts and a live CPU/RAM readout in the header, so the header updates on every tab. The readout hides when the server is stopped, refresh is off, the tab was hidden since the last sample, a sample failed, or the server changed. Redundant usage bars and stat blocks were removed.
+- Frontend: the install panel names a CurseForge pack and release instead of project/file IDs when metadata is available, and the server page header no longer repeats the game port (it stays on server cards and in Settings → Network).
+
+### Fixed
+
+- Backend: declare the process crate runtime feature explicitly so standalone builds and tests do not depend on workspace feature unification.
 ## 0.9.1 - 2026-11-14
 
 

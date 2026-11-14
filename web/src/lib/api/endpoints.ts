@@ -10,6 +10,7 @@ import type {
 	ConsoleLine,
 	CreateServerRequest,
 	CurseForgeFile,
+	CurseForgeModpack,
 	CurseForgeSearch,
 	DirectoryListing,
 	FileContent,
@@ -131,6 +132,22 @@ export const sendCommand = (id: string, line: string, o: Opts = {}) =>
 export const getServerMetrics = (id: string, o: Opts = {}) =>
 	request<ServerMetrics>(`/api/v1/servers/${enc(id)}/metrics`, o);
 
+/**
+ * Replaces the Chunkyard display icon with raw PNG/JPEG/WebP/ICO bytes (at most 2 MiB).
+ * Manager metadata only: allowed while running and never touches `server-icon.png`.
+ */
+export const uploadServerIcon = (id: string, file: Blob, contentType: string, o: Opts = {}) =>
+	request<{ server: ServerView }>(`/api/v1/servers/${enc(id)}/icon`, {
+		...o,
+		method: 'PUT',
+		rawBody: file,
+		rawContentType: contentType
+	});
+
+/** Removes the custom display icon; the server falls back to its pack logo or none. */
+export const resetServerIcon = (id: string, o: Opts = {}) =>
+	request<{ server: ServerView }>(`/api/v1/servers/${enc(id)}/icon`, { ...o, method: 'DELETE' });
+
 export const getIsolation = (o: Opts = {}) => request<Isolation>('/api/v1/system/isolation', o);
 
 // Software catalog & modpacks ----------------------------------------------------
@@ -151,6 +168,10 @@ export const searchCurseForgeModpacks = (query: string, index = 0, o: Opts = {})
 	const params = new URLSearchParams({ query, index: String(index) });
 	return request<CurseForgeSearch>(`/api/v1/modpacks/curseforge?${params}`, o);
 };
+
+/** Pack metadata by project ID (name, summary, safe website and same-origin logo URLs). */
+export const getCurseForgeModpack = (projectId: number, o: Opts = {}) =>
+	request<CurseForgeModpack>(`/api/v1/modpacks/curseforge/${enc(String(projectId))}`, o);
 
 export const listCurseForgeFiles = (projectId: number, o: Opts = {}) =>
 	request<Items<CurseForgeFile>>(`/api/v1/modpacks/curseforge/${enc(String(projectId))}/files`, o);
@@ -364,6 +385,30 @@ export const createExport = (serverId: string, body: CreateExportRequest, o: Opt
 /** Same-origin attachment URL, streamed through the backend for local and S3 archives. */
 export const exportDownloadUrl = (id: string) => `/api/v1/exports/${enc(id)}/download`;
 
-/** Removes the archive and its catalog record (204). Never touches the server. */
+/**
+ * Removes a stopped server's local files after re-verifying the chosen full S3 export (202).
+ * `confirmDiscardChanges` is mandatory: changes made after that backup are lost. The record,
+ * icon and history stay; the job's successful `result` is `{server}` with `archive` set.
+ * Never stops, starts or changes EULA acceptance.
+ */
+export const archiveServer = (id: string, exportId: string, o: Opts = {}) =>
+	request<{ job: Job }>(`/api/v1/servers/${enc(id)}/archive`, {
+		...o,
+		method: 'POST',
+		body: { exportId, confirmDiscardChanges: true }
+	});
+
+/**
+ * Restores a full archive into an archived or removed server identity (202). Never overwrites
+ * a local instance; the game stays stopped. Recreated records have EULA acceptance `false`.
+ * The job's successful `result` is `{server}`.
+ */
+export const restoreExport = (id: string, o: Opts = {}) =>
+	request<{ job: Job }>(`/api/v1/exports/${enc(id)}/restore`, { ...o, method: 'POST' });
+
+/**
+ * Removes the archive and its catalog record (204). Never touches the server. Refused with
+ * `exports.backup_required` while it is the restore point of an archived server.
+ */
 export const deleteExport = (id: string, o: Opts = {}) =>
 	request<void>(`/api/v1/exports/${enc(id)}`, { ...o, method: 'DELETE' });

@@ -26,6 +26,7 @@ async fn server_and_active_job_filters_preserve_keyset_pagination_and_deleted_se
             server_id: server_id.map(str::to_owned),
             state,
             progress: None,
+            work: None,
             message: None,
             error: None,
             result: None,

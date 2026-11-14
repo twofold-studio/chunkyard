@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import NewServerForm from './new-server-form.svelte';
 
@@ -75,6 +75,15 @@ beforeEach(() => {
 		'fetch',
 		vi.fn(async (path: string, init: RequestInit) => {
 			const method = init.method ?? 'GET';
+			if (path === '/api/v1/system/isolation') {
+				// Host capacity guidance for the resources step; unknown here.
+				return new Response(
+					JSON.stringify({
+						docker: { available: true, version: null, reason: null, capacity: null }
+					}),
+					{ status: 200, headers: { 'content-type': 'application/json' } }
+				);
+			}
 			calls.push({ path, method, body: init.body ? JSON.parse(init.body as string) : undefined });
 			const next = replies[key(method, path)]?.shift();
 			if (!next) throw new Error(`unexpected request ${method} ${path}`);
@@ -116,8 +125,8 @@ async function chooseVanilla() {
 			]
 		})
 	);
+	// A plain click on a managed kind continues to its version step.
 	await page.getByText('Vanilla', { exact: true }).click();
-	await next();
 	await expect
 		.element(page.getByRole('combobox', { name: 'Minecraft version' }))
 		.toHaveTextContent('1.21.1');
@@ -130,7 +139,7 @@ const next = () => page.getByRole('button', { name: 'Next' }).click();
 /** From the name & port step, continue through resources to the review step. */
 async function toReview() {
 	await next();
-	await expect.element(page.getByLabelText('Min heap (MiB)')).toBeVisible();
+	await expect.element(page.getByRole('slider', { name: 'Server RAM (GB)' })).toBeVisible();
 	await next();
 	await expect.element(page.getByRole('checkbox', { name: /I accept the/ })).toBeVisible();
 }
@@ -239,7 +248,7 @@ describe('NewServerForm', () => {
 		await next();
 		await expect.element(page.getByText(/or leave it blank for automatic/)).toBeVisible();
 		// The wizard stays on the name & port step.
-		await expect.element(page.getByLabelText('Min heap (MiB)')).not.toBeInTheDocument();
+		await expect.element(page.getByRole('slider')).not.toBeInTheDocument();
 		expect(posts('/api/v1/servers')).toHaveLength(0);
 	});
 
@@ -249,7 +258,7 @@ describe('NewServerForm', () => {
 		await chooseVanilla();
 		await page.getByLabelText('Game port (optional)').fill('25570');
 		await next();
-		await page.getByLabelText('Max heap (MiB)').fill('4096');
+		await page.getByRole('button', { name: '4 GB', exact: true }).click();
 		await page.getByRole('button', { name: 'Back' }).click();
 		await expect.element(page.getByLabelText('Server name')).toHaveValue('Survival');
 		await expect.element(page.getByLabelText('Game port (optional)')).toHaveValue(25570);
@@ -270,7 +279,8 @@ describe('NewServerForm', () => {
 			.toHaveTextContent('1.21.1');
 		await next();
 		await toReview();
-		await expect.element(page.getByText('512 MiB – 4 GiB heap')).toBeVisible();
+		await expect.element(page.getByText('4,096 MiB', { exact: true })).toBeVisible();
+		await expect.element(page.getByText('512 MiB', { exact: true })).toBeVisible();
 		await expect.element(page.getByText('25570', { exact: true })).toBeVisible();
 		// Review "Edit" jumps straight back to the step that owns the value.
 		await page.getByRole('button', { name: 'Edit name' }).click();
@@ -287,7 +297,8 @@ describe('NewServerForm', () => {
 		await expect.element(page.getByText(/Use 1–80 characters/)).toBeVisible();
 		await page.getByLabelText('Server name').fill('Survival');
 		await next();
-		await page.getByLabelText('Max heap (MiB)').fill('256');
+		await page.getByRole('button', { name: 'Custom Server RAM' }).click();
+		await page.getByLabelText('Server RAM (MiB)').fill('256');
 		await next();
 		await expect
 			.element(page.getByText('Maximum heap must be at least the minimum heap.'))
@@ -321,7 +332,6 @@ describe('NewServerForm', () => {
 		);
 		setup();
 		await page.getByText('Paper', { exact: true }).click();
-		await next();
 		const gameVersion = page.getByRole('combobox', { name: 'Minecraft version' });
 		const paperBuild = page.getByRole('combobox', { name: 'Paper build' });
 		await expect.element(gameVersion).toHaveTextContent('1.21.4');
@@ -421,7 +431,6 @@ describe('NewServerForm', () => {
 			})
 		);
 		setup();
-		await page.getByText('CurseForge modpack', { exact: true }).click();
 		// An empty query lists popular packs.
 		reply(
 			'GET',
@@ -440,9 +449,9 @@ describe('NewServerForm', () => {
 				pagination: { index: 0, pageSize: 20, totalCount: 1 }
 			})
 		);
-		await next();
+		await page.getByText('CurseForge modpack', { exact: true }).click();
 		await expect.element(page.getByText('Popular modpacks')).toBeVisible();
-		await expect.element(page.getByText('Popular Pack')).toBeVisible();
+		await expect.element(page.getByRole('button', { name: 'Select Popular Pack' })).toBeVisible();
 
 		reply(
 			'GET',
@@ -462,7 +471,9 @@ describe('NewServerForm', () => {
 			})
 		);
 		await page.getByLabelText('Search modpacks').fill('atm');
-		await expect.element(page.getByText('All the Mods 10')).toBeVisible();
+		await expect
+			.element(page.getByRole('button', { name: 'Select All the Mods 10' }))
+			.toBeVisible();
 		// Upstream text is rendered as text, never markup or remote images.
 		await expect.element(page.getByText('<img src=x onerror=alert(1)>')).toBeVisible();
 		expect(document.querySelector('img')).toBeNull();
@@ -476,9 +487,8 @@ describe('NewServerForm', () => {
 			})
 		);
 		await page.getByRole('button', { name: 'Select All the Mods 10' }).click();
-		await expect
-			.element(page.getByRole('combobox', { name: 'Release' }))
-			.toHaveTextContent('ATM10 2.0');
+		// The newest server-pack release is preselected; Next confirms it.
+		await expect.element(page.getByRole('radio', { name: /ATM10 2\.0/ })).toBeChecked();
 		await next();
 		await page.getByLabelText('Server name').fill('ATM');
 
@@ -497,9 +507,15 @@ describe('NewServerForm', () => {
 			body: { code: 'server.busy', detail: 'Busy.' }
 		});
 		await toReview();
-		await expect.element(page.getByText('All the Mods 10 (release 555)')).toBeVisible();
+		// The review names the pack and release, never raw IDs.
+		await expect.element(page.getByText('All the Mods 10 · ATM10 2.0')).toBeVisible();
 		await page.getByRole('button', { name: 'Create and install' }).click();
 		await expect.element(page.getByText('Operation in progress')).toBeVisible();
+		// The install panel names the chosen pack and release instead of project/file IDs.
+		await expect
+			.element(page.getByRole('heading', { name: /All the Mods 10 · ATM10 2\.0/ }))
+			.toBeVisible();
+		expect(document.body.textContent).not.toContain('project 101');
 		expect(posts('/api/v1/servers')[0].body).toMatchObject({
 			software: { type: 'curseforge', projectId: 101, fileId: 555 }
 		});
@@ -512,7 +528,6 @@ describe('NewServerForm', () => {
 			ok({ items: [{ id: 'curseforge', name: 'CurseForge', available: true, reason: null }] })
 		);
 		const { oncreated } = setup();
-		await page.getByText('CurseForge modpack', { exact: true }).click();
 		const packItem = {
 			id: 101,
 			name: 'All the Mods 10',
@@ -533,12 +548,10 @@ describe('NewServerForm', () => {
 				items: [{ id: 555, name: 'ATM10 2.0', gameVersions: ['1.21.1'], serverPackFileId: 556 }]
 			})
 		);
-		await next();
+		await page.getByText('CurseForge modpack', { exact: true }).click();
 		await page.getByRole('button', { name: 'Select All the Mods 10' }).click();
-		await expect
-			.element(page.getByRole('combobox', { name: 'Release' }))
-			.toHaveTextContent('ATM10 2.0');
-		await next();
+		// Picking the release with a plain click continues to Name & port.
+		await page.getByText('ATM10 2.0').click();
 		await page.getByLabelText('Server name').fill('ATM');
 
 		const pack = { software: { type: 'curseforge', projectId: 101, fileId: 555 } };
@@ -578,5 +591,196 @@ describe('NewServerForm', () => {
 		expect(installs[1].body).toEqual({ loader: 'neoforge', loaderVersion: '21.1.77' });
 		// Installing never accepts the EULA for the owner.
 		expect(posts('/api/v1/servers/srv-1/eula')).toHaveLength(0);
+	});
+
+	describe('navigation and auto-advance', () => {
+		const VERSIONS = ok({ items: [{ id: '1.21.1', stable: true }] });
+		const heading = () => document.activeElement?.tagName;
+
+		it('keeps Back/Next in the sticky top bar and focuses each step heading', async () => {
+			reply('GET', '/api/v1/software', ok(CATALOG));
+			reply('GET', '/api/v1/software/vanilla/versions', VERSIONS);
+			setup();
+			const bar = page.getByTestId('wizard-bar');
+			await expect.element(bar.getByRole('button', { name: 'Next' })).toBeDisabled();
+			await expect
+				.element(bar.getByRole('link', { name: 'Cancel' }))
+				.toHaveAttribute('href', '/servers');
+			expect(bar.element().className).toContain('sticky');
+			await page.getByText('Vanilla', { exact: true }).click();
+			await expect.element(page.getByRole('heading', { name: /Vanilla version/ })).toBeVisible();
+			await vi.waitFor(() => expect(heading()).toBe('H2'));
+			await expect.element(bar.getByRole('button', { name: 'Back' })).toBeVisible();
+		});
+
+		it('selects with arrow keys without advancing; Enter continues', async () => {
+			reply('GET', '/api/v1/software', ok(CATALOG));
+			reply(
+				'GET',
+				'/api/v1/software/paper/versions',
+				ok({ items: [{ id: '1.21.4', stable: true }] })
+			);
+			reply('GET', '/api/v1/software/paper/versions/1.21.4/builds', ok({ items: [] }));
+			setup();
+			const vanilla = page.getByRole('radio', { name: /Vanilla/ });
+			await expect.element(vanilla).toBeEnabled();
+			(vanilla.element() as HTMLInputElement).focus();
+			await userEvent.keyboard(' ');
+			await userEvent.keyboard('{ArrowRight}');
+			await expect.element(page.getByRole('radio', { name: /Paper/ })).toBeChecked();
+			// Still on the software step: keyboard selection never jumps ahead.
+			await expect.element(page.getByRole('heading', { name: /Choose software/ })).toBeVisible();
+			await userEvent.keyboard('{Enter}');
+			await expect.element(page.getByRole('heading', { name: /Paper version/ })).toBeVisible();
+		});
+
+		it('ignores modified clicks and never auto-advances while editing back', async () => {
+			reply('GET', '/api/v1/software', ok(CATALOG));
+			reply('GET', '/api/v1/software/vanilla/versions', VERSIONS);
+			setup();
+			await page.getByText('Vanilla', { exact: true }).click({ modifiers: ['Shift'] });
+			// A modified click never continues (whether it selects is up to the browser).
+			await expect.element(page.getByRole('heading', { name: /Choose software/ })).toBeVisible();
+			await page.getByText('Vanilla', { exact: true }).click();
+			await expect.element(page.getByRole('heading', { name: /Vanilla version/ })).toBeVisible();
+			await page.getByRole('button', { name: 'Back' }).click();
+			reply(
+				'GET',
+				'/api/v1/software/paper/versions',
+				ok({ items: [{ id: '1.21.4', stable: true }] })
+			);
+			reply('GET', '/api/v1/software/paper/versions/1.21.4/builds', ok({ items: [] }));
+			await page.getByText('Paper', { exact: true }).click();
+			// Editing an earlier step: the pick sticks, the owner continues explicitly.
+			await expect.element(page.getByRole('radio', { name: /Paper/ })).toBeChecked();
+			await expect.element(page.getByRole('heading', { name: /Choose software/ })).toBeVisible();
+		});
+
+		it('does not auto-advance a custom JAR choice', async () => {
+			reply('GET', '/api/v1/software', ok(CATALOG));
+			setup();
+			await page.getByText(/^Custom JAR/).click();
+			await expect.element(page.getByRole('radio', { name: /Custom JAR/ })).toBeChecked();
+			await expect.element(page.getByRole('heading', { name: /Choose software/ })).toBeVisible();
+		});
+
+		it('opens a pack, advances on a release click, and never creates, starts or accepts the EULA', async () => {
+			reply(
+				'GET',
+				'/api/v1/software',
+				ok({ items: [{ id: 'curseforge', name: 'CurseForge', available: true, reason: null }] })
+			);
+			const packs = [
+				{
+					id: 925200,
+					name: 'All the Mods 10 - ATM10',
+					summary: 'The top pack with around 500 mods.',
+					websiteUrl: 'https://www.curseforge.com/minecraft/modpacks/all-the-mods-10',
+					logoUrl: '/api/v1/modpacks/curseforge/925200/logo',
+					downloads: 23_047_304
+				},
+				{
+					id: 285109,
+					name: 'RLCraft',
+					summary: 'Hardcore survival.',
+					websiteUrl: 'https://www.curseforge.com/minecraft/modpacks/rlcraft',
+					logoUrl: null,
+					downloads: 30_582_763
+				}
+			];
+			reply(
+				'GET',
+				'/api/v1/modpacks/curseforge?query=&index=0',
+				ok({ items: packs, pagination: { index: 0, pageSize: 20, totalCount: 2 } })
+			);
+			setup();
+			await page.getByText('CurseForge modpack', { exact: true }).click();
+			await expect.element(page.getByRole('heading', { name: /Choose a modpack/ })).toBeVisible();
+			// Search label and help sit above the field; cards use the full width.
+			await expect.element(page.getByText(/Leave empty to browse popular packs/)).toBeVisible();
+			const cards = page.getByRole('list', { name: 'Modpack results' }).getByRole('listitem');
+			await expect.element(cards.first()).toBeVisible();
+			expect(cards.elements()).toHaveLength(2);
+			// Only same-origin logo routes are ever requested; a missing logo shows the monogram.
+			const slots = [...document.querySelectorAll('[data-slot="pack-logo"]')];
+			for (const img of document.querySelectorAll<HTMLImageElement>(
+				'[data-slot="pack-logo"] img'
+			)) {
+				expect(new URL(img.src).pathname).toBe('/api/v1/modpacks/curseforge/925200/logo');
+			}
+			expect(slots[1].querySelector('img')).toBeNull();
+			expect(slots[1].textContent?.trim()).toBe('R');
+			// One selection button per card, the external link is separate: nothing is nested.
+			for (const card of cards.elements()) {
+				expect(card.querySelectorAll('button')).toHaveLength(1);
+				expect(card.querySelector('button a, a button')).toBeNull();
+			}
+			await expect
+				.element(cards.first().getByRole('link', { name: /CurseForge/ }))
+				.toHaveAttribute('target', '_blank');
+
+			reply(
+				'GET',
+				'/api/v1/modpacks/curseforge/285109/files',
+				ok({
+					items: [
+						{ id: 9, name: 'RLCraft 2.9.3', gameVersions: ['1.12.2'], serverPackFileId: 10 },
+						{ id: 7, name: 'RLCraft 2.9.1', gameVersions: ['1.12.2'], serverPackFileId: 8 }
+					]
+				})
+			);
+			// The card's single selection button (stretched over the card by CSS in the app).
+			await page.getByRole('button', { name: 'Select RLCraft' }).click();
+			await expect.element(page.getByRole('radio', { name: /RLCraft 2\.9\.3/ })).toBeChecked();
+			await page.getByText('RLCraft 2.9.1').click();
+			await expect.element(page.getByLabelText('Server name')).toBeVisible();
+
+			// Editing back: a release click only selects.
+			reply(
+				'GET',
+				'/api/v1/modpacks/curseforge/285109/files',
+				ok({
+					items: [
+						{ id: 9, name: 'RLCraft 2.9.3', gameVersions: ['1.12.2'], serverPackFileId: 10 },
+						{ id: 7, name: 'RLCraft 2.9.1', gameVersions: ['1.12.2'], serverPackFileId: 8 }
+					]
+				})
+			);
+			await page.getByRole('button', { name: 'Back' }).click();
+			await expect.element(page.getByRole('radio', { name: /RLCraft 2\.9\.1/ })).toBeChecked();
+			await page.getByText('RLCraft 2.9.3').click();
+			await expect.element(page.getByRole('radio', { name: /RLCraft 2\.9\.3/ })).toBeChecked();
+			await expect.element(page.getByRole('heading', { name: /Choose a modpack/ })).toBeVisible();
+
+			expect(calls.some((c) => c.method !== 'GET')).toBe(false);
+		});
+
+		it('keeps an unusual heap exact and reviews Server RAM and initial heap', async () => {
+			reply('GET', '/api/v1/software', ok(CATALOG));
+			const { oncreated } = setup();
+			await chooseVanilla();
+			await next();
+			await page.getByRole('button', { name: 'Custom Server RAM' }).click();
+			await page.getByLabelText('Server RAM (MiB)').fill('8048');
+			// Advanced initial heap keeps the default 512 MiB exactly.
+			await expect
+				.element(page.getByRole('button', { name: /Advanced · initial heap 512 MiB/ }))
+				.toBeVisible();
+			await next();
+			await expect.element(page.getByText('8,048 MiB', { exact: true })).toBeVisible();
+			reply('POST', '/api/v1/servers', ok({ server: managedServer() }, 201));
+			reply('POST', '/api/v1/servers/srv-1/install', ok({ job: job('queued') }, 202));
+			reply(
+				'GET',
+				'/api/v1/jobs/job-1',
+				ok(job('succeeded', { result: { server: managedServer({ launch: {} }) } }))
+			);
+			await page.getByRole('button', { name: 'Create and install' }).click();
+			await vi.waitFor(() => expect(oncreated).toHaveBeenCalledOnce());
+			expect(posts('/api/v1/servers')[0].body).toMatchObject({
+				memoryMinMb: 512,
+				memoryMaxMb: 8048
+			});
+		});
 	});
 });

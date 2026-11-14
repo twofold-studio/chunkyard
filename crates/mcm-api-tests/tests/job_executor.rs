@@ -6,6 +6,73 @@ use std::sync::Arc;
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[tokio::test]
+async fn progress_is_durable_while_running_and_retained_at_completion() -> Result {
+    use mcm_core::progress::{ProgressReporter, Stage};
+    let dir = tempfile::tempdir()?;
+    let db = Database::open(&dir.path().join("test.db")).await?;
+    let repo = Arc::new(SqliteJobRepo::new(&db));
+    let manager = JobManager::new(repo.clone(), 1).await?;
+    let progress = ProgressReporter::default();
+    progress.stage(Stage::Resolve);
+    let worker = progress.clone();
+    let (release, wait) = tokio::sync::oneshot::channel();
+    let job = manager
+        .submit_progress_for_server(
+            "server.install",
+            "fixture",
+            None,
+            Box::pin(async move {
+                worker.bytes(Stage::Download, Some(10), Some(100));
+                let _ = wait.await;
+                worker.stage(Stage::Finalize);
+                Ok(json!({"ok":true}))
+            }),
+            progress,
+        )
+        .await?;
+    for _ in 0..200 {
+        if repo
+            .get(&job.id)
+            .await?
+            .and_then(|j| j.work)
+            .is_some_and(|w| w.stage == Stage::Download)
+        {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    let active = repo.get(&job.id).await?.ok_or("job")?;
+    assert_eq!(active.state, JobState::Running);
+    assert!(
+        active.progress.is_none(),
+        "Stage bytes must not invent an overall percentage"
+    );
+    let work = active.work.ok_or("Missing persisted progress")?;
+    assert_eq!(
+        (work.completed_bytes, work.total_bytes),
+        (Some(10), Some(100))
+    );
+    assert_eq!(work.completed_stages, vec![Stage::Resolve]);
+    release.send(()).map_err(|_| "worker stopped")?;
+    for _ in 0..200 {
+        if repo
+            .get(&job.id)
+            .await?
+            .is_some_and(|j| j.state == JobState::Succeeded)
+        {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    let done = repo.get(&job.id).await?.ok_or("job")?;
+    assert_eq!(done.state, JobState::Succeeded);
+    assert_eq!(done.work.ok_or("progress")?.stage, Stage::Finalize);
+    manager.shutdown().await;
+    db.close().await;
+    Ok(())
+}
+
+#[tokio::test]
 async fn startup_marks_interrupted_jobs_failed_and_preserves_completed_jobs() -> Result {
     let dir = tempfile::tempdir()?;
     let db = Database::open(&dir.path().join("test.db")).await?;
@@ -21,6 +88,7 @@ async fn startup_marks_interrupted_jobs_failed_and_preserves_completed_jobs() ->
             server_id: None,
             state,
             progress: None,
+            work: None,
             message: None,
             error: None,
             result: None,
@@ -123,6 +191,7 @@ async fn keyset_pagination_has_no_duplicates_and_rejects_invalid_cursors() -> Re
             server_id: None,
             state: JobState::Succeeded,
             progress: Some(1.0),
+            work: None,
             message: None,
             error: None,
             result: None,

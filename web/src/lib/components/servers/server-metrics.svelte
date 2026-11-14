@@ -2,7 +2,6 @@
 	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import RotateCwIcon from '@lucide/svelte/icons/rotate-cw';
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
-	import { untrack } from 'svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
@@ -12,128 +11,42 @@
 		metricsInterval,
 		type MetricsIntervalSeconds
 	} from '#lib/metrics-interval.svelte.js';
-	import {
-		describeError,
-		errorCode,
-		getServerMetrics,
-		isAbortError,
-		type ServerMetrics,
-		type ServerState
-	} from '#lib/api/index.js';
-	import { poll } from '#lib/polling.js';
+	import { describeError, errorCode } from '#lib/api/index.js';
 	import { formatTime } from '#lib/format.js';
-	import {
-		formatBytes,
-		formatCount,
-		formatCpu,
-		formatUptime,
-		ratio,
-		UNAVAILABLE
-	} from '#lib/metrics.js';
+	import { formatBytes, formatCount, formatCpu, formatUptime } from '#lib/metrics.js';
 	import { cn } from '#lib/utils.js';
 	import {
-		appendSample,
 		gapThresholdMs,
 		latestMemoryLimit,
 		MAX_HISTORY_POINTS,
 		segments,
-		seriesStats,
-		type HistoryPoint
+		seriesStats
 	} from '#lib/metrics-history.js';
+	import type { MetricsSource } from '#lib/servers/metrics-source.svelte.js';
 	import HistorySparkline from '#lib/components/charts/history-sparkline.svelte';
 
 	interface Props {
-		serverId: string;
-		serverState: ServerState;
-		/** Configured CPU limit (cores), used to scale the CPU bar. */
+		/** The page's single metrics sampler (shared with the header readout). */
+		source: MetricsSource;
+		/** Configured CPU limit (cores), used as the CPU chart ceiling. */
 		cpus?: number;
 	}
 
-	let { serverId, serverState, cpus }: Props = $props();
+	let { source, cpus }: Props = $props();
 
-	let metrics = $state.raw<ServerMetrics | null>(null);
-	let error = $state.raw<unknown>(null);
-	let loading = $state(false);
-	let manual: AbortController | null = null;
-	/** Samples observed while this panel is open, for this server only (never persisted). */
-	let history = $state.raw<HistoryPoint[]>([]);
-	let historyFor = untrack(() => serverId);
-
-	function record(id: string, sample: ServerMetrics | null) {
-		if (id !== historyFor || (sample && sample.serverId !== id)) return;
-		history = appendSample(history, sample, Date.now());
-	}
-
-	const live = $derived(serverState === 'running');
-	// Browser-wide preference; 0 pauses automatic refresh (manual Refresh still works).
-	const seconds = $derived(metricsInterval.seconds);
-	const paused = $derived(live && seconds === 0);
-
-	async function load(id: string, signal: AbortSignal) {
-		loading = true;
-		try {
-			const sample = await getServerMetrics(id, { signal });
-			if (signal.aborted) return;
-			metrics = sample;
-			error = null;
-			record(id, sample);
-		} catch (cause) {
-			if (isAbortError(cause) || signal.aborted) return;
-			error = cause;
-			// A busy sampler is transient; anything else means the old values are no longer trustworthy.
-			if (errorCode(cause) !== 'metrics.busy') {
-				metrics = null;
-				record(id, null); // a failed sample is a gap, not a zero
-			}
-		} finally {
-			if (!signal.aborted) loading = false;
-		}
-	}
-
-	$effect(() => {
-		const id = serverId;
-		const running = live;
-		const every = seconds;
-		const controller = new AbortController();
-		untrack(() => {
-			if (historyFor !== id) {
-				// Another server: its history starts empty.
-				historyFor = id;
-				history = [];
-			}
-			manual?.abort();
-			loading = false;
-			error = null;
-			const current = metrics?.serverId === id;
-			if (!running || !current) metrics = null;
-			if (running && every > 0) {
-				// Sequential: the next sample waits for the previous one; hidden tabs pause.
-				poll((signal) => load(id, signal), { intervalMs: every * 1000, signal: controller.signal });
-			} else if (!(running && current)) {
-				// Stopped, or refresh off: one snapshot. Turning refresh off keeps the last sample.
-				load(id, controller.signal);
-			}
-		});
-		return () => controller.abort();
-	});
-
-	$effect(() => () => manual?.abort());
-
-	function refresh() {
-		manual?.abort();
-		manual = new AbortController();
-		load(serverId, manual.signal);
-	}
+	const metrics = $derived(source.metrics);
+	const history = $derived(source.history);
+	const live = $derived(source.running);
+	const seconds = $derived(source.seconds);
+	const paused = $derived(source.paused);
+	const error = $derived(source.error);
+	const busy = $derived(source.busy);
 
 	const sampledAt = $derived.by(() => {
 		if (!metrics) return null;
 		const date = new Date(metrics.sampledAt);
 		return Number.isNaN(date.getTime()) ? null : date;
 	});
-	const memoryUsed = $derived(metrics?.memoryWorkingSetBytes ?? null);
-	const cpuRatio = $derived(ratio(metrics?.cpuPercent, cpus && cpus > 0 ? cpus * 100 : null));
-	const memoryRatio = $derived(ratio(memoryUsed, metrics?.memoryLimitBytes));
-	const busy = $derived(errorCode(error) === 'metrics.busy');
 
 	const gapMs = $derived(gapThresholdMs(seconds));
 	const windowStart = $derived(history[0]?.t ?? 0);
@@ -142,7 +55,7 @@
 	const memoryStats = $derived(seriesStats(history, 'memory'));
 	const windowText = $derived.by(() => {
 		const minutes = Math.round((windowEnd - windowStart) / 60_000);
-		if (history.length < 2) return 'the time this view has been open';
+		if (history.length < 2) return 'the time this page has been open';
 		return minutes < 1
 			? 'the last minute'
 			: `the last ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
@@ -156,38 +69,17 @@
 	});
 </script>
 
-{#snippet bar(value: number | null, label: string)}
-	<div
-		class="mt-2 h-1 overflow-hidden rounded-full bg-muted"
-		role="meter"
-		aria-label={label}
-		aria-valuemin={0}
-		aria-valuemax={100}
-		aria-valuenow={value === null ? undefined : Math.round(value * 100)}
-	>
-		{#if value !== null}
-			<div
-				class={cn(
-					'h-full rounded-full transition-[width] duration-500',
-					value >= 0.9 ? 'bg-destructive' : value >= 0.75 ? 'bg-warning' : 'bg-primary'
-				)}
-				style:width="{(value * 100).toFixed(1)}%"
-			></div>
-		{/if}
-	</div>
-{/snippet}
-
 <section
-	class="flex flex-col gap-3 rounded-lg border border-border bg-card/40 p-4"
+	class="flex flex-col gap-4 rounded-lg border border-border bg-card/40 p-4"
 	aria-labelledby="metrics-heading"
 >
 	<div class="flex flex-wrap items-center justify-between gap-2">
 		<h2 id="metrics-heading" class="flex items-center gap-2 text-sm font-medium">
 			<ActivityIcon class="size-4 text-muted-foreground" aria-hidden="true" />
-			Resources
+			Usage
 		</h2>
-		<div class="flex items-center gap-2 text-xs text-muted-foreground">
-			<span>
+		<div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+			<span data-testid="metrics-state">
 				{#if !live}
 					Not running
 				{:else if paused}
@@ -198,6 +90,13 @@
 					Waiting for first sample
 				{/if}
 			</span>
+			{#if live && metrics?.uptimeSeconds != null}
+				<span title="Time since the container started. Minecraft may still be loading.">
+					· up <span class="font-mono text-foreground tabular-nums" data-testid="metric-uptime"
+						>{formatUptime(metrics.uptimeSeconds)}</span
+					>
+				</span>
+			{/if}
 			<Select.Root
 				type="single"
 				value={String(seconds)}
@@ -222,81 +121,48 @@
 			<Button
 				variant="ghost"
 				size="icon-xs"
-				onclick={refresh}
-				disabled={loading}
+				onclick={() => source.refresh()}
+				disabled={source.loading}
 				aria-label="Refresh metrics"
 			>
-				{#if loading}<Spinner />{:else}<RotateCwIcon />{/if}
+				{#if source.loading}<Spinner />{:else}<RotateCwIcon />{/if}
 			</Button>
 		</div>
 	</div>
 
-	<div class="grid gap-4 sm:grid-cols-3">
-		<div title="CPU time relative to one logical core; can exceed 100%.">
-			<p class="text-xs text-muted-foreground">CPU</p>
-			<p class="font-mono text-lg tabular-nums" data-testid="metric-cpu">
-				{formatCpu(metrics?.cpuPercent)}
-			</p>
-			<p class="text-xs text-muted-foreground">
-				of one core{#if cpus}&nbsp;· limit {cpus} {cpus === 1 ? 'core' : 'cores'}{/if}
-			</p>
-			{@render bar(cpuRatio, 'CPU of limit')}
-		</div>
-		<div title="Container working set (usage minus inactive file cache). This is not the JVM heap.">
-			<p class="text-xs text-muted-foreground">Memory</p>
-			<p class="font-mono text-lg tabular-nums" data-testid="metric-memory">
-				{formatBytes(memoryUsed)}
-			</p>
-			<p class="text-xs text-muted-foreground">
-				of {formatBytes(metrics?.memoryLimitBytes)} limit · usage {formatBytes(
-					metrics?.memoryUsageBytes
-				)}
-			</p>
-			{@render bar(memoryRatio, 'Memory of limit')}
-		</div>
-		<div title="Time since the container started. Minecraft may still be loading.">
-			<p class="text-xs text-muted-foreground">Uptime</p>
-			<p class="font-mono text-lg tabular-nums" data-testid="metric-uptime">
-				{formatUptime(metrics?.uptimeSeconds)}
-			</p>
-			<p class="text-xs text-muted-foreground">
-				{metrics?.startedAt ? `since ${formatTime(new Date(metrics.startedAt))}` : UNAVAILABLE}
-			</p>
-		</div>
+	<div class="grid gap-5 sm:grid-cols-2" data-testid="metrics-history">
+		<HistorySparkline
+			label="CPU"
+			current={formatCpu(metrics?.cpuPercent)}
+			currentTestId="metric-cpu"
+			runs={segments(history, 'cpu', gapMs)}
+			start={windowStart}
+			end={windowEnd}
+			ceiling={cpus && cpus > 0 ? cpus * 100 : 100}
+			ceilingLabel={cpus ? `CPU limit (${cpus * 100}%)` : 'One core (100%)'}
+			stats={cpuStats}
+			format={formatCpu}
+			{windowText}
+		/>
+		<HistorySparkline
+			label="Memory (working set)"
+			current={formatBytes(metrics?.memoryWorkingSetBytes)}
+			currentTestId="metric-memory"
+			runs={segments(history, 'memory', gapMs)}
+			start={windowStart}
+			end={windowEnd}
+			ceiling={latestMemoryLimit(history)}
+			ceilingLabel="Memory limit"
+			stats={memoryStats}
+			format={formatBytes}
+			{windowText}
+		/>
 	</div>
-
-	{#if cpuStats.count + memoryStats.count > 0}
-		<div class="flex flex-col gap-2 border-t border-border pt-3" data-testid="metrics-history">
-			<p class="text-xs text-muted-foreground">
-				History collected while this view is open · {history.length}/{MAX_HISTORY_POINTS} samples, not
-				stored. Gaps mean no measurement.
-			</p>
-			<div class="grid gap-4 sm:grid-cols-2">
-				<HistorySparkline
-					label="CPU"
-					runs={segments(history, 'cpu', gapMs)}
-					start={windowStart}
-					end={windowEnd}
-					ceiling={cpus && cpus > 0 ? cpus * 100 : 100}
-					ceilingLabel={cpus ? `CPU limit (${cpus * 100}%)` : 'One core (100%)'}
-					stats={cpuStats}
-					format={formatCpu}
-					{windowText}
-				/>
-				<HistorySparkline
-					label="Memory (working set)"
-					runs={segments(history, 'memory', gapMs)}
-					start={windowStart}
-					end={windowEnd}
-					ceiling={latestMemoryLimit(history)}
-					ceilingLabel="Memory limit"
-					stats={memoryStats}
-					format={formatBytes}
-					{windowText}
-				/>
-			</div>
-		</div>
-	{/if}
+	<p class="text-xs text-muted-foreground">
+		CPU is relative to one core (can exceed 100%). Memory is the container working set, not the JVM
+		heap. History collected while this page is open · {history.length}/{MAX_HISTORY_POINTS} samples, not
+		stored. Gaps mean no measurement.
+	</p>
 
 	<dl
 		class="flex flex-wrap gap-x-6 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground"
@@ -331,7 +197,9 @@
 			<CircleAlertIcon class="size-3.5 shrink-0" aria-hidden="true" />
 			<span>{errorText}</span>
 			{#if !busy}
-				<Button variant="link" size="sm" class="h-auto p-0 text-xs" onclick={refresh}>Retry</Button>
+				<Button variant="link" size="sm" class="h-auto p-0 text-xs" onclick={() => source.refresh()}
+					>Retry</Button
+				>
 			{/if}
 		</div>
 	{/if}

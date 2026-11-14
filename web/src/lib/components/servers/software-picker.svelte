@@ -21,6 +21,11 @@
 		value: SoftwareKind | null;
 		disabled?: boolean;
 		onRetry?: () => void;
+		/**
+		 * A choice was picked with a plain pointer click. Arrow keys, Space and modified clicks
+		 * only select, so keyboard users move freely and confirm with Enter/Next.
+		 */
+		onPicked?: (kind: SoftwareKind) => void;
 	}
 
 	let {
@@ -28,8 +33,25 @@
 		loadError = null,
 		value = $bindable(),
 		disabled = false,
-		onRetry
+		onRetry,
+		onPicked
 	}: Props = $props();
+
+	function picked(event: MouseEvent, choice: Choice) {
+		// The radio's own (forwarded) click also bubbles here; react to the label click only.
+		if (event.target instanceof HTMLInputElement) return;
+		if (disabled || !choice.available) return;
+		const plain =
+			event.detail > 0 &&
+			event.button === 0 &&
+			!event.metaKey &&
+			!event.ctrlKey &&
+			!event.shiftKey &&
+			!event.altKey;
+		if (!plain) return;
+		value = choice.id;
+		onPicked?.(choice.id);
+	}
 
 	const icons: Record<SoftwareKind, Component> = {
 		vanilla: PickaxeIcon,
@@ -98,7 +120,9 @@
 			{#each managed as choice (choice.id)}
 				{@const Icon = icons[choice.id]}
 				{@const selected = value === choice.id}
+				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions (keyboard selection stays native radio behaviour; only pointer clicks continue) -->
 				<label
+					onclick={(event) => picked(event, choice)}
 					class={cn(
 						'motion-press relative flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-background p-3 transition-colors',
 						'hover:border-ring/60 hover:bg-accent/30',
@@ -132,7 +156,9 @@
 		</p>
 	{/if}
 
+	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions (keyboard selection stays native radio behaviour; only pointer clicks continue) -->
 	<label
+		onclick={(event) => picked(event, custom)}
 		class={cn(
 			'flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-border px-3 py-2 transition-colors',
 			'hover:border-ring/60 hover:bg-accent/30',

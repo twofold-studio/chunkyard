@@ -4,6 +4,7 @@ pub mod exports;
 pub mod files;
 pub mod java;
 pub mod jobs;
+pub mod progress;
 pub mod properties;
 pub mod repository;
 pub mod server;

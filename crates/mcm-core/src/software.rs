@@ -217,6 +217,30 @@ impl SoftwareError {
 }
 #[async_trait]
 pub trait SoftwareService: Send + Sync {
+    async fn prepare_with_progress(
+        &self,
+        software: &Software,
+        directory: &Path,
+        _progress: crate::progress::ProgressReporter,
+    ) -> Result<Launch, SoftwareError> {
+        self.prepare(software, directory).await
+    }
+    async fn prepare_plan_with_progress(
+        &self,
+        software: &Software,
+        directory: &Path,
+        options: &InstallOptions,
+        lease: std::sync::Arc<dyn Send + Sync>,
+        _progress: crate::progress::ProgressReporter,
+    ) -> Result<PreparedSoftware, SoftwareError> {
+        self.prepare_plan(software, directory, options, lease).await
+    }
+    async fn modpack(&self, _project_id: u64) -> Result<Value, SoftwareError> {
+        Err(SoftwareError::DownloadUnavailable)
+    }
+    async fn modpack_logo(&self, _project_id: u64) -> Result<Vec<u8>, SoftwareError> {
+        Err(SoftwareError::DownloadUnavailable)
+    }
     async fn search_modpacks(&self, _query: &str, _index: u32) -> Result<Value, SoftwareError> {
         Err(SoftwareError::DownloadUnavailable)
     }

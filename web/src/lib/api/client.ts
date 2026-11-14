@@ -47,6 +47,8 @@ export interface RequestOptions {
 	body?: unknown;
 	/** Raw binary body sent as `application/octet-stream` (file uploads). Excludes `body`. */
 	rawBody?: Blob;
+	/** Content type for `rawBody`; defaults to `application/octet-stream`. */
+	rawContentType?: string;
 	signal?: AbortSignal;
 	/** SvelteKit's `fetch` inside load functions; defaults to the global. */
 	fetch?: Fetch;
@@ -113,7 +115,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 	if (method !== 'GET') headers['X-MCM-CSRF'] = '1';
 	let body: string | Blob | undefined;
 	if (options.rawBody !== undefined) {
-		headers['Content-Type'] = 'application/octet-stream';
+		headers['Content-Type'] = options.rawContentType ?? 'application/octet-stream';
 		body = options.rawBody;
 	} else if (options.body !== undefined) {
 		headers['Content-Type'] = 'application/json';

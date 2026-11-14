@@ -4,6 +4,7 @@ import {
 	listExports,
 	listServers,
 	type ExportRecord,
+	type ServerView,
 	type StorageConnection
 } from '#lib/api/index.js';
 import { loadError } from '#lib/load-error.js';
@@ -17,21 +18,21 @@ export const load: PageLoad = async ({ fetch, parent }) => {
 			crumbs,
 			storage: null as StorageConnection | null,
 			exports: [] as ExportRecord[],
-			serverIds: null as string[] | null
+			servers: null as ServerView[] | null
 		};
 	}
 	try {
 		const [storage, exports, servers] = await Promise.all([
 			getStorage({ fetch }),
 			listExports({ fetch }),
-			// Only used to mark archives of deleted servers; never blocks the page.
+			// Local/archived/removed state of each backed-up server; never blocks the page.
 			listServers({ fetch }).catch(() => null)
 		]);
 		return {
 			crumbs,
 			storage: storage as StorageConnection | null,
 			exports: exports.items,
-			serverIds: servers ? servers.items.map((s) => s.id) : null
+			servers: servers ? servers.items : null
 		};
 	} catch (error) {
 		loadError(error);

@@ -12,9 +12,20 @@ use tokio::io::AsyncWriteExt;
 pub struct SafeHttp {
     client: Client,
     hosts: Arc<[String]>,
+    progress: Option<Arc<dyn Fn(ArtifactProgress) + Send + Sync>>,
+}
+
+#[derive(Clone, Copy)]
+pub enum ArtifactProgress {
+    Bytes { completed: u64, total: u64 },
+    Verify,
 }
 
 impl SafeHttp {
+    pub fn with_progress(mut self, progress: Arc<dyn Fn(ArtifactProgress) + Send + Sync>) -> Self {
+        self.progress = Some(progress);
+        self
+    }
     pub fn modpacks() -> Result<Self, DownloadError> {
         Self::with_hosts(&[
             "api.curseforge.com",
@@ -26,6 +37,25 @@ impl SafeHttp {
             "maven.fabricmc.net",
             "meta.fabricmc.net",
         ])
+    }
+    /// Public logo requests have their own allowlist and never carry API keys.
+    pub fn logos() -> Result<Self, DownloadError> {
+        Self::with_hosts(&[
+            "media.forgecdn.net",
+            "mediafilez.forgecdn.net",
+            "mediafiles.forgecdn.net",
+        ])
+    }
+    pub async fn icon_bytes(&self, url: Url) -> Result<Vec<u8>, DownloadError> {
+        let mut response = self.get(url).await?;
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await? {
+            if bytes.len() + chunk.len() > 2 * 1024 * 1024 {
+                return Err(DownloadError::Size);
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        Ok(bytes)
     }
     /// Credentialed metadata requests never follow redirects or send the key to a CDN.
     pub async fn curseforge_json<T: DeserializeOwned>(
@@ -82,7 +112,15 @@ impl SafeHttp {
             return Err(DownloadError::Size);
         }
         let response = self.get(url).await?;
-        write_artifact(response, path, size, checksum, 2 * 1024 * 1024 * 1024).await
+        write_artifact_progress(
+            response,
+            path,
+            size,
+            checksum,
+            2 * 1024 * 1024 * 1024,
+            self.progress.as_deref(),
+        )
+        .await
     }
     pub async fn installer_artifact(
         &self,
@@ -92,7 +130,15 @@ impl SafeHttp {
     ) -> Result<(), DownloadError> {
         let response = self.get(url).await?;
         let size = response.content_length().ok_or(DownloadError::Size)?;
-        write_artifact(response, path, size, checksum, 512 * 1024 * 1024).await
+        write_artifact_progress(
+            response,
+            path,
+            size,
+            checksum,
+            512 * 1024 * 1024,
+            self.progress.as_deref(),
+        )
+        .await
     }
     pub fn adoptium() -> Result<Self, DownloadError> {
         let hosts = [
@@ -127,6 +173,7 @@ impl SafeHttp {
                 .user_agent("Chunkyard/0.1.0 (https://chunkyard.fractal-tess.xyz)")
                 .build()?,
             hosts: hosts.iter().map(|host| String::from(*host)).collect(),
+            progress: None,
         })
     }
 
@@ -188,7 +235,15 @@ impl SafeHttp {
             return Err(DownloadError::Size);
         }
         let response = self.get(url).await?;
-        write_artifact(response, destination, size, checksum, 512 * 1024 * 1024).await
+        write_artifact_progress(
+            response,
+            destination,
+            size,
+            checksum,
+            512 * 1024 * 1024,
+            self.progress.as_deref(),
+        )
+        .await
     }
 
     /// Writes only to a caller-owned staging directory; no partially verified final file.
@@ -225,6 +280,16 @@ async fn write_artifact(
     checksum: &str,
     max_size: u64,
 ) -> Result<(), DownloadError> {
+    write_artifact_progress(response, destination, size, checksum, max_size, None).await
+}
+async fn write_artifact_progress(
+    response: reqwest::Response,
+    destination: &Path,
+    size: u64,
+    checksum: &str,
+    max_size: u64,
+    progress: Option<&(dyn Fn(ArtifactProgress) + Send + Sync)>,
+) -> Result<(), DownloadError> {
     let limit = size;
     if size == 0
         || size > max_size
@@ -244,6 +309,12 @@ async fn write_artifact(
     let mut stream = response.bytes_stream();
     let mut received = 0u64;
     let mut hasher = ArtifactHash::new(checksum.len());
+    if let Some(report) = progress {
+        report(ArtifactProgress::Bytes {
+            completed: 0,
+            total: size,
+        });
+    }
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
         received += chunk.len() as u64;
@@ -252,9 +323,18 @@ async fn write_artifact(
         }
         hasher.update(&chunk);
         file.write_all(&chunk).await?;
+        if let Some(report) = progress {
+            report(ArtifactProgress::Bytes {
+                completed: received,
+                total: size,
+            });
+        }
     }
     if received == 0 || size != received {
         return Err(DownloadError::Size);
+    }
+    if let Some(report) = progress {
+        report(ArtifactProgress::Verify);
     }
     if hasher.finish() != checksum.to_ascii_lowercase() {
         return Err(DownloadError::Checksum);
@@ -297,6 +377,24 @@ fn serde_json_decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, DownloadErr
 mod tests {
     use super::*;
     #[test]
+    fn logo_policy_never_accepts_api_hosts_private_addresses_or_credentials()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let client = SafeHttp::logos()?;
+        for url in [
+            "https://api.curseforge.com/v1/mods",
+            "https://127.0.0.1/icon.png",
+            "http://media.forgecdn.net/a.png",
+            "https://user@media.forgecdn.net/a.png",
+            "https://media.forgecdn.net.evil.test/a.png",
+        ] {
+            assert!(client.validate(&Url::parse(url)?).is_err());
+        }
+        client.validate(&Url::parse(
+            "https://media.forgecdn.net/avatars/1/2/icon.png",
+        )?)?;
+        Ok(())
+    }
+    #[test]
     fn minecraft_policy_is_separate_from_java_and_rejects_private_or_external_urls()
     -> Result<(), Box<dyn std::error::Error>> {
         let client = SafeHttp::minecraft()?;
@@ -337,6 +435,44 @@ mod tests {
 #[cfg(test)]
 mod streaming_tests {
     use super::*;
+    #[tokio::test]
+    async fn download_reports_observed_bytes_then_verification()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let events = std::sync::Mutex::new(Vec::new());
+        let report = |event| {
+            if let Ok(mut events) = events.lock() {
+                events.push(event);
+            }
+        };
+        let dir = tempfile::tempdir()?;
+        let checksum = format!("{:x}", Sha256::digest(b"abc"));
+        write_artifact_progress(
+            response().await?,
+            &dir.path().join("jar"),
+            3,
+            &checksum,
+            512,
+            Some(&report),
+        )
+        .await?;
+        let events = events.into_inner().map_err(|_| "events lock")?;
+        assert!(matches!(
+            events.first(),
+            Some(ArtifactProgress::Bytes {
+                completed: 0,
+                total: 3
+            })
+        ));
+        assert!(events.iter().any(|e| matches!(
+            e,
+            ArtifactProgress::Bytes {
+                completed: 3,
+                total: 3
+            }
+        )));
+        assert!(matches!(events.last(), Some(ArtifactProgress::Verify)));
+        Ok(())
+    }
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         net::TcpListener,

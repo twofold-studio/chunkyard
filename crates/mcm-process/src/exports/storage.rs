@@ -93,10 +93,22 @@ impl ExportManager {
         path: &Path,
         size: u64,
         expected: &str,
+        progress: mcm_core::progress::ProgressReporter,
     ) -> Result<(), ExportError> {
         let (bucket, credentials) = client(c)?;
         let file = tokio::fs::File::open(path).await?;
-        let body = reqwest::Body::wrap_stream(tokio_util::io::ReaderStream::new(file));
+        use mcm_core::progress::Stage;
+        progress.bytes(Stage::Upload, Some(0), Some(size));
+        let sent_progress = progress.clone();
+        let mut sent = 0;
+        let body =
+            reqwest::Body::wrap_stream(tokio_util::io::ReaderStream::new(file).map(move |chunk| {
+                if let Ok(bytes) = &chunk {
+                    sent += bytes.len() as u64;
+                    sent_progress.bytes(Stage::Upload, Some(sent), Some(size));
+                }
+                chunk
+            }));
         success(
             self.http
                 .put(bucket.put_object(Some(&credentials), key).sign(EXPIRY))
@@ -106,6 +118,7 @@ impl ExportManager {
                 .send()
                 .await,
         )?;
+        progress.bytes(Stage::VerifyUpload, Some(0), Some(size));
         let result = async {
             let mut response = success(
                 self.http
@@ -121,6 +134,7 @@ impl ExportManager {
                     return Err(ExportError::Storage);
                 }
                 hash.update(&chunk);
+                progress.bytes(Stage::VerifyUpload, Some(received), Some(size));
             }
             if received != size || format!("{:x}", hash.finalize()) != expected {
                 return Err(ExportError::Storage);

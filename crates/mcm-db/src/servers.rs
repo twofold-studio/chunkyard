@@ -18,6 +18,20 @@ impl SqliteServerRepo {
 }
 #[async_trait]
 impl ServerRepo for SqliteServerRepo {
+    async fn save(&self, server: &Server) -> Result<(), RepositoryError> {
+        let document = serde_json::to_string(server).map_err(storage)?;
+        let result = sqlx::query("UPDATE servers SET port=?,document=? WHERE id=?")
+            .bind(server.port)
+            .bind(document)
+            .bind(&server.id)
+            .execute(&self.pool)
+            .await
+            .map_err(storage)?;
+        if result.rows_affected() != 1 {
+            return Err(storage("server record disappeared"));
+        }
+        Ok(())
+    }
     async fn set_launch(
         &self,
         id: &str,

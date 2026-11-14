@@ -75,6 +75,30 @@ export interface ServerView {
 	autoJava?: boolean;
 	/** Owner-saved launch profile replacing detection; `null`/absent uses the detected launch. */
 	launchOverride?: LaunchProfile | null;
+	/**
+	 * Chunkyard display icon (custom upload first, then the CurseForge pack logo), or `null`
+	 * when none applies. Absent on backends that predate display icons. Never the Minecraft
+	 * `server-icon.png`.
+	 */
+	icon?: ServerIconRef | null;
+	/**
+	 * Set while the local instance files were removed and only the pinned full S3 backup
+	 * remains. `null`/absent means local (older backends omit it). Archived records stay in
+	 * `GET /servers` with a stopped status; local operations refuse with `server.archived`.
+	 */
+	archive?: ServerArchive | null;
+}
+
+/** Restore point of an archived server: the pinned full S3 export and when files were removed. */
+export interface ServerArchive {
+	exportId: string;
+	archivedAt: string;
+}
+
+/** Same-origin display icon reference; `url` changes after a custom icon update. */
+export interface ServerIconRef {
+	url: string;
+	source: 'custom' | 'modpack';
 }
 
 export interface ServerLaunch {
@@ -168,6 +192,10 @@ export type ServerSoftware =
 	| { type: LoaderSoftwareKind; version: string; loaderVersion: string }
 	| { type: 'curseforge'; projectId: number; fileId: number };
 
+/**
+ * A CurseForge modpack from search or `GET /api/v1/modpacks/curseforge/{projectId}`.
+ * `logoUrl` is a same-origin `/api/v1/modpacks/curseforge/{id}/logo` URL on current backends.
+ */
 export interface CurseForgeModpack {
 	id: number;
 	name: string;
@@ -259,6 +287,19 @@ export interface DockerInfo {
 	available: boolean;
 	version: string | null;
 	reason: string | null;
+	/** Engine totals; `null` when the engine is unavailable. Absent on older backends. */
+	capacity?: DockerCapacity | null;
+}
+
+/**
+ * Totals visible to the Docker engine that runs game containers (including Docker Desktop VM
+ * limits). Not free memory, reservations or the manager container's own allowance.
+ */
+export interface DockerCapacity {
+	logicalCpus: number | null;
+	memoryTotalBytes: number | null;
+	architecture: string | null;
+	operatingSystem: string | null;
 }
 
 export interface Isolation {
@@ -270,6 +311,38 @@ export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelle
 export interface JobFailure {
 	code: string;
 	detail: string;
+}
+
+/**
+ * Stages a job can report. Install: resolve → download → verify → extract → prepare_loader →
+ * finalize. Export: scan → compress → upload → verify_upload → finalize. Restore: fetch_archive →
+ * verify_archive → restore → finalize. Remove local files: fetch_archive → verify_archive → finalize.
+ */
+export type JobWorkStage =
+	| 'resolve'
+	| 'download'
+	| 'verify'
+	| 'extract'
+	| 'prepare_loader'
+	| 'finalize'
+	| 'scan'
+	| 'compress'
+	| 'upload'
+	| 'verify_upload'
+	| 'fetch_archive'
+	| 'verify_archive'
+	| 'restore';
+
+/**
+ * Last observed work of a job. Byte counts belong to the current stage only; `totalBytes` is
+ * `null` when the size is unknown (compression never has one). `completedStages` holds observed
+ * earlier transitions (last 32, may repeat) and never includes skipped steps.
+ */
+export interface JobWork {
+	stage: JobWorkStage;
+	completedBytes: number | null;
+	totalBytes: number | null;
+	completedStages: JobWorkStage[];
 }
 
 export interface Job {
@@ -286,6 +359,8 @@ export interface Job {
 	createdAt: string;
 	startedAt: string | null;
 	finishedAt: string | null;
+	/** Stage/byte observations; omitted or `null` from older builds and jobs. Validate before use. */
+	work?: JobWork | null;
 }
 
 /** `GET /api/v1/jobs`: newest first; pass `nextCursor` back as `cursor` for older jobs. */

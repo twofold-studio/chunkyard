@@ -1,9 +1,11 @@
 import {
+	archiveServer,
 	getServer,
 	installServer,
 	isAbortError,
 	listJobs,
 	isJobActive,
+	restoreExport,
 	serverAction,
 	setEula,
 	waitForJob,
@@ -26,6 +28,8 @@ export interface ServerApi {
 	waitForJob: typeof waitForJob;
 	installServer: typeof installServer;
 	listJobs: typeof listJobs;
+	archiveServer: typeof archiveServer;
+	restoreExport: typeof restoreExport;
 }
 
 const defaultApi: ServerApi = {
@@ -34,7 +38,9 @@ const defaultApi: ServerApi = {
 	setEula,
 	waitForJob,
 	installServer,
-	listJobs
+	listJobs,
+	archiveServer,
+	restoreExport
 };
 
 /** Upper bound for active-job discovery; the backend allows at most four active jobs. */
@@ -48,13 +54,22 @@ const LIFECYCLE_KINDS: Record<string, ServerAction> = {
 };
 
 /** What a returning page re-attaches to; other job kinds are ignored, never treated as installs. */
-export type RecoverableKind = 'install' | 'lifecycle' | 'export' | 'delete';
+export type RecoverableKind = 'install' | 'lifecycle' | 'export' | 'delete' | 'backup';
+
+/** Storage transitions: removing local files (archive) or restoring a full backup. */
+export type BackupOperation = 'archive' | 'restore';
+
+const BACKUP_KINDS: Record<string, BackupOperation> = {
+	'server.archive': 'archive',
+	'server.restore': 'restore'
+};
 
 export function recoverableKind(kind: string): RecoverableKind | null {
 	if (kind === 'server.install') return 'install';
 	if (kind in LIFECYCLE_KINDS) return 'lifecycle';
 	if (kind === 'server.export') return 'export';
 	if (kind === 'server.delete') return 'delete';
+	if (kind in BACKUP_KINDS) return 'backup';
 	return null;
 }
 
@@ -93,6 +108,13 @@ export class ServerController {
 	deleteJob = $state.raw<Job | null>(null);
 	/** Set when a recovered delete succeeded: the record is gone. */
 	deleted = $state.raw<DeletedServer | null>(null);
+	/** Archive (remove local files) or restore job, started here or recovered. */
+	backupJob = $state.raw<Job | null>(null);
+	backupOp = $state<BackupOperation | null>(null);
+	/** Failure of the last archive/restore, kept separate from lifecycle errors. */
+	backupError = $state.raw<unknown>(null);
+	/** True while an archive/restore POST is in flight, before a job exists. */
+	#backupRequested = $state(false);
 	/** The finished job behind `error`, for an Activity link. */
 	errorJobId = $state<string | null>(null);
 	/** Active-job discovery failed; work may still be running. */
@@ -145,8 +167,14 @@ export class ServerController {
 		return this.deleteJob !== null && isJobActive(this.deleteJob);
 	}
 
+	/** Archive/restore request or job in flight. */
+	get backupActive(): boolean {
+		return this.#backupRequested || (this.backupJob !== null && isJobActive(this.backupJob));
+	}
+
 	get busy(): boolean {
 		return (
+			this.backupActive ||
 			(this.job !== null && isJobActive(this.job)) ||
 			this.eulaPending ||
 			this.installWorking ||
@@ -173,6 +201,10 @@ export class ServerController {
 		this.exportError = null;
 		this.deleteJob = null;
 		this.deleted = null;
+		this.backupJob = null;
+		this.backupOp = null;
+		this.backupError = null;
+		this.#backupRequested = false;
 		this.errorJobId = null;
 		this.eulaPending = false;
 		this.server = server;
@@ -274,6 +306,50 @@ export class ServerController {
 	}
 
 	/**
+	 * Removes this stopped server's local files after the backend re-verifies the chosen full S3
+	 * export. The caller must have obtained explicit confirmation that newer local changes are
+	 * lost. Never stops, starts or changes EULA acceptance.
+	 */
+	archive(exportId: string): Promise<Job | null> {
+		if (this.server.archive || this.server.status.state !== 'stopped') return Promise.resolve(null);
+		return this.#submitBackup('archive', (signal) =>
+			this.#api.archiveServer(this.server.id, exportId, { signal })
+		);
+	}
+
+	/** Restores this archived server from a full archive. The game stays stopped. */
+	restore(exportId: string): Promise<Job | null> {
+		if (!this.server.archive) return Promise.resolve(null);
+		return this.#submitBackup('restore', (signal) => this.#api.restoreExport(exportId, { signal }));
+	}
+
+	async #submitBackup(
+		op: BackupOperation,
+		submit: (signal: AbortSignal) => Promise<{ job: Job }>
+	): Promise<Job | null> {
+		if (this.busy) return null;
+		const id = this.server.id;
+		const signal = this.signal;
+		this.backupError = null;
+		this.backupJob = null;
+		this.backupOp = op;
+		this.#backupRequested = true;
+		try {
+			const { job } = await submit(signal);
+			if (signal.aborted || this.server.id !== id) return null;
+			this.#backupRequested = false;
+			return await this.#followBackup(job, signal);
+		} catch (error) {
+			if (!isAbortError(error) && !signal.aborted && this.server.id === id) {
+				this.backupError = error;
+			}
+			return null;
+		} finally {
+			if (this.server.id === id) this.#backupRequested = false;
+		}
+	}
+
+	/**
 	 * Re-attaches to this server's queued/running jobs (`GET /api/v1/jobs?serverId&activeOnly`)
 	 * after a reload, navigation or the page becoming visible again. It only follows existing
 	 * jobs by ID; it never submits an install, lifecycle action, export or delete. Overlapping
@@ -322,7 +398,7 @@ export class ServerController {
 		this.#discovery?.abort();
 		this.#discovery = null;
 		this.recovering = false;
-		for (const job of [this.installJob, this.job, this.exportJob, this.deleteJob]) {
+		for (const job of [this.installJob, this.job, this.exportJob, this.deleteJob, this.backupJob]) {
 			if (job && isJobActive(job) && this.#recovered.has(job.id)) {
 				this.#suspended.set(job.id, job);
 				this.#tracked.delete(job.id);
@@ -360,6 +436,8 @@ export class ServerController {
 					await this.#followInstall(job, signal);
 				} else if (kind === 'export') {
 					await this.#followExport(job, signal);
+				} else if (kind === 'backup') {
+					await this.#followBackup(job, signal);
 				} else {
 					await this.#followDelete(job, signal);
 				}
@@ -372,6 +450,7 @@ export class ServerController {
 				if (this.installJob?.id === job.id) this.installJob = null;
 				if (this.exportJob?.id === job.id) this.exportJob = null;
 				if (this.deleteJob?.id === job.id) this.deleteJob = null;
+				if (this.backupJob?.id === job.id) this.backupJob = null;
 			} finally {
 				if (!signal.aborted) this.#recovered.delete(job.id);
 			}
@@ -420,6 +499,31 @@ export class ServerController {
 		this.exportJob = final;
 		if (final.state !== 'succeeded') this.exportError = jobFailure(final, 'export');
 		this.exportsVersion += 1;
+	}
+
+	/**
+	 * Follows an archive/restore job, then applies the returned record or re-reads it, so the
+	 * page shows the actual retained local/archived state also after failures or interruptions.
+	 */
+	async #followBackup(job: Job, signal: AbortSignal): Promise<Job | null> {
+		if (this.backupActive && this.backupJob && this.backupJob.id !== job.id) return null;
+		this.backupOp = BACKUP_KINDS[job.kind] ?? this.backupOp;
+		this.backupJob = job;
+		const final = await this.#wait(job, signal, (update) => (this.backupJob = update));
+		if (!final) return null;
+		this.backupJob = final;
+		const updated = final.state === 'succeeded' ? serverFromResult(final.result) : null;
+		if (final.state !== 'succeeded') {
+			this.backupError = jobFailure(final, this.backupOp === 'restore' ? 'restore' : 'archive');
+		}
+		if (updated && updated.id === this.server.id) this.server = updated;
+		else await this.refresh().catch(() => {});
+		this.exportsVersion += 1;
+		return final;
+	}
+
+	clearBackupError() {
+		this.backupError = null;
 	}
 
 	async #followDelete(job: Job, signal: AbortSignal) {

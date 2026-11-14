@@ -14,16 +14,15 @@ The phase specs describe the long-term product. This page records the smaller, s
 | Configuration | Searchable structured properties, raw text, autosave, immutable history, restore-as-new-revision and saved/applied revision indicators. | Generic files are writable only while stopped. No dedicated player administration yet. |
 | Files | Browse, download, file uploads including drag/drop, syntax-aware text editing, mkdir, folder-picker move/copy and confirmed deletion. Select files/folders and pass them to the export flow. Dirty editor navigation has an in-app stay/discard guard. | No folder/resumable/chunked uploads or generic archive extraction. Selection survives in-app navigation but not reload. |
 | Console | Authenticated same-origin WebSocket stream with bounded buffers, reconnect/fallback and commands. Client-side filter, wrap/follow controls, text download/copy and per-instance command recall. | No persisted searchable console history. |
-| Monitoring | On-demand Docker CPU/memory/IO/network snapshots; configurable polling; bounded CPU/RAM charts from samples collected while Overview is open. | Charts reset on leaving Overview. No persisted history, host metrics, TPS/MSPT or player-session collection. |
-| Exports and storage | Stopped-instance world/full/selected `.tar.gz` exports, checksum verification, local or S3-compatible storage, retained archives after instance deletion. RustFS verified over NetBird. | Restore is manual extraction. No one-click restore, schedules, retention or hot backups. See [export contract](exports-contract.md). |
-| Activity | Global and per-instance cursor-paged jobs, loaded-record state/type filters, safe result summaries and job details. Returning server pages reconnect to active operations without resubmitting them. | Sidebar count queries active jobs globally on navigation and observed changes; no separate polling timer. No cancellation or percentage progress. |
+| Monitoring | On-demand Docker CPU/memory/IO/network snapshots; configurable polling; bounded CPU/RAM charts from a shared sampler while a server page is open. Docker engine CPU/RAM totals, architecture and OS are available through the isolation API. | Charts reset on leaving the server page. Host capacity is not live free memory; no persisted history, host usage metrics, TPS/MSPT or player-session collection. |
+| Exports and storage | World/full/selected archives, local or S3 storage, verification, archived identities and one-click full-instance restore. RustFS verified over NetBird. | Stopped only; full S3 backup required before removing local files. No schedules, retention or hot backups. See [export contract](exports-contract.md). |
+| Activity | Global and per-instance cursor-paged jobs, loaded-record state/type filters, safe result summaries and job details. Returning server pages reconnect to active operations without resubmitting them. | Sidebar count queries active jobs globally on navigation and observed changes; no separate polling timer. Observed install/export stages and byte progress are available; no cancellation or estimated overall percentage. |
 | Deployment | Version/changelog badge, local OpenAPI viewer, static UI serving, Gitadel-to-Dokploy deployment on Oracle ARM64. | No multi-node agents, relay or automatic router configuration. |
 
 ## Next useful milestones
 
-1. Add archive restore with backend validation, staging and rollback before a UI exposes destructive replacement. Restoring into a new instance should be the first safe workflow.
-2. Add server readiness/player status and persistent bounded metrics collection before historical dashboards or player controls claim that data exists.
-3. Add stopped-instance player-list management, then content updates and additional installers with explicit compatibility checks.
-4. Add backup schedules and retention only after restore is verified, including archives of deleted instances.
+1. Add server readiness/player status and persistent bounded metrics collection before historical dashboards or player controls claim that data exists.
+2. Add stopped-instance player-list management, then content updates and additional installers with explicit compatibility checks.
+3. Add backup schedules and retention only after restore is verified, including archives of deleted instances.
 
 Keep these as bounded milestones with real integration checks and changelog notes. Existing worlds, owner settings and credentials must survive upgrades. Do not implement broader authentication or multi-node specifications ahead of these core workflows.

@@ -33,6 +33,7 @@ impl JobManager {
         server_id: Option<&str>,
         actor: Option<&str>,
         task: JobTask,
+        progress: Option<mcm_core::progress::ProgressReporter>,
     ) -> Result<Job, JobError> {
         let _guard = self.admission.lock().await;
         if self.shutdown.is_cancelled() {
@@ -49,6 +50,7 @@ impl JobManager {
             server_id: server_id.map(str::to_owned),
             state: JobState::Queued,
             progress: None,
+            work: None,
             message: None,
             error: None,
             result: None,
@@ -66,10 +68,22 @@ impl JobManager {
             running.state = JobState::Running;
             running.started_at = Some(timestamp());
             if let Err(error) = repo.update(&running).await { tracing::error!(%error, job_id = %running.id, "could not start job"); return; }
-            let outcome = tokio::select! {
-                result = AssertUnwindSafe(task).catch_unwind() => result.unwrap_or_else(|_| Err(JobFailure { code: "job.panicked".into(), detail: "The background operation stopped unexpectedly.".into() })),
-                _ = shutdown.cancelled() => Err(JobFailure { code: "job.interrupted".into(), detail: "The manager stopped before this job completed.".into() }),
-            };
+            let task = AssertUnwindSafe(task).catch_unwind();
+            tokio::pin!(task);
+            let mut tick = tokio::time::interval(std::time::Duration::from_millis(500));
+            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            let outcome = loop { tokio::select! {
+                result = &mut task => break result.unwrap_or_else(|_| Err(JobFailure { code: "job.panicked".into(), detail: "The background operation stopped unexpectedly.".into() })),
+                _ = shutdown.cancelled() => break Err(JobFailure { code: "job.interrupted".into(), detail: "The manager stopped before this job completed.".into() }),
+                _ = tick.tick(), if progress.is_some() => {
+                    let latest = progress.as_ref().and_then(|p| p.snapshot());
+                    if latest != running.work {
+                        running.work = latest;
+                        if let Err(error) = repo.update(&running).await { tracing::warn!(%error, "could not persist job progress"); }
+                    }
+                }
+            }};
+            running.work = progress.as_ref().and_then(|p| p.snapshot());
             running.finished_at = Some(timestamp());
             match outcome {
                 Ok(result) => { running.state = JobState::Succeeded; running.progress = Some(1.0); running.result = Some(result); }
@@ -97,7 +111,7 @@ impl JobService for JobManager {
         actor: Option<&str>,
         task: JobTask,
     ) -> Result<Job, JobError> {
-        self.submit_inner(kind, None, actor, task).await
+        self.submit_inner(kind, None, actor, task, None).await
     }
     async fn submit_for_server(
         &self,
@@ -106,7 +120,19 @@ impl JobService for JobManager {
         actor: Option<&str>,
         task: JobTask,
     ) -> Result<Job, JobError> {
-        self.submit_inner(kind, Some(server_id), actor, task).await
+        self.submit_inner(kind, Some(server_id), actor, task, None)
+            .await
+    }
+    async fn submit_progress_for_server(
+        &self,
+        kind: &str,
+        server_id: &str,
+        actor: Option<&str>,
+        task: JobTask,
+        progress: mcm_core::progress::ProgressReporter,
+    ) -> Result<Job, JobError> {
+        self.submit_inner(kind, Some(server_id), actor, task, Some(progress))
+            .await
     }
     async fn get(&self, id: &str) -> Result<Option<Job>, JobError> {
         Ok(self.repo.get(id).await?)

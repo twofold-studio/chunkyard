@@ -172,6 +172,9 @@ describe('installed software labels', () => {
 		// A build number is only ever labelled as a Paper build for Paper servers.
 		expect(rows.some((row) => /build/i.test(row.label))).toBe(false);
 		expect(softwareHeadline(server)).toBe('CurseForge modpack · Minecraft 1.20.1 · Forge 47.3.0');
+		expect(softwareHeadline(server, 'Better MC')).toBe(
+			'Better MC · Minecraft 1.20.1 · Forge 47.3.0'
+		);
 		expect(cardSummary(server)).toEqual({ software: 'CurseForge · Forge', version: '1.20.1' });
 	});
 
@@ -198,8 +201,10 @@ describe('installed software labels', () => {
 				launch
 			})
 		).toBe('Fabric 0.16.5');
-		expect(softwareHeadline({ software: pack, launch: null })).toBe(
-			'CurseForge modpack project 101 · release 555'
+		// Raw project/file IDs are never shown as the headline.
+		expect(softwareHeadline({ software: pack, launch: null })).toBe('CurseForge modpack');
+		expect(softwareHeadline({ software: pack, launch: null }, 'All the Mods 10')).toBe(
+			'All the Mods 10'
 		);
 		expect(installedDetails({ software: pack, launch: null })).toEqual([]);
 	});

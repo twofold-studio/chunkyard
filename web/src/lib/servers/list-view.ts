@@ -1,4 +1,5 @@
 import type { ServerState, ServerView } from '#lib/api/index.js';
+import { isArchived } from '#lib/exports/backups.js';
 import { SOFTWARE_LABELS } from './software.js';
 
 /**
@@ -11,12 +12,16 @@ export type StateFilter = 'all' | ServerState;
 /** `custom` is a manual JAR server (`software == null`). */
 export type SoftwareFilter = 'all' | 'custom' | string;
 export type SortKey = 'name' | 'state' | 'port';
+/** Local instance files present, or archived to an S3 backup (`archive` set). */
+export type LocationFilter = 'all' | 'local' | 'archived';
 
 export interface ListView {
 	query: string;
 	state: StateFilter;
 	software: SoftwareFilter;
 	sort: SortKey;
+	/** Optional so older callers default to all instances. */
+	location?: LocationFilter;
 }
 
 export const DEFAULT_VIEW: ListView = { query: '', state: 'all', software: 'all', sort: 'name' };
@@ -26,6 +31,11 @@ export const STATE_LABELS: Record<ServerState, string> = {
 	paused: 'Paused',
 	stopped: 'Stopped',
 	unknown: 'Unknown'
+};
+
+export const LOCATION_LABELS: Record<Exclude<LocationFilter, 'all'>, string> = {
+	local: 'Local',
+	archived: 'Archived'
 };
 
 export const SORT_LABELS: Record<SortKey, string> = {
@@ -60,7 +70,8 @@ function haystack(server: ServerView): string {
 		softwareFilterLabel(softwareKey(server)),
 		typeof software?.version === 'string' ? software.version : '',
 		server.launch?.version ?? '',
-		String(server.port)
+		String(server.port),
+		isArchived(server) ? 'archived' : 'local'
 	];
 	return parts.join(' ').toLowerCase();
 }
@@ -95,13 +106,24 @@ export function applyView(servers: readonly ServerView[], view: ListView): Serve
 			(server) =>
 				(view.state === 'all' || server.status.state === view.state) &&
 				(view.software === 'all' || softwareKey(server) === view.software) &&
+				matchesLocation(server, view.location ?? 'all') &&
 				matchesQuery(server, view.query)
 		)
 		.sort(compareServers(view.sort));
 }
 
+function matchesLocation(server: ServerView, location: LocationFilter): boolean {
+	if (location === 'all') return true;
+	return isArchived(server) === (location === 'archived');
+}
+
 export function isFiltered(view: ListView): boolean {
-	return view.query.trim() !== '' || view.state !== 'all' || view.software !== 'all';
+	return (
+		view.query.trim() !== '' ||
+		view.state !== 'all' ||
+		view.software !== 'all' ||
+		(view.location ?? 'all') !== 'all'
+	);
 }
 
 /** "3 servers" or "2 of 5 loaded servers" — never a claim about servers not returned. */

@@ -68,7 +68,26 @@ impl Sandbox {
         manifest: &[u8],
         properties: Option<&str>,
     ) -> Result<(u64, String), FileError> {
+        self.export_archive_with_progress(
+            paths,
+            world_only,
+            output,
+            manifest,
+            properties,
+            Default::default(),
+        )
+    }
+    pub fn export_archive_with_progress(
+        &self,
+        paths: &[String],
+        world_only: bool,
+        output: std::fs::File,
+        manifest: &[u8],
+        properties: Option<&str>,
+        progress: mcm_core::progress::ProgressReporter,
+    ) -> Result<(u64, String), FileError> {
         use flate2::{Compression, write::GzEncoder};
+        progress.stage(mcm_core::progress::Stage::Scan);
         let all = paths.is_empty() && !world_only;
         if !all {
             for path in paths {
@@ -99,6 +118,7 @@ impl Sandbox {
             roots
         };
         let writer = ArchiveWriter {
+            progress,
             output,
             size: 0,
             hash: Sha256::new(),
@@ -309,6 +329,7 @@ struct ExportBudget {
     bytes: u64,
 }
 struct ArchiveWriter {
+    progress: mcm_core::progress::ProgressReporter,
     output: std::fs::File,
     size: u64,
     hash: Sha256,
@@ -324,6 +345,8 @@ impl Write for ArchiveWriter {
         let n = self.output.write(bytes)?;
         self.size += n as u64;
         self.hash.update(&bytes[..n]);
+        self.progress
+            .bytes(mcm_core::progress::Stage::Compress, Some(self.size), None);
         Ok(n)
     }
     fn flush(&mut self) -> std::io::Result<()> {

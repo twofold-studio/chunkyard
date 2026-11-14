@@ -19,8 +19,68 @@ pub(crate) fn routes() -> Router<AppState> {
         .route("/api/v1/storage/test", post(test_storage))
         .route("/api/v1/exports", get(list))
         .route("/api/v1/servers/{id}/exports", post(create))
+        .route("/api/v1/servers/{id}/archive", post(archive_instance))
+        .route("/api/v1/exports/{id}/restore", post(restore_instance))
         .route("/api/v1/exports/{id}/download", get(download))
         .route("/api/v1/exports/{id}", axum::routing::delete(delete))
+}
+async fn archive_instance(
+    State(s): State<AppState>,
+    Extension(actor): Extension<Actor>,
+    Path(id): Path<String>,
+    ApiJson(body): ApiJson<ArchiveRequest>,
+) -> Result<impl IntoResponse, ApiError> {
+    s.servers.get(&id).await?;
+    let service = s.exports.clone();
+    let server = id.clone();
+    let progress = mcm_core::progress::ProgressReporter::default();
+    let worker = progress.clone();
+    let task = Box::pin(async move {
+        service
+            .archive_instance(&server, body, worker)
+            .await
+            .map(|server| json!({"server":server}))
+            .map_err(|error| JobFailure {
+                code: error.code().into(),
+                detail: error.public_detail().into(),
+            })
+    });
+    let job = s
+        .jobs
+        .submit_progress_for_server("server.archive", &id, actor.user_id(), task, progress)
+        .await?;
+    Ok((StatusCode::ACCEPTED, Json(json!({"job":job}))))
+}
+async fn restore_instance(
+    State(s): State<AppState>,
+    Extension(actor): Extension<Actor>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, ApiError> {
+    let record = s.exports.get(&id).await?;
+    let service = s.exports.clone();
+    let progress = mcm_core::progress::ProgressReporter::default();
+    let worker = progress.clone();
+    let task = Box::pin(async move {
+        service
+            .restore_instance(&id, worker)
+            .await
+            .map(|server| json!({"server":server}))
+            .map_err(|error| JobFailure {
+                code: error.code().into(),
+                detail: error.public_detail().into(),
+            })
+    });
+    let job = s
+        .jobs
+        .submit_progress_for_server(
+            "server.restore",
+            &record.server_id,
+            actor.user_id(),
+            task,
+            progress,
+        )
+        .await?;
+    Ok((StatusCode::ACCEPTED, Json(json!({"job":job}))))
 }
 async fn storage(State(s): State<AppState>) -> Result<Json<StorageView>, ApiError> {
     Ok(Json(s.exports.storage().await?))
@@ -47,10 +107,12 @@ async fn create(
     // Check the instance exists before accepting a durable job.
     s.servers.get(&id).await?;
     let service = s.exports.clone();
+    let progress = mcm_core::progress::ProgressReporter::default();
+    let worker_progress = progress.clone();
     let server = id.clone();
     let task = Box::pin(async move {
         let record = service
-            .create(&server, body)
+            .create_with_progress(&server, body, worker_progress)
             .await
             .map_err(|e| JobFailure {
                 code: e.code().into(),
@@ -63,7 +125,7 @@ async fn create(
     });
     let job = s
         .jobs
-        .submit_for_server("server.export", &id, actor.user_id(), task)
+        .submit_progress_for_server("server.export", &id, actor.user_id(), task, progress)
         .await?;
     Ok((StatusCode::ACCEPTED, Json(json!({"job":job}))))
 }
@@ -99,6 +161,11 @@ impl From<ExportError> for ApiError {
     fn from(e: ExportError) -> Self {
         let detail = e.public_detail();
         let (status, code) = match e {
+            ExportError::BackupRequired => (StatusCode::CONFLICT, "exports.backup_required"),
+            ExportError::RestoreConflict => (StatusCode::CONFLICT, "exports.restore_conflict"),
+            ExportError::InvalidArchive => {
+                (StatusCode::UNPROCESSABLE_ENTITY, "exports.invalid_archive")
+            }
             ExportError::Server(e) => return e.into(),
             ExportError::Files(e) => return e.into(),
             ExportError::Invalid => (StatusCode::UNPROCESSABLE_ENTITY, "exports.invalid"),

@@ -370,3 +370,111 @@ describe('ServerController.recover', () => {
 		controller.destroy();
 	});
 });
+
+describe('ServerController archive/restore', () => {
+	const archived = (id = 's1') =>
+		server(id, { archive: { exportId: 'full-s3', archivedAt: '2026-11-14T00:00:00Z' } });
+
+	it('maps archive and restore jobs to the backup tracker', () => {
+		expect(recoverableKind('server.archive')).toBe('backup');
+		expect(recoverableKind('server.restore')).toBe('backup');
+	});
+
+	it('submits an explicit archive request and applies the archived record', async () => {
+		const result = archived();
+		const archiveServer = vi.fn().mockResolvedValue({ job: job('a1', 'server.archive', 'queued') });
+		const getJob = vi
+			.fn()
+			.mockResolvedValueOnce(job('a1', 'server.archive', 'running'))
+			.mockResolvedValueOnce(
+				job('a1', 'server.archive', 'succeeded', { result: { server: result } })
+			);
+		const { controller, mutations } = make({ archiveServer, getJob });
+		const pending = controller.archive('full-s3');
+		expect(controller.busy).toBe(true);
+		expect(controller.backupOp).toBe('archive');
+		const final = await pending;
+		expect(final?.state).toBe('succeeded');
+		expect(archiveServer).toHaveBeenCalledWith('s1', 'full-s3', expect.anything());
+		expect(controller.server.archive?.exportId).toBe('full-s3');
+		expect(controller.exportsVersion).toBe(1);
+		// Nothing implicit: no lifecycle action, install or EULA change.
+		expect(mutations.serverAction).not.toHaveBeenCalled();
+		expect(mutations.setEula).not.toHaveBeenCalled();
+		expect(mutations.installServer).not.toHaveBeenCalled();
+	});
+
+	it('refuses to archive a running or already archived server', async () => {
+		const archiveServer = vi.fn();
+		const running = make(
+			{ archiveServer },
+			server('s1', {
+				status: { state: 'running', containerId: 'c', exitCode: null, oomKilled: false }
+			})
+		);
+		expect(await running.controller.archive('x')).toBeNull();
+		const already = make({ archiveServer }, archived());
+		expect(await already.controller.archive('x')).toBeNull();
+		expect(archiveServer).not.toHaveBeenCalled();
+	});
+
+	it('reports a failed restore and re-reads the actual state so it can be retried', async () => {
+		const record = archived();
+		const getServer = vi.fn().mockResolvedValue(record);
+		const restoreExport = vi
+			.fn()
+			.mockResolvedValue({ job: job('r1', 'server.restore', 'running') });
+		const getJob = vi.fn().mockResolvedValue(
+			job('r1', 'server.restore', 'failed', {
+				error: { code: 'exports.restore_conflict', detail: 'files exist' }
+			})
+		);
+		const { controller } = make({ restoreExport, getJob, getServer }, record);
+		const final = await controller.restore('full-s3');
+		expect(final?.state).toBe('failed');
+		expect(controller.backupError).toEqual({
+			code: 'exports.restore_conflict',
+			detail: 'files exist'
+		});
+		expect(getServer).toHaveBeenCalled();
+		expect(controller.busy).toBe(false);
+		expect(controller.server.archive).not.toBeNull();
+		// Retry is possible once the failure is shown.
+		restoreExport.mockRejectedValueOnce({ code: 'exports.busy', detail: 'busy' });
+		await controller.restore('full-s3');
+		expect(restoreExport).toHaveBeenCalledTimes(2);
+		expect(controller.backupError).toEqual({ code: 'exports.busy', detail: 'busy' });
+	});
+
+	it('does not restore a local instance', async () => {
+		const restoreExport = vi.fn();
+		const { controller } = make({ restoreExport });
+		expect(await controller.restore('x')).toBeNull();
+		expect(restoreExport).not.toHaveBeenCalled();
+	});
+
+	it('recovers a running archive job as busy and refreshes after it finishes', async () => {
+		const running = job('a1', 'server.archive', 'running');
+		const getServer = vi.fn().mockResolvedValue(archived());
+		const getJob = vi
+			.fn()
+			.mockResolvedValueOnce(running)
+			.mockResolvedValueOnce(
+				job('a1', 'server.archive', 'failed', { error: { code: 'job.interrupted', detail: 'x' } })
+			);
+		const { controller } = make({
+			listJobs: vi.fn().mockResolvedValue(page([running])),
+			getJob,
+			getServer
+		});
+		await controller.recover();
+		expect(controller.backupActive).toBe(true);
+		expect(controller.backupOp).toBe('archive');
+		expect(controller.busy).toBe(true);
+		await vi.waitFor(() => expect(controller.backupActive).toBe(false));
+		expect(controller.backupError).toEqual({ code: 'job.interrupted', detail: 'x' });
+		// The interrupted operation may have completed; the re-read record is shown.
+		expect(controller.server.archive?.exportId).toBe('full-s3');
+		expect(controller.exportsVersion).toBe(1);
+	});
+});

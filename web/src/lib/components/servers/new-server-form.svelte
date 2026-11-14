@@ -1,11 +1,8 @@
 <script lang="ts">
-	import BlocksIcon from '@lucide/svelte/icons/blocks';
-	import LayersIcon from '@lucide/svelte/icons/layers';
-	import PackageSearchIcon from '@lucide/svelte/icons/package-search';
 	import TagIcon from '@lucide/svelte/icons/tag';
 	import NetworkIcon from '@lucide/svelte/icons/network';
 	import ContainerIcon from '@lucide/svelte/icons/container';
-	import CpuIcon from '@lucide/svelte/icons/cpu';
+	import XIcon from '@lucide/svelte/icons/x';
 	import FileArchiveIcon from '@lucide/svelte/icons/file-archive';
 	import ScaleIcon from '@lucide/svelte/icons/scale';
 	import ClipboardCheckIcon from '@lucide/svelte/icons/clipboard-check';
@@ -23,10 +20,12 @@
 	import SoftwarePicker from './software-picker.svelte';
 	import SoftwareVersionPicker from './software-version-picker.svelte';
 	import CurseForgePicker from './curseforge-picker.svelte';
+	import ResourcePicker from './resource-picker.svelte';
 	import ServerInstallPanel from './server-install-panel.svelte';
 	import {
 		isAbortError,
 		listSoftware,
+		type CurseForgeFile,
 		type CurseForgeModpack,
 		type InstallOptions,
 		type ServerSoftware,
@@ -56,7 +55,8 @@
 		wizardSteps,
 		type WizardStep
 	} from '#lib/servers/wizard.js';
-	import { formatCpus, formatMemory } from '#lib/format.js';
+	import { formatCpus } from '#lib/format.js';
+	import { formatMib } from '#lib/servers/heap.js';
 	import { collapse } from '#lib/motion/index.js';
 
 	interface Props {
@@ -100,6 +100,8 @@
 	let build = $state('');
 	let pack = $state.raw<CurseForgeModpack | null>(null);
 	let fileId = $state<number | null>(null);
+	/** The chosen release, for the review summary (the picker is unmounted by then). */
+	let release = $state.raw<CurseForgeFile | null>(null);
 
 	const managed = $derived(kind !== null && kind !== 'custom');
 
@@ -115,6 +117,7 @@
 		build = '';
 		pack = null;
 		fileId = null;
+		release = null;
 	}
 
 	const selectionComplete = $derived(kind === 'custom' || software !== null);
@@ -139,6 +142,9 @@
 	let current = $state<WizardStep>('software');
 	let direction = $state<1 | -1>(1);
 	let heading = $state<HTMLElement | null>(null);
+	let formEl = $state<HTMLFormElement | null>(null);
+	/** Furthest step reached; single-choice picks only continue on a first pass, never when editing back. */
+	let furthest = $state(0);
 
 	/** Once a record exists every further attempt installs into it: show the install stage. */
 	const activeStep: WizardStep = $derived(flow.server && managed ? 'install' : current);
@@ -154,8 +160,24 @@
 		direction = to > from ? 1 : -1;
 		current = step;
 		attempted = false;
+		furthest = Math.max(furthest, to);
 		await tick();
-		heading?.focus({ preventScroll: false });
+		// Bring the step's start into view below the sticky bar, then move focus to its heading.
+		formEl?.scrollIntoView?.({ block: 'start' });
+		heading?.focus({ preventScroll: true });
+	}
+
+	/** On a first pass a deliberate single-choice pick continues to the next step. */
+	const autoAdvance = $derived(index === furthest && !locked);
+
+	function onSoftwarePicked(picked: SoftwareKind) {
+		selectKind(picked);
+		// A custom JAR needs its path and image reviewed explicitly; managed kinds continue.
+		if (autoAdvance && picked !== 'custom' && current === 'software') next();
+	}
+
+	function onReleasePicked() {
+		if (autoAdvance && current === 'version' && selectionComplete) next();
 	}
 
 	function next() {
@@ -196,6 +218,47 @@
 	}
 
 	const summary = $derived(software ? describeSoftware(software) : null);
+
+	const STEP_COPY: Record<WizardStep, { title: string; description: string }> = {
+		software: {
+			title: 'Choose software',
+			description:
+				'What the manager downloads and installs for this server, or a custom JAR you provide.'
+		},
+		version: { title: 'Version', description: '' },
+		identity: { title: 'Name & port', description: 'How the server is listed and reached.' },
+		resources: {
+			title: 'Resources',
+			description:
+				'Java heap and CPU limit. You can change these later while the server is stopped.'
+		},
+		review: {
+			title: 'Review',
+			description: 'Nothing has been created yet. Check the details, then create the server.'
+		},
+		install: { title: 'Install', description: '' }
+	};
+
+	const stepTitle = $derived(
+		current === 'version' && kind === 'curseforge'
+			? 'Choose a modpack'
+			: current === 'version' && kind
+				? `${SOFTWARE_LABELS[kind]} version`
+				: STEP_COPY[current].title
+	);
+	const stepDescription = $derived.by(() => {
+		if (current !== 'version' || !kind) return STEP_COPY[current].description;
+		if (kind === 'curseforge')
+			return 'Browse CurseForge, choose a pack, then pick a release that ships a server pack.';
+		if (needsLoader(kind)) return `Minecraft version and ${SOFTWARE_LABELS[kind]} loader.`;
+		if (kind === 'paper')
+			return 'Minecraft version and Paper build. Stable releases are listed first.';
+		return 'Minecraft version to install. Stable releases are listed first.';
+	});
+	const stepLabels = $derived(steps.map((step) => stepLabel(step, kind)));
+	const releaseSummary = $derived(
+		pack ? `${pack.name} · ${release?.name ?? `release ${fileId}`}` : '—'
+	);
 </script>
 
 {#snippet reviewRow(label: string, value: string, step: WizardStep, mono = false)}
@@ -217,13 +280,8 @@
 {/snippet}
 
 <div class="flex flex-col gap-6">
-	<SetupProgress
-		current={index}
-		steps={steps.map((step) => stepLabel(step, kind))}
-		label="New server progress"
-	/>
-
 	{#if activeStep === 'install' && flow.server && software}
+		<SetupProgress current={index} steps={stepLabels} label="New server progress" />
 		<Reveal preset="step" direction={1} class="flex flex-col gap-4">
 			<!-- A record exists: further attempts install into it, never create another one. -->
 			<ServerInstallPanel
@@ -233,6 +291,8 @@
 				working={flow.busy}
 				installed={flow.phase === 'done'}
 				onInstall={flow.phase === 'install-failed' ? retry : undefined}
+				packName={pack?.name ?? null}
+				releaseName={release?.name ?? null}
 			>
 				{#snippet actions()}
 					<Button size="sm" variant="outline" href={serverHref(flow.server!.id)}>
@@ -249,68 +309,114 @@
 			{/if}
 		</Reveal>
 	{:else}
-		<form class="flex flex-col gap-6" {onsubmit} novalidate>
-			<h2 bind:this={heading} tabindex="-1" class="sr-only">
-				Step {index + 1} of {steps.length}: {stepLabel(activeStep, kind)}
-			</h2>
+		<form bind:this={formEl} class="flex scroll-mt-[72px] flex-col gap-6" {onsubmit} novalidate>
+			<!-- Navigation stays reachable at the top while long lists scroll underneath. -->
+			<div
+				class="sticky top-[72px] z-[5] -mx-4 border-b border-border bg-background/95 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:-mx-8 sm:px-8 lg:-mx-16 lg:px-16"
+				data-testid="wizard-bar"
+			>
+				<div class="flex items-center gap-2 sm:gap-4">
+					<div class="flex shrink-0 items-center gap-1.5">
+						<Button
+							variant="ghost"
+							size="sm"
+							href={cancelHref}
+							aria-label="Cancel"
+							title="Cancel"
+							class="max-sm:px-2"
+						>
+							<XIcon data-icon="inline-start" class="sm:hidden" />
+							<span class="max-sm:sr-only">Cancel</span>
+						</Button>
+						{#if index > 0}
+							<Button variant="outline" size="sm" onclick={back} disabled={locked}>
+								<ArrowLeftIcon data-icon="inline-start" />
+								Back
+							</Button>
+						{/if}
+					</div>
+					<div class="min-w-0 flex-1">
+						<div class="max-lg:hidden">
+							<SetupProgress current={index} steps={stepLabels} label="New server progress" />
+						</div>
+						<p
+							class="truncate text-center text-xs text-muted-foreground lg:hidden"
+							aria-hidden="true"
+						>
+							Step {index + 1} of {steps.length} ·
+							<span class="text-foreground">{stepLabel(activeStep, kind)}</span>
+						</p>
+					</div>
+					<div class="flex shrink-0 items-center">
+						{#if current === 'review'}
+							<Button type="submit" size="sm" disabled={flow.busy}>
+								{#if flow.busy}<Spinner data-icon="inline-start" />{/if}
+								{managed ? 'Create and install' : 'Create server'}
+							</Button>
+						{:else}
+							<Button type="submit" size="sm" disabled={current === 'software' && !kind}>
+								Next
+								<ArrowRightIcon data-icon="inline-end" />
+							</Button>
+						{/if}
+					</div>
+				</div>
+			</div>
+
 			{#key current}
-				<Reveal preset="step" {direction}>
-					<SettingsPanel>
-						{#if current === 'software'}
-							<SettingsSection
-								title="Software"
-								description="What the manager downloads and installs for this server, or a custom JAR you provide."
-								icon={BlocksIcon}
-							>
-								<SoftwarePicker
-									{catalog}
-									loadError={catalogError}
-									bind:value={() => kind, selectKind}
-									disabled={locked}
-									onRetry={() => (catalogNonce += 1)}
-								/>
-								{#if attempted && !kind}
-									<p class="text-sm text-destructive" role="alert">Choose the server software.</p>
-								{/if}
-							</SettingsSection>
-						{:else if current === 'version' && kind && isVersioned(kind)}
-							<SettingsSection
-								title="Version"
-								description={needsLoader(kind)
-									? `Minecraft version and ${SOFTWARE_LABELS[kind]} loader.`
-									: kind === 'paper'
-										? 'Minecraft version and Paper build. Stable releases are listed first.'
-										: 'Minecraft version to install. Stable releases are listed first.'}
-								icon={LayersIcon}
-							>
-								{#key kind}
-									<SoftwareVersionPicker {kind} bind:version bind:build disabled={locked} />
-								{/key}
-								{#if attempted && !selectionComplete}
-									<p class="text-sm text-destructive" role="alert">
-										Wait for the versions to load and choose one.
-									</p>
-								{/if}
-							</SettingsSection>
-						{:else if current === 'version' && kind === 'curseforge'}
-							<SettingsSection
-								title="Modpack"
-								description="Search CurseForge, pick a pack, then a release that ships a server pack."
-								icon={PackageSearchIcon}
-							>
-								<CurseForgePicker
-									bind:pack
-									bind:fileId
-									disabled={locked}
-									debounceMs={searchDebounceMs}
-								/>
-								{#if attempted && !selectionComplete}
-									<p class="text-sm text-destructive" role="alert">
-										Pick a modpack and a release with a server pack.
-									</p>
-								{/if}
-							</SettingsSection>
-						{:else if current === 'identity'}
+				<Reveal preset="step" {direction} class="flex flex-col gap-5">
+					<header class="flex flex-col gap-1">
+						<h2
+							bind:this={heading}
+							tabindex="-1"
+							class="scroll-mt-32 text-lg font-semibold tracking-tight focus-visible:outline-none"
+						>
+							<span class="sr-only">Step {index + 1} of {steps.length}: </span>{stepTitle}
+						</h2>
+						{#if stepDescription}
+							<p class="text-sm text-muted-foreground">{stepDescription}</p>
+						{/if}
+					</header>
+
+					{#if current === 'software'}
+						<SoftwarePicker
+							{catalog}
+							loadError={catalogError}
+							bind:value={() => kind, selectKind}
+							disabled={locked}
+							onRetry={() => (catalogNonce += 1)}
+							onPicked={onSoftwarePicked}
+						/>
+						{#if attempted && !kind}
+							<p class="text-sm text-destructive" role="alert">Choose the server software.</p>
+						{/if}
+					{:else if current === 'version' && kind && isVersioned(kind)}
+						<div class="rounded-lg border border-border bg-card p-5">
+							{#key kind}
+								<SoftwareVersionPicker {kind} bind:version bind:build disabled={locked} />
+							{/key}
+						</div>
+						{#if attempted && !selectionComplete}
+							<p class="text-sm text-destructive" role="alert">
+								Wait for the versions to load and choose one.
+							</p>
+						{/if}
+					{:else if current === 'version' && kind === 'curseforge'}
+						<CurseForgePicker
+							bind:pack
+							bind:fileId
+							bind:release
+							disabled={locked}
+							debounceMs={searchDebounceMs}
+							{onReleasePicked}
+						/>
+						{#if attempted && !selectionComplete}
+							<p class="text-sm text-destructive" role="alert">
+								Pick a modpack and a release with a server pack.
+							</p>
+						{/if}
+					{:else if current === 'identity'}
+						<SettingsPanel>
 							<SettingsSection title="Name" description="Shown in the server list." icon={TagIcon}>
 								<Field.Field data-invalid={errors.name ? true : undefined}>
 									<Field.Label for="name">Server name</Field.Label>
@@ -354,55 +460,24 @@
 									{#if errors.port}<Field.Error>{errors.port}</Field.Error>{/if}
 								</Field.Field>
 							</SettingsSection>
-						{:else if current === 'resources'}
-							<SettingsSection
-								title="Resources"
-								description="Java heap bounds and CPU limit. The container memory limit adds overhead above the maximum heap."
-								icon={CpuIcon}
-							>
-								<Field.Group class="grid gap-4 sm:grid-cols-3">
-									<Field.Field data-invalid={errors.memoryMinMb ? true : undefined}>
-										<Field.Label for="mem-min">Min heap (MiB)</Field.Label>
-										<Input
-											id="mem-min"
-											type="number"
-											min={128}
-											step={128}
-											bind:value={form.memoryMinMb}
-											aria-invalid={errors.memoryMinMb ? true : undefined}
-											disabled={locked}
-										/>
-										{#if errors.memoryMinMb}<Field.Error>{errors.memoryMinMb}</Field.Error>{/if}
-									</Field.Field>
-									<Field.Field data-invalid={errors.memoryMaxMb ? true : undefined}>
-										<Field.Label for="mem-max">Max heap (MiB)</Field.Label>
-										<Input
-											id="mem-max"
-											type="number"
-											min={128}
-											step={128}
-											bind:value={form.memoryMaxMb}
-											aria-invalid={errors.memoryMaxMb ? true : undefined}
-											disabled={locked}
-										/>
-										{#if errors.memoryMaxMb}<Field.Error>{errors.memoryMaxMb}</Field.Error>{/if}
-									</Field.Field>
-									<Field.Field data-invalid={errors.cpus ? true : undefined}>
-										<Field.Label for="cpus">CPUs</Field.Label>
-										<Input
-											id="cpus"
-											type="number"
-											min={0.1}
-											step={0.5}
-											bind:value={form.cpus}
-											aria-invalid={errors.cpus ? true : undefined}
-											disabled={locked}
-										/>
-										{#if errors.cpus}<Field.Error>{errors.cpus}</Field.Error>{/if}
-									</Field.Field>
-								</Field.Group>
-							</SettingsSection>
+						</SettingsPanel>
+					{:else if current === 'resources'}
+						<div class="rounded-lg border border-border bg-card p-5 sm:p-6">
+							<ResourcePicker
+								id="create-resources"
+								bind:memoryMaxMb={form.memoryMaxMb}
+								bind:memoryMinMb={form.memoryMinMb}
+								bind:cpus={form.cpus}
+								{errors}
+								disabled={locked}
+							/>
+						</div>
+						<p class="text-xs text-muted-foreground">
+							Docker also needs memory outside the Java heap, so the container limit sits above
+							Server RAM.
+						</p>
 
+						<SettingsPanel>
 							{#if managed}
 								<SettingsSection
 									title="Docker image"
@@ -478,9 +553,11 @@
 									</Field.Field>
 								</SettingsSection>
 							{/if}
-						{:else if current === 'review'}
+						</SettingsPanel>
+					{:else if current === 'review'}
+						<SettingsPanel>
 							<SettingsSection
-								title="Review"
+								title="Summary"
 								description={managed
 									? 'Creating saves the server record, then downloads and verifies its software. The server is never started automatically.'
 									: 'Creating saves the server record. Nothing is downloaded and the server is not started.'}
@@ -491,9 +568,7 @@
 									{#if managed}
 										{@render reviewRow(
 											kind === 'curseforge' ? 'Modpack' : 'Version',
-											kind === 'curseforge' && pack
-												? `${pack.name} (release ${fileId})`
-												: (summary?.detail ?? '—'),
+											kind === 'curseforge' ? releaseSummary : (summary?.detail ?? '—'),
 											'version'
 										)}
 									{/if}
@@ -503,9 +578,10 @@
 										form.port != null ? String(form.port) : 'Automatic (first free from 25565)',
 										'identity'
 									)}
+									{@render reviewRow('Server RAM', formatMib(form.memoryMaxMb) || '—', 'resources')}
 									{@render reviewRow(
-										'Memory',
-										`${formatMemory(form.memoryMinMb ?? 0)} – ${formatMemory(form.memoryMaxMb ?? 0)} heap`,
+										'Initial heap',
+										formatMib(form.memoryMinMb) || '—',
 										'resources'
 									)}
 									{@render reviewRow('CPU limit', formatCpus(form.cpus ?? 0), 'resources')}
@@ -540,37 +616,14 @@
 									</Field.Label>
 								</Field.Field>
 							</SettingsSection>
-						{/if}
-					</SettingsPanel>
+						</SettingsPanel>
+					{/if}
 				</Reveal>
 			{/key}
 
 			{#if flow.error}
 				<div transition:collapse><ErrorAlert error={flow.error} /></div>
 			{/if}
-
-			<div class="flex flex-wrap items-center justify-between gap-2">
-				<Button variant="ghost" href={cancelHref}>Cancel</Button>
-				<div class="flex gap-2">
-					{#if index > 0}
-						<Button variant="outline" onclick={back} disabled={locked}>
-							<ArrowLeftIcon data-icon="inline-start" />
-							Back
-						</Button>
-					{/if}
-					{#if current === 'review'}
-						<Button type="submit" disabled={flow.busy}>
-							{#if flow.busy}<Spinner data-icon="inline-start" />{/if}
-							{managed ? 'Create and install' : 'Create server'}
-						</Button>
-					{:else}
-						<Button type="submit" disabled={current === 'software' && !kind}>
-							Next
-							<ArrowRightIcon data-icon="inline-end" />
-						</Button>
-					{/if}
-				</div>
-			</div>
 		</form>
 	{/if}
 </div>

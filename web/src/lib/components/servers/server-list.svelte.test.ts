@@ -95,4 +95,35 @@ describe('ServerList', () => {
 		expect(items[1].textContent).toContain('Beta');
 		expect(items[2].textContent).toContain('Alpha');
 	});
+	it('adds a location filter only when archived servers exist and keeps the create tile', async () => {
+		const first = render(ServerList, {
+			servers,
+			createHref: '/servers/new',
+			storage: memoryStorage()
+		});
+		await expect.element(page.getByTestId('list-count')).toBeVisible();
+		expect(page.getByRole('combobox', { name: 'Filter by location' }).elements()).toHaveLength(0);
+		first.unmount();
+		const withArchived = [
+			...servers,
+			server('gamma', {
+				name: 'Gamma',
+				archive: { exportId: 'e', archivedAt: '2026-11-14T00:00:00Z' }
+			})
+		];
+		render(ServerList, {
+			servers: withArchived,
+			createHref: '/servers/new',
+			storage: memoryStorage()
+		});
+		await page.getByRole('combobox', { name: 'Filter by location' }).selectOptions('archived');
+		await expect.element(page.getByTestId('list-count')).toHaveTextContent('1 of 3 loaded servers');
+		await expect.element(page.getByText('Gamma')).toBeVisible();
+		await expect.element(page.getByRole('link', { name: /Create server/ })).toBeVisible();
+		await page.getByRole('button', { name: 'Clear' }).click();
+		await expect.element(page.getByTestId('list-count')).toHaveTextContent('3 servers');
+		// Search also finds archived instances.
+		await page.getByRole('searchbox', { name: 'Search loaded servers' }).fill('archived');
+		await expect.element(page.getByTestId('list-count')).toHaveTextContent('1 of 3 loaded servers');
+	});
 });

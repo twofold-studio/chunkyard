@@ -77,6 +77,13 @@ async fn exports_preserve_world_selection_desired_properties_and_survive_instanc
         )
         .await?;
         assert_eq!(completed["state"], "succeeded", "{completed}");
+        assert_eq!(completed["work"]["stage"], "finalize");
+        assert!(
+            completed["work"]["completedStages"]
+                .as_array()
+                .ok_or("stages")?
+                .contains(&json!("compress"))
+        );
         let export = completed["result"]["id"].as_str().ok_or("export id")?;
         let bytes = app
             .client

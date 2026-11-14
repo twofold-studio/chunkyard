@@ -100,6 +100,17 @@ const KNOWN: Record<string, Omit<ErrorMessage, 'detail'> & { detail?: string }> 
 		title: 'Version information disabled',
 		hint: 'The manager hides its version and changelog (CHUNKYARD_HTTP__SHOW_VERSION=false).'
 	},
+	'icons.invalid': {
+		title: 'Image rejected',
+		hint: 'Use a valid PNG, JPEG, WebP or ICO image.'
+	},
+	'icons.too_large': { title: 'Image too large', hint: 'Display icons are limited to 2 MiB.' },
+	'icons.unsupported': {
+		title: 'Unsupported image type',
+		hint: 'Use a PNG, JPEG, WebP or ICO image.'
+	},
+	'icons.not_found': { title: 'No custom icon', hint: 'The icon may already have been reset.' },
+	'icons.storage': { title: 'Could not store the icon' },
 	'files.path_invalid': { title: 'Invalid path' },
 	'files.symlink': {
 		title: 'Symbolic link',
@@ -150,6 +161,22 @@ const KNOWN: Record<string, Omit<ErrorMessage, 'detail'> & { detail?: string }> 
 	'exports.busy': {
 		title: 'Export in progress',
 		hint: 'Wait for the current export or storage change to finish.'
+	},
+	'exports.backup_required': {
+		title: 'Backup is a restore point',
+		hint: 'This full backup is the only restore point of an archived server. Restore the server before deleting it.'
+	},
+	'exports.restore_conflict': {
+		title: 'Restore would overwrite files',
+		hint: 'Local instance files already exist for this server. Nothing was overwritten; remove or move them first.'
+	},
+	'exports.invalid_archive': {
+		title: 'Archive failed verification',
+		hint: 'The backup did not match its checksum, structure or manifest. Local files were kept.'
+	},
+	'server.archived': {
+		title: 'Server is archived',
+		hint: 'Its local files were removed. Restore it from its backup first.'
 	},
 	validation: { title: 'Invalid input' }
 };

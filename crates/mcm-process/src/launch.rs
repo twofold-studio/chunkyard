@@ -42,7 +42,7 @@ pub(crate) fn command(server: &Server) -> (String, Vec<String>) {
 }
 impl ServerManager {
     pub(crate) async fn read_launch(&self, id: &str) -> Result<LaunchSettings, ServerError> {
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         Ok(LaunchSettings {
             detected: detected(&server),
             current: current(&server),
@@ -62,10 +62,10 @@ impl ServerManager {
         if let Some(Some(image)) = &request.docker_image {
             crate::validation::image_name(image)?;
         }
-        let server = self.record(id).await?;
+        let server = self.local_record(id).await?;
         let lock = self.lock(&server.id)?;
         let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
-        let mut server = self.record(id).await?;
+        let mut server = self.local_record(id).await?;
         if server.software.is_some() && server.launch.is_none() {
             return Err(ServerError::NotInstalled);
         }

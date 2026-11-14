@@ -10,6 +10,8 @@
 	import ServerNetwork from './server-network.svelte';
 	import ServerResources from './server-resources.svelte';
 	import ServerLaunch from './server-launch.svelte';
+	import ServerIconSettings from './server-icon-settings.svelte';
+	import ServerDiagnostics from './server-diagnostics.svelte';
 	import type { ServerView } from '#lib/api/index.js';
 
 	interface Props {
@@ -27,6 +29,11 @@
 		/** Bump to expand Launch and scroll it into view (e.g. after `server.launch_missing`). */
 		launchFocus?: number;
 		onLaunchFocused?: () => void;
+		/** Bump to expand Resources and scroll it into view (e.g. after an OOM kill). */
+		resourcesFocus?: number;
+		onResourcesFocused?: () => void;
+		/** Local files were removed: only display metadata stays editable. */
+		archived?: boolean;
 	}
 
 	let {
@@ -39,13 +46,17 @@
 		networkFocus = 0,
 		onNetworkFocused,
 		launchFocus = 0,
-		onLaunchFocused
+		onLaunchFocused,
+		resourcesFocus = 0,
+		onResourcesFocused,
+		archived = false
 	}: Props = $props();
 
 	const stopped = $derived(server.status.state === 'stopped');
 	let networkOpen = $state(false);
 	let networkEl = $state<HTMLElement | null>(null);
 	let launchOpen = $state(false);
+	let resourcesOpen = $state(false);
 
 	async function reveal(openSection: () => void) {
 		openSection();
@@ -65,6 +76,14 @@
 	});
 
 	$effect(() => {
+		if (resourcesFocus <= 0) return;
+		untrack(() => {
+			void reveal(() => (resourcesOpen = true));
+			onResourcesFocused?.();
+		});
+	});
+
+	$effect(() => {
 		if (launchFocus <= 0) return;
 		untrack(() => {
 			void reveal(() => (launchOpen = true));
@@ -74,7 +93,15 @@
 </script>
 
 <div class="flex flex-col gap-4">
-	{#if !server.acceptEula}
+	{#if archived}
+		<p
+			class="rounded-lg border border-dashed border-border px-4 py-2.5 text-xs text-muted-foreground"
+			role="status"
+		>
+			Network, resources, launch and EULA settings return once the server is restored. The display
+			icon stays editable.
+		</p>
+	{:else if !server.acceptEula}
 		<div
 			class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-warning/30 bg-warning/10 px-4 py-2.5 text-sm"
 			role="status"
@@ -89,55 +116,70 @@
 		</div>
 	{/if}
 
-	<button
-		type="button"
-		class="motion-lift flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5 text-left hover:border-ring/60 focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none"
-		onclick={onOpenProperties}
-	>
-		<FileCogIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-		<span class="flex min-w-0 flex-1 flex-col">
-			<span class="text-sm font-medium">Minecraft settings</span>
-			<span class="text-xs text-muted-foreground"
-				>Difficulty, whitelist, MOTD and more in Properties; editable while running.</span
-			>
-		</span>
-		<ArrowRightIcon class="size-4 text-muted-foreground" aria-hidden="true" />
-	</button>
+	{#if !archived}
+		<button
+			type="button"
+			class="motion-lift flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5 text-left hover:border-ring/60 focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none"
+			onclick={onOpenProperties}
+		>
+			<FileCogIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+			<span class="flex min-w-0 flex-1 flex-col">
+				<span class="text-sm font-medium">Minecraft settings</span>
+				<span class="text-xs text-muted-foreground"
+					>Difficulty, whitelist, MOTD and more in Properties; editable while running.</span
+				>
+			</span>
+			<ArrowRightIcon class="size-4 text-muted-foreground" aria-hidden="true" />
+		</button>
+	{/if}
 
 	<section
-		bind:this={networkEl}
-		aria-label="Hosting"
-		class="scroll-mt-24 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card"
+		aria-label="Display"
+		class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card"
 	>
-		<ServerNetwork {server} {busy} {onServerUpdated} bind:open={networkOpen} />
-		<ServerResources {server} {busy} {onServerUpdated} />
-		<ServerLaunch {server} {busy} {onServerUpdated} bind:open={launchOpen} />
-		<div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5">
-			<ScaleIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-			<span class="text-sm font-medium">Minecraft EULA</span>
-			<a
-				href="https://aka.ms/MinecraftEULA"
-				target="_blank"
-				rel="noreferrer noopener"
-				class="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
-				>Read</a
-			>
-			<div class="ml-auto flex items-center gap-2">
-				{#if !stopped}
-					<span class="text-xs text-muted-foreground">Stop the server to change</span>
-				{/if}
-				<span class="text-xs text-muted-foreground" aria-hidden="true">
-					{server.acceptEula ? 'Accepted' : 'Not accepted'}
-				</span>
-				<Switch
-					id="eula-switch"
-					aria-label="Minecraft EULA accepted"
-					bind:checked={
-						() => server.acceptEula, (checked) => (checked ? onRequestEula() : onRevokeEula())
-					}
-					disabled={!stopped || busy}
-				/>
+		<ServerIconSettings {server} disabled={busy} {onServerUpdated} />
+	</section>
+
+	{#if !archived}
+		<section
+			bind:this={networkEl}
+			aria-label="Hosting"
+			class="scroll-mt-24 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card"
+		>
+			<ServerNetwork {server} {busy} {onServerUpdated} bind:open={networkOpen} />
+			<ServerResources {server} {busy} {onServerUpdated} bind:open={resourcesOpen} />
+			<ServerLaunch {server} {busy} {onServerUpdated} bind:open={launchOpen} />
+			<div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5">
+				<ScaleIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+				<span class="text-sm font-medium">Minecraft EULA</span>
+				<a
+					href="https://aka.ms/MinecraftEULA"
+					target="_blank"
+					rel="noreferrer noopener"
+					class="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+					>Read</a
+				>
+				<div class="ml-auto flex items-center gap-2">
+					{#if !stopped}
+						<span class="text-xs text-muted-foreground">Stop the server to change</span>
+					{/if}
+					<span class="text-xs text-muted-foreground" aria-hidden="true">
+						{server.acceptEula ? 'Accepted' : 'Not accepted'}
+					</span>
+					<Switch
+						id="eula-switch"
+						aria-label="Minecraft EULA accepted"
+						bind:checked={
+							() => server.acceptEula, (checked) => (checked ? onRequestEula() : onRevokeEula())
+						}
+						disabled={!stopped || busy}
+					/>
+				</div>
 			</div>
-		</div>
+		</section>
+	{/if}
+
+	<section aria-label="Diagnostics" class="overflow-hidden rounded-lg border border-border bg-card">
+		<ServerDiagnostics {server} />
 	</section>
 </div>

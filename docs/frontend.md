@@ -87,7 +87,7 @@ With the flag, the smoke also exercises text editing, downloads, uploads, the un
 
 ## Activity, selection exports and resource history
 
-Activity lists cursor-paged background jobs, filters the loaded records and refreshes active jobs while visible. Detail pages show safe summaries of known result fields; there is no raw JSON, cancellation or percentage progress. The sidebar indicator queries active jobs globally on navigation and when a job view observes a change; scoped views never replace the global count with their own. It has no independent polling timer.
+Activity lists cursor-paged background jobs, filters the loaded records and refreshes active jobs while visible. Detail pages show safe summaries of known result fields; there is no raw JSON or cancellation. Install/export work shows observed stages and bytes, with percentages only when the current stage has a known size. The sidebar indicator queries active jobs globally on navigation and when a job view observes a change; scoped views never replace the global count with their own. It has no independent polling timer.
 
 Files offers up to 100 selected file/folder paths per instance. Selecting a folder includes its contents. Export selected opens the existing Exports tab; a confirmation lists the paths and local/S3 destination before submitting the stopped-only export. Selections survive in-app navigation, but a reload clears them. Typed paths remain available.
 
