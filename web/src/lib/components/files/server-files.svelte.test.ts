@@ -4,8 +4,9 @@ import { render } from 'vitest-browser-svelte';
 import ServerFiles from './server-files.svelte';
 import { editorDoc, setEditorDoc } from '#lib/components/editor/test-utils.js';
 import { exportSelection } from '#lib/exports/export-selection.svelte.js';
+import { toast } from 'svelte-sonner';
 
-type Reply = { status: number; body?: unknown };
+type Reply = { status: number; body?: unknown; wait?: Promise<void> };
 interface Call {
 	url: string;
 	method: string;
@@ -71,6 +72,7 @@ beforeEach(() => {
 			calls.push({ url, method, headers: init.headers as Record<string, string>, body });
 			const next = replies[key(method, url)]?.shift();
 			if (!next) throw new Error(`unexpected request ${method} ${url}`);
+			if (next.wait) await next.wait;
 			return new Response(next.status === 204 ? null : JSON.stringify(next.body ?? {}), {
 				status: next.status,
 				headers: {
@@ -394,6 +396,264 @@ describe('ServerFiles', () => {
 			await page.getByRole('checkbox', { name: 'Select all visible entries for export' }).click();
 			await expect.element(page.getByTestId('selection-count')).toHaveTextContent('100 selected');
 			expect(exportSelection.count('srv-1')).toBe(100);
+		});
+	});
+
+	describe('move and copy', () => {
+		it('moves through the folder picker, then follows the moved entry', async () => {
+			reply(
+				'GET',
+				`${BASE}?${q('')}`,
+				ok(listing('', ROOT_ENTRIES)),
+				ok(listing('', ROOT_ENTRIES))
+			);
+			reply(
+				'GET',
+				`${BASE}?${q('plugins')}`,
+				ok(listing('plugins', [])),
+				ok(listing('plugins', []))
+			);
+			reply(
+				'POST',
+				`${BASE}/move`,
+				ok({ entry: entry('server.jar', { path: 'plugins/server.jar' }) })
+			);
+			exportSelection.add('srv-1', [{ path: 'server.properties', kind: 'file' }]);
+			setup({ onExportSelected: () => {} });
+			await page
+				.getByRole('button', { name: 'Actions for <img src=x onerror=alert(1)>.txt' })
+				.click();
+			await page.getByRole('menuitem', { name: 'Move' }).click();
+			const dialog = page.getByRole('dialog');
+			await dialog.getByRole('button', { name: 'Open plugins' }).click();
+			await expect
+				.element(dialog.getByTestId('relocate-summary'))
+				.toHaveTextContent('/plugins/<img src=x onerror=alert(1)>.txt');
+			await dialog.getByRole('button', { name: 'Move', exact: true }).click();
+			await vi.waitFor(() => expect(mutations()).toHaveLength(1));
+			expect(mutations()[0].body).toEqual({
+				from: '<img src=x onerror=alert(1)>.txt',
+				to: 'plugins/<img src=x onerror=alert(1)>.txt'
+			});
+			await expect.element(dialog).not.toBeInTheDocument();
+			// The browser opens the destination folder.
+			await expect.element(page.getByText('This folder is empty')).toBeVisible();
+			// Unrelated selections survive the move.
+			expect(exportSelection.paths('srv-1')).toEqual(['server.properties']);
+		});
+
+		it('keeps Move and Copy disabled while the server runs', async () => {
+			reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES, false)));
+			setup({ serverState: 'running' });
+			await page.getByRole('button', { name: 'Actions for world', exact: true }).click();
+			await expect
+				.element(page.getByRole('menuitem', { name: 'Move' }))
+				.toHaveAttribute('data-disabled');
+			await expect
+				.element(page.getByRole('menuitem', { name: 'Copy' }))
+				.toHaveAttribute('data-disabled');
+		});
+	});
+
+	describe('drag-and-drop uploads', () => {
+		interface FakeItem {
+			kind: 'file';
+			webkitGetAsEntry: () => { isDirectory: boolean; name: string };
+			getAsFile: () => File | null;
+		}
+		const transfer = (files: File[], folders: string[] = []) => ({
+			types: ['Files'],
+			files,
+			dropEffect: 'none',
+			items: [
+				...folders.map((name): FakeItem => ({
+					kind: 'file',
+					webkitGetAsEntry: () => ({ isDirectory: true, name }),
+					getAsFile: () => null
+				})),
+				...files.map((file): FakeItem => ({
+					kind: 'file',
+					webkitGetAsEntry: () => ({ isDirectory: false, name: file.name }),
+					getAsFile: () => file
+				}))
+			]
+		});
+		function fire(target: Element, type: string, data: unknown) {
+			const event = new Event(type, { bubbles: true, cancelable: true });
+			Object.defineProperty(event, 'dataTransfer', { value: data });
+			target.dispatchEvent(event);
+			return event;
+		}
+		const zone = () => document.querySelector<HTMLElement>('[data-testid="file-drop-zone"]')!;
+		const overlay = () => page.getByTestId('drop-overlay');
+		const uploadUrl = (path: string, overwrite = false) =>
+			`${BASE}/upload?${new URLSearchParams({ path, overwrite: String(overwrite) })}`;
+
+		async function openPlugins() {
+			reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES)));
+			reply('GET', `${BASE}?${q('plugins')}`, ok(listing('plugins', [])));
+			const view = setup();
+			await page.getByRole('button', { name: 'plugins', exact: true }).click();
+			await expect.element(page.getByText('This folder is empty')).toBeVisible();
+			return view;
+		}
+
+		it('shows the drop target only during a file drag, without flicker over children', async () => {
+			await openPlugins();
+			const data = transfer([new File(['x'], 'a.jar')]);
+			fire(zone(), 'dragenter', data);
+			await expect.element(overlay()).toHaveTextContent('Drop files to upload into /plugins');
+			// Entering a child and leaving it keeps the target visible.
+			const child = zone().querySelector('p, div')!;
+			fire(child, 'dragenter', data);
+			fire(child, 'dragleave', data);
+			await expect.element(overlay()).toBeInTheDocument();
+			const over = fire(zone(), 'dragover', data);
+			expect(over.defaultPrevented).toBe(true);
+			fire(zone(), 'dragleave', data);
+			await expect.element(overlay()).not.toBeInTheDocument();
+			// Dragging page text (not files) never shows it.
+			fire(zone(), 'dragenter', { types: ['text/plain'], items: [], files: [] });
+			await expect.element(overlay()).not.toBeInTheDocument();
+			expect(mutations()).toEqual([]);
+		});
+
+		it('binds dropped files to the folder at drop time, even after navigating away', async () => {
+			let release!: () => void;
+			const wait = new Promise<void>((resolve) => (release = resolve));
+			await openPlugins();
+			reply('POST', uploadUrl('plugins/a.jar'), { ...ok({ entry: entry('a.jar') }, 201), wait });
+			reply('POST', uploadUrl('plugins/b.jar'), ok({ entry: entry('b.jar') }, 201));
+			for (let i = 0; i < 4; i++) reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES)));
+			const files = [new File(['a'], 'a.jar'), new File(['b'], 'b.jar')];
+			const data = transfer(files);
+			fire(zone(), 'dragenter', data);
+			const drop = fire(zone(), 'drop', data);
+			expect(drop.defaultPrevented).toBe(true);
+			await expect.element(overlay()).not.toBeInTheDocument();
+			await page.getByRole('button', { name: 'Server', exact: true }).click();
+			await expect.element(page.getByRole('button', { name: 'world', exact: true })).toBeVisible();
+			// Dropping the same file again while it waits does not queue it twice.
+			const info = vi.spyOn(toast, 'info');
+			fire(zone(), 'drop', transfer([files[0]]));
+			// ...but in the root it is a different destination.
+			reply('POST', uploadUrl('a.jar'), ok({ entry: entry('a.jar') }, 201));
+			release();
+			await vi.waitFor(() => expect(mutations()).toHaveLength(3));
+			expect(mutations().map((c) => c.url)).toEqual([
+				uploadUrl('plugins/a.jar'),
+				uploadUrl('plugins/b.jar'),
+				uploadUrl('a.jar')
+			]);
+			expect(info).not.toHaveBeenCalled();
+		});
+
+		it('does not queue a destination that is already waiting', async () => {
+			let release!: () => void;
+			const wait = new Promise<void>((resolve) => (release = resolve));
+			await openPlugins();
+			reply('POST', uploadUrl('plugins/a.jar'), { ...ok({ entry: entry('a.jar') }, 201), wait });
+			reply('GET', `${BASE}?${q('plugins')}`, ok(listing('plugins', [])));
+			const info = vi.spyOn(toast, 'info');
+			const file = new File(['a'], 'a.jar');
+			fire(zone(), 'drop', transfer([file]));
+			fire(zone(), 'drop', transfer([file]));
+			expect(info).toHaveBeenCalledWith('a.jar is already queued', expect.anything());
+			await vi.waitFor(() =>
+				expect(document.querySelectorAll('[aria-label="Uploads"] li')).toHaveLength(1)
+			);
+			release();
+			await expect.element(page.getByText('Uploaded')).toBeVisible();
+			expect(mutations()).toHaveLength(1);
+		});
+
+		it('skips dropped folders with a notice instead of flattening them', async () => {
+			await openPlugins();
+			reply('POST', uploadUrl('plugins/a.jar'), ok({ entry: entry('a.jar') }, 201));
+			reply('GET', `${BASE}?${q('plugins')}`, ok(listing('plugins', [])));
+			const warning = vi.spyOn(toast, 'warning');
+			fire(zone(), 'drop', transfer([new File(['a'], 'a.jar')], ['world']));
+			expect(warning).toHaveBeenCalledWith(
+				'Folder world was skipped',
+				expect.objectContaining({ description: expect.stringMatching(/not supported/) })
+			);
+			await vi.waitFor(() => expect(mutations()).toHaveLength(1));
+			expect(mutations()[0].url).toBe(uploadUrl('plugins/a.jar'));
+			// A folder-only drop sends nothing.
+			fire(zone(), 'drop', transfer([], ['a', 'b']));
+			expect(warning).toHaveBeenLastCalledWith('2 folders were skipped', expect.anything());
+			await new Promise((resolve) => setTimeout(resolve, 20));
+			expect(mutations()).toHaveLength(1);
+		});
+
+		it('uses a real browser DataTransfer and asks before replacing', async () => {
+			await openPlugins();
+			reply('POST', uploadUrl('plugins/a.jar'), problem(409, 'files.exists'));
+			reply('POST', uploadUrl('plugins/a.jar', true), ok({ entry: entry('a.jar') }, 201));
+			reply('GET', `${BASE}?${q('plugins')}`, ok(listing('plugins', [])));
+			const data = new DataTransfer();
+			data.items.add(new File(['PK'], 'a.jar'));
+			const event = new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true });
+			zone().dispatchEvent(event);
+			expect(event.defaultPrevented).toBe(true);
+			await expect.element(page.getByText('Already exists')).toBeVisible();
+			expect(mutations()).toHaveLength(1);
+			await page.getByRole('button', { name: 'Replace', exact: true }).click();
+			await expect.element(page.getByText('Uploaded')).toBeVisible();
+			expect(mutations().map((c) => c.url)).toEqual([
+				uploadUrl('plugins/a.jar'),
+				uploadUrl('plugins/a.jar', true)
+			]);
+		});
+
+		it('rejects protected names before any request', async () => {
+			reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES)));
+			setup();
+			await expect.element(page.getByRole('button', { name: 'world', exact: true })).toBeVisible();
+			fire(zone(), 'drop', transfer([new File(['x'], 'eula.txt')]));
+			await expect.element(page.getByText(/changes only through the EULA action/)).toBeVisible();
+			expect(mutations()).toEqual([]);
+		});
+
+		it('refuses drops while read-only and never lets the browser open the file', async () => {
+			reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES, false)));
+			const warning = vi.spyOn(toast, 'warning');
+			setup({ serverState: 'running' });
+			await expect.element(page.getByRole('button', { name: 'world', exact: true })).toBeVisible();
+			const data = transfer([new File(['x'], 'a.jar')]);
+			fire(zone(), 'dragenter', data);
+			await expect
+				.element(overlay())
+				.toHaveTextContent('Uploads are unavailable while files are read-only');
+			const drop = fire(zone(), 'drop', data);
+			expect(drop.defaultPrevented).toBe(true);
+			expect(warning).toHaveBeenCalledWith('Files are read-only right now', expect.anything());
+			// Outside the drop zone the page also swallows the drop.
+			const outside = fire(document.body, 'drop', data);
+			expect(outside.defaultPrevented).toBe(true);
+			expect(mutations()).toEqual([]);
+			await expect.element(page.getByRole('region', { name: 'Uploads' })).not.toBeInTheDocument();
+		});
+
+		it('pauses waiting uploads when the server starts', async () => {
+			let release!: () => void;
+			const wait = new Promise<void>((resolve) => (release = resolve));
+			const view = await openPlugins();
+			reply('POST', uploadUrl('plugins/a.jar'), { ...ok({ entry: entry('a.jar') }, 201), wait });
+			reply(
+				'GET',
+				`${BASE}?${q('plugins')}`,
+				ok(listing('plugins', [], false)),
+				ok(listing('plugins', [], false))
+			);
+			fire(zone(), 'drop', transfer([new File(['a'], 'a.jar'), new File(['b'], 'b.jar')]));
+			await vi.waitFor(() => expect(mutations()).toHaveLength(1));
+			await view.rerender({ serverState: 'running' });
+			await expect.element(page.getByText(/Uploads paused/)).toBeVisible();
+			release();
+			await expect.element(page.getByText('Uploaded')).toBeVisible();
+			await new Promise((resolve) => setTimeout(resolve, 20));
+			expect(mutations()).toHaveLength(1);
 		});
 	});
 });

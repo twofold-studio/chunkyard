@@ -112,3 +112,9 @@ Ctrl/Command+K or the top-bar Go to button opens a navigation-only palette. It s
 The server list searches names/software/versions/ports, filters by state/software and sorts by name/state/port. Only the sort preference is saved locally. Counts and filters cover the records returned by GET /servers, not a separate global search service. The create tile stays first, and no-match results can clear filters without losing that tile.
 
 Management tabs stay synchronized with URL deep links and palette navigation. Clicking a tab updates its URL through same-server shallow routing, keeping editors mounted and preserving unsaved edits.
+
+## File destinations and drops
+
+Move and Copy offer a destination folder picker with breadcrumbs, root/up navigation, a filename and an exact destination summary. Only folders are shown; protected folders and a directory’s own subtree cannot be selected. Manual relative paths remain available. Listings load one folder at a time with cancellation and stale-response protection, and truncated results are labelled. Existing destinations are never overwritten; server errors leave the dialog open and the source intact. Rename retains its simple name input.
+
+Files can be dropped onto the file list or selected through the Upload button. Each queued file keeps the folder captured when it was added, uploads sequentially, and needs explicit Replace on a clash. Pending destinations are deduplicated; unsafe/protected names and files over 128 MiB are rejected locally. Queue requests and Retry/Replace recheck whether files are writable; in-flight requests remain subject to backend validation. Dropping outside the list does not navigate away. Identifiable folder drops are skipped; browsers without directory-entry detection should use Choose files. Folder uploads and resumable transfers remain unsupported.

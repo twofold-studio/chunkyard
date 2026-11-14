@@ -47,6 +47,60 @@ export function joinPath(dir: string, name: string): string {
 	return dir ? `${dir}/${name}` : name;
 }
 
+/** True when `path` is `ancestor` itself or lies anywhere beneath it. */
+export function isWithin(path: string, ancestor: string): boolean {
+	if (ancestor === ROOT) return true;
+	return path === ancestor || path.startsWith(`${ancestor}/`);
+}
+
+/** Hidden, manager-owned path components (`.chunkyard-*`). */
+export function isManagerName(name: string): boolean {
+	return name.startsWith('.chunkyard-');
+}
+
+/**
+ * Why `name` cannot be uploaded into `dir`, checked before any request. The backend
+ * remains the authority on protected paths; this only catches the known cases early.
+ */
+export function uploadNameError(dir: string, name: string): string | null {
+	const invalid = validateName(name);
+	if (invalid) return invalid;
+	if (isManagerName(name)) return 'Names starting with .chunkyard- are reserved for the manager.';
+	if (dir === ROOT && name === SERVER_PROPERTIES)
+		return 'server.properties is managed by the Properties tab and cannot be replaced by upload.';
+	if (dir === ROOT && name === EULA) return 'eula.txt changes only through the EULA action.';
+	return null;
+}
+
+export interface Relocation {
+	/** Source entry path. */
+	from: string;
+	/** True when the source is a directory, so its own subtree is excluded. */
+	directory: boolean;
+}
+
+/**
+ * Validates a destination folder chosen for a move/copy. Returns a message when the
+ * folder is the source itself or lies inside a source directory.
+ */
+export function destinationFolderError(source: Relocation, folder: string): string | null {
+	if (source.directory && isWithin(folder, source.from))
+		return 'A folder cannot be placed inside itself.';
+	if (folder.split('/').some(isManagerName)) return 'This folder is reserved for the manager.';
+	return null;
+}
+
+/** Full validation of a move/copy target built from a folder and a new name. */
+export function relocationError(source: Relocation, folder: string, name: string): string | null {
+	const folderError = destinationFolderError(source, folder);
+	if (folderError) return folderError;
+	const nameError = validateName(name);
+	if (nameError) return nameError;
+	if (isManagerName(name)) return 'Names starting with .chunkyard- are reserved for the manager.';
+	if (joinPath(folder, name) === source.from) return 'Choose a different destination or name.';
+	return null;
+}
+
 export function parentPath(path: string): string {
 	const index = path.lastIndexOf('/');
 	return index < 0 ? ROOT : path.slice(0, index);
@@ -126,3 +180,4 @@ export const MAX_UPLOAD_BYTES = 128 * 1024 * 1024;
 export const MAX_EDIT_BYTES = 1024 * 1024;
 
 export const SERVER_PROPERTIES = 'server.properties';
+export const EULA = 'eula.txt';

@@ -72,13 +72,21 @@
 					<span class="w-24 text-xs text-muted-foreground" role="status">{labels[item.state]}</span>
 					{#if item.state === 'exists'}
 						<span class="flex gap-1">
-							<Button size="xs" variant="outline" onclick={() => queue.replace(item.id)}
-								>Replace</Button
+							<Button
+								size="xs"
+								variant="outline"
+								disabled={!queue.canUpload}
+								onclick={() => queue.replace(item.id)}>Replace</Button
 							>
 							<Button size="xs" variant="ghost" onclick={() => queue.skip(item.id)}>Skip</Button>
 						</span>
 					{:else if item.state === 'failed' && queue.canRetry(item.id)}
-						<Button size="xs" variant="outline" onclick={() => queue.retry(item.id)}>Retry</Button>
+						<Button
+							size="xs"
+							variant="outline"
+							disabled={!queue.canUpload}
+							onclick={() => queue.retry(item.id)}>Retry</Button
+						>
 					{/if}
 					{#if item.state === 'failed'}
 						<span class="basis-full pl-7 text-xs text-destructive">

@@ -337,7 +337,49 @@ try {
   assert.equal(attachment.status(), 200);
   assert.equal((await attachment.body()).length, exported.size);
   await api(`/api/v1/servers/${second.id}/files/content?path=selected-marker.txt`, "PUT", {content:"\ufeffSelected export integration marker\r\n",etag:null});
+  await api(`/api/v1/servers/${second.id}/files/mkdir`,"POST",{path:"transfer-target"});
+  await api(`/api/v1/servers/${second.id}/files/content?path=transfer-source.txt`,"PUT",{content:"Move/copy fixture\n",etag:null});
   await page.getByRole("tab", { name: "Files", exact: true }).click();
+  for(const [mode,name] of [["Copy","copied.txt"],["Move","moved.txt"]]) {
+    await page.getByRole("button",{name:"Actions for transfer-source.txt",exact:true}).click();
+    await page.getByRole("menuitem",{name:mode,exact:true}).click();
+    const dialog=page.getByRole("dialog",{name:`${mode} transfer-source.txt`,exact:true});
+    await dialog.getByRole("button",{name:"Open transfer-target",exact:true}).click();
+    await dialog.getByLabel("Name",{exact:true}).fill(name);
+    await dialog.getByTestId("relocate-summary").getByText(`/transfer-target/${name}`,{exact:true}).waitFor();
+    const relocated=page.waitForResponse(r=>r.url().endsWith(`/files/${mode.toLowerCase()}`) && r.request().method()==="POST");
+    await dialog.getByRole("button",{name:mode,exact:true}).click();
+    const response=await relocated;
+    assert.equal(response.status(),200);
+    assert.deepEqual(response.request().postDataJSON(),{from:"transfer-source.txt",to:`transfer-target/${name}`});
+    assert.equal((await api(`/api/v1/servers/${second.id}/files/content?path=transfer-target/${name}`)).content,"Move/copy fixture\n");
+    await page.getByRole("button",{name:"Up one folder",exact:true}).click();
+  }
+  assert.equal((await page.request.get(`${base}/api/v1/servers/${second.id}/files/content?path=transfer-source.txt`)).status(),404);
+  async function dropFile(name,content) {
+    await page.getByTestId("file-drop-zone").evaluate((zone,{name,content})=>{
+      const transfer=new DataTransfer();transfer.items.add(new File([content],name,{type:"text/plain"}));
+      zone.dispatchEvent(new DragEvent("drop",{bubbles:true,cancelable:true,dataTransfer:transfer}));
+    },{name,content});
+  }
+  const firstDrop=page.waitForResponse(r=>r.url().includes("/files/upload?") && r.request().method()==="POST");
+  await dropFile("drop-fixture.txt","Original drop\n");
+  assert.equal((await firstDrop).status(),201);
+  const clashDrop=page.waitForResponse(r=>r.url().includes("/files/upload?") && r.request().method()==="POST");
+  await dropFile("drop-fixture.txt","Explicit replacement\n");
+  assert.equal((await clashDrop).status(),409);
+  assert.equal((await api(`/api/v1/servers/${second.id}/files/content?path=drop-fixture.txt`)).content,"Original drop\n");
+  const replacement=page.waitForResponse(r=>r.url().includes("/files/upload?") && new URL(r.url()).searchParams.get("overwrite")==="true");
+  await page.getByRole("button",{name:"Replace",exact:true}).click();
+  assert.equal((await replacement).status(),201);
+  assert.equal((await api(`/api/v1/servers/${second.id}/files/content?path=drop-fixture.txt`)).content,"Explicit replacement\n");
+  await page.getByRole("button",{name:"transfer-target",exact:true}).click();
+  const folderDrop=page.waitForResponse(r=>r.url().includes("/files/upload?") && new URL(r.url()).searchParams.get("path")==="transfer-target/folder-drop.txt");
+  await dropFile("folder-drop.txt","Captured folder\n");
+  await page.getByRole("button",{name:"Up one folder",exact:true}).click();
+  assert.equal((await folderDrop).status(),201);
+  assert.equal((await api(`/api/v1/servers/${second.id}/files/content?path=transfer-target/folder-drop.txt`)).content,"Captured folder\n");
+  console.log("PASS: real destination-picker move/copy payloads, file drops, explicit overwrite and captured upload folder");
   await page.getByRole("button",{name:"selected-marker.txt",exact:true}).click();
   const fileEditor=page.getByRole("textbox",{name:"Contents of selected-marker.txt",exact:true});
   await fileEditor.fill("Unsaved CodeMirror edit\n");

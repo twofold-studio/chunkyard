@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Chunkyard API",
-    "version": "0.8.0",
+    "version": "0.9.0",
     "description": "Single-owner Minecraft manager. Cookie authentication is required unless CHUNKYARD_AUTH__ENABLED=false. Host/origin and X-MCM-CSRF protections apply in both modes. JSON bodies are limited to 1 MiB, except file/properties editors' 8 MiB envelopes for escaped text up to 1 MiB. Raw uploads stream up to 128 MiB. Properties revisions can be saved while running and apply on the next explicit start/restart. Console supports snapshots and same-origin WebSocket streaming; metrics are snapshots."
   },
   "servers": [

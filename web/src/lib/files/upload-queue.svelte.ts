@@ -1,5 +1,5 @@
 import { errorCode, isAbortError, uploadFile, type FileEntry } from '#lib/api/index.js';
-import { joinPath, MAX_UPLOAD_BYTES, validateName } from './paths.js';
+import { joinPath, MAX_UPLOAD_BYTES, uploadNameError } from './paths.js';
 
 export type UploadState =
 	| 'pending'
@@ -13,6 +13,8 @@ export type UploadState =
 export interface UploadItem {
 	id: number;
 	file: File;
+	/** Folder captured when the file was queued; never follows later navigation. */
+	dir: string;
 	/** Destination path (directory + validated file name). */
 	path: string;
 	state: UploadState;
@@ -25,9 +27,15 @@ export interface UploadQueueOptions {
 	upload?: typeof uploadFile;
 	/** Called after each successful upload, e.g. to refresh the listing. */
 	onUploaded?: (entry: FileEntry) => void;
+	/** Rechecked before each request or retry; the backend remains authoritative. */
+	canUpload?: () => boolean;
 }
 
 let nextId = 1;
+
+/** Waiting, uploading or awaiting a replace decision. */
+const isOpen = (state: UploadState) =>
+	state === 'pending' || state === 'uploading' || state === 'exists';
 
 /**
  * Uploads files one at a time as raw `application/octet-stream` bodies. Existing
@@ -48,15 +56,32 @@ export class UploadQueue {
 		return this.items.some((item) => item.state === 'pending' || item.state === 'uploading');
 	}
 
-	/** Queues files for `dir`. Oversized or unsafe names fail locally without a request. */
-	add(dir: string, files: Iterable<File>) {
+	get canUpload(): boolean {
+		return this.#options.canUpload?.() ?? true;
+	}
+
+	/**
+	 * Queues files for `dir`. Oversized or unsafe names fail locally without a request.
+	 * A file whose destination is already waiting, uploading or awaiting a replace
+	 * decision is not queued twice; those names are returned as `duplicates`.
+	 */
+	add(dir: string, files: Iterable<File>): { added: number; duplicates: string[] } {
+		const duplicates: string[] = [];
+		let added = 0;
 		for (const file of files) {
-			const nameError = validateName(file.name);
+			const path = joinPath(dir, file.name);
+			if (this.items.some((item) => item.path === path && isOpen(item.state))) {
+				duplicates.push(file.name);
+				continue;
+			}
+			const nameError = uploadNameError(dir, file.name);
 			const tooLarge = file.size > MAX_UPLOAD_BYTES;
+			added += 1;
 			this.items.push({
 				id: nextId++,
 				file,
-				path: joinPath(dir, file.name),
+				dir,
+				path,
 				state: nameError || tooLarge ? 'failed' : 'pending',
 				overwrite: false,
 				error: nameError
@@ -67,10 +92,24 @@ export class UploadQueue {
 			});
 		}
 		void this.#drain();
+		return { added, duplicates };
+	}
+
+	/**
+	 * Stops waiting items (e.g. the server started) without sending them. They become
+	 * retryable failures; an upload already in flight is left to the backend.
+	 */
+	hold(error: { code: string; detail: string }) {
+		for (const item of this.items) {
+			if (item.state !== 'pending') continue;
+			item.state = 'failed';
+			item.error = error;
+		}
 	}
 
 	/** Confirms replacing an existing target for one item. */
 	replace(id: number) {
+		if (!this.canUpload) return;
 		const item = this.items.find((i) => i.id === id);
 		if (!item || item.state !== 'exists') return;
 		item.overwrite = true;
@@ -91,11 +130,12 @@ export class UploadQueue {
 			!!item &&
 			item.state === 'failed' &&
 			item.file.size <= MAX_UPLOAD_BYTES &&
-			validateName(item.file.name) === null
+			uploadNameError(item.dir, item.file.name) === null
 		);
 	}
 
 	retry(id: number) {
+		if (!this.canUpload) return;
 		const item = this.items.find((i) => i.id === id);
 		if (!item || !this.canRetry(id)) return;
 		item.state = 'pending';
@@ -117,6 +157,14 @@ export class UploadQueue {
 		try {
 			for (;;) {
 				if (this.#abort.signal.aborted) return;
+				if (!this.canUpload) {
+					this.hold({
+						code: 'files.server_running',
+						detail:
+							'Uploads paused while files are read-only. Retry once the server is stopped and files are writable.'
+					});
+					return;
+				}
 				const item = this.items.find((i) => i.state === 'pending');
 				if (!item) return;
 				item.state = 'uploading';

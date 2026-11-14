@@ -39,13 +39,13 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { ErrorAlert, UnsavedChangesDialog } from '#lib/components/app/index.js';
 	import { Reveal } from '#lib/components/motion/index.js';
-	import { collapse } from '#lib/motion/index.js';
+	import { collapse, fadeIn } from '#lib/motion/index.js';
 	import FileEditor from './file-editor.svelte';
 	import UploadQueuePanel from './upload-queue-panel.svelte';
 	import FileNameDialog, { type NameDialogRequest } from './file-name-dialog.svelte';
 	import FileDeleteDialog from './file-delete-dialog.svelte';
+	import RelocateDialog, { type RelocateRequest } from './relocate-dialog.svelte';
 	import {
-		copyFile,
 		fileDownloadUrl,
 		isAbortError,
 		listFiles,
@@ -64,7 +64,6 @@
 		joinPath,
 		MAX_EDIT_BYTES,
 		parentPath,
-		parseRelativePath,
 		ROOT,
 		SERVER_PROPERTIES,
 		sortEntries,
@@ -73,6 +72,7 @@
 		type SortKey
 	} from '#lib/files/paths.js';
 	import { UploadQueue } from '#lib/files/upload-queue.svelte.js';
+	import { carriesFiles, readDrop } from '#lib/files/drop.js';
 	import { cn } from '#lib/utils.js';
 
 	interface OpenRequest {
@@ -118,11 +118,15 @@
 	let deleteEntry = $state<FileEntry | null>(null);
 	/** Path of the most recently created/changed entry, highlighted once. */
 	let highlight = $state<string | null>(null);
+	let relocateRequest = $state<RelocateRequest | null>(null);
 	let dragging = $state(false);
+	/** Nested dragenter/dragleave pairs; the overlay hides only when this reaches zero. */
+	let dragDepth = 0;
 	let fileInput = $state<HTMLInputElement | null>(null);
 
 	const uploads = new UploadQueue({
 		serverId: untrack(() => serverId),
+		canUpload: () => writable,
 		onUploaded: (entry) => {
 			highlight = entry.path;
 			nonce += 1;
@@ -340,66 +344,113 @@
 	}
 
 	function relocate(entry: FileEntry, mode: 'move' | 'copy') {
-		const verb = mode === 'move' ? 'Move' : 'Copy';
-		nameRequest = {
-			title: `${verb} ${entry.name}`,
-			description:
-				'Destination path relative to the server directory, including the new name. Existing files are never overwritten.',
-			label: 'Destination',
-			submitLabel: verb,
-			initial: mode === 'copy' ? copyName(entry) : entry.path,
-			validate: (value) => {
-				const parsed = parseRelativePath(value);
-				if (!parsed.ok) return parsed.error;
-				if (parsed.path === entry.path) return 'Choose a different destination.';
-				if (entry.kind === 'directory' && parsed.path.startsWith(`${entry.path}/`))
-					return 'A folder cannot be placed inside itself.';
-				return null;
-			},
-			submit: async (value) => {
-				const parsed = parseRelativePath(value);
-				if (!parsed.ok) throw new Error(parsed.error);
-				if (mode === 'move') {
-					await moveFile(serverId, entry.path, parsed.path);
-					dropSelected(entry.path);
-				} else await copyFile(serverId, entry.path, parsed.path);
-				const where = parentPath(parsed.path);
-				highlight = parsed.path;
-				toast.success(`${mode === 'move' ? 'Moved' : 'Copied'} ${entry.name}`, {
-					description: `to /${parsed.path}`
-				});
-				if (where !== path) path = where;
-				else nonce += 1;
-			}
-		};
+		relocateRequest = { entry, mode };
 	}
 
-	function copyName(entry: FileEntry): string {
-		const dir = parentPath(entry.path);
-		const dot = entry.kind === 'file' ? entry.name.lastIndexOf('.') : -1;
-		const name =
-			dot > 0 ? `${entry.name.slice(0, dot)} copy${entry.name.slice(dot)}` : `${entry.name} copy`;
-		return joinPath(dir, name);
+	function relocated(request: RelocateRequest, target: string) {
+		if (request.mode === 'move') dropSelected(request.entry.path);
+		highlight = target;
+		toast.success(`${request.mode === 'move' ? 'Moved' : 'Copied'} ${request.entry.name}`, {
+			description: `to /${target}`
+		});
+		const where = parentPath(target);
+		if (where !== path) {
+			path = where;
+			filter = '';
+		} else nonce += 1;
 	}
 
 	function onFilesPicked(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
-		if (input.files?.length) uploads.add(path, input.files);
+		if (input.files?.length) queueUploads(path, Array.from(input.files));
 		input.value = '';
 	}
 
-	function ondragover(event: DragEvent) {
-		if (!writable || !event.dataTransfer?.types.includes('Files')) return;
+	/** Queues files for the folder shown when they were chosen or dropped. */
+	function queueUploads(dir: string, files: File[]) {
+		const { duplicates } = uploads.add(dir, files);
+		if (duplicates.length)
+			toast.info(
+				`${duplicates.length === 1 ? `${duplicates[0]} is` : `${duplicates.length} files are`} already queued`,
+				{ description: 'Each destination is uploaded once.' }
+			);
+	}
+
+	function resetDrag() {
+		dragDepth = 0;
+		dragging = false;
+	}
+
+	function ondragenter(event: DragEvent) {
+		if (!carriesFiles(event.dataTransfer)) return;
 		event.preventDefault();
+		dragDepth += 1;
 		dragging = true;
 	}
 
-	function ondrop(event: DragEvent) {
-		dragging = false;
-		if (!writable || !event.dataTransfer?.files.length) return;
+	function ondragover(event: DragEvent) {
+		if (!carriesFiles(event.dataTransfer)) return;
+		// Always claim the drop so the browser never opens the file itself.
 		event.preventDefault();
-		uploads.add(path, event.dataTransfer.files);
+		if (event.dataTransfer) event.dataTransfer.dropEffect = writable ? 'copy' : 'none';
 	}
+
+	function ondragleave(event: DragEvent) {
+		if (!carriesFiles(event.dataTransfer)) return;
+		dragDepth = Math.max(0, dragDepth - 1);
+		if (dragDepth === 0) dragging = false;
+	}
+
+	function ondrop(event: DragEvent) {
+		if (!carriesFiles(event.dataTransfer)) return;
+		event.preventDefault();
+		resetDrag();
+		// Bind the destination now: later navigation never changes where these go.
+		const dir = path;
+		if (!writable) {
+			toast.warning('Files are read-only right now', {
+				description: stopped
+					? 'The manager cannot confirm the server is stopped.'
+					: 'Stop the server to upload files.'
+			});
+			return;
+		}
+		const { files, folders } = readDrop(event.dataTransfer!);
+		if (folders.length)
+			toast.warning(
+				`${folders.length === 1 ? `Folder ${folders[0]} was` : `${folders.length} folders were`} skipped`,
+				{
+					description:
+						'Folder upload is not supported yet. Drop the files themselves, or create the folder first.'
+				}
+			);
+		if (files.length) queueUploads(dir, files);
+	}
+
+	/** Anywhere else on the page, a dropped file must not replace the app. */
+	function guardWindowDrag(event: DragEvent) {
+		if (!carriesFiles(event.dataTransfer) || event.defaultPrevented) return;
+		event.preventDefault();
+		if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
+	}
+
+	function guardWindowDrop(event: DragEvent) {
+		resetDrag();
+		if (carriesFiles(event.dataTransfer) && !event.defaultPrevented) event.preventDefault();
+	}
+
+	// Waiting uploads must not start once the server leaves the stopped state.
+	$effect(() => {
+		if (writable) return;
+		untrack(() => {
+			if (uploads.items.some((item) => item.state === 'pending'))
+				uploads.hold({
+					code: 'files.server_running',
+					detail: 'Uploads paused: files are read-only right now. Retry once the server is stopped.'
+				});
+			resetDrag();
+		});
+	});
 
 	function formatModified(value: string | null): string {
 		if (!value) return '—';
@@ -417,6 +468,8 @@
 		return FileIcon;
 	}
 </script>
+
+<svelte:window ondragover={guardWindowDrag} ondrop={guardWindowDrop} ondragend={resetDrag} />
 
 <UnsavedChangesDialog
 	open={pendingOpen !== null}
@@ -621,17 +674,30 @@
 		<div
 			class={cn(
 				'relative overflow-hidden rounded-lg border border-border bg-card transition-colors',
-				dragging && 'border-ring bg-accent/30'
+				dragging && writable && 'border-ring bg-accent/30'
 			)}
+			{ondragenter}
 			{ondragover}
-			ondragleave={() => (dragging = false)}
+			{ondragleave}
 			{ondrop}
+			data-testid="file-drop-zone"
 		>
 			{#if dragging}
 				<div
-					class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/70 text-sm font-medium"
+					class="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-background/80 text-sm font-medium"
+					transition:fadeIn
+					data-testid="drop-overlay"
 				>
-					Drop to upload into /{path}
+					{#if writable}
+						<UploadIcon class="size-5 text-muted-foreground" aria-hidden="true" />
+						<span>Drop files to upload into <span class="font-mono">/{path}</span></span>
+						<span class="text-xs font-normal text-muted-foreground"
+							>Files only, up to 128 MiB each. Existing files are never replaced without asking.</span
+						>
+					{:else}
+						<LockIcon class="size-5 text-muted-foreground" aria-hidden="true" />
+						<span>Uploads are unavailable while files are read-only</span>
+					{/if}
 				</div>
 			{/if}
 			{#if loading && !listing}
@@ -852,6 +918,7 @@
 {/snippet}
 
 <FileNameDialog bind:request={nameRequest} />
+<RelocateDialog {serverId} bind:request={relocateRequest} {writable} ondone={relocated} />
 <FileDeleteDialog
 	{serverId}
 	bind:entry={deleteEntry}
