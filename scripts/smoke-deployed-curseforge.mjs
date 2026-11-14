@@ -47,8 +47,8 @@ try {
   })).server;
   await wait((await api(`/servers/${instance.id}/install`, 'POST')).job);
   const installed = await api(`/servers/${instance.id}`);
-  assert.equal(installed.server.acceptEula, false);
-  assert(installed.server.launch?.path);
+  assert.equal(installed.acceptEula, false);
+  assert(installed.launch?.path);
   assert.equal(installed.status.state, 'stopped');
   const launch = await api(`/servers/${instance.id}/launch`);
   assert.equal(launch.overridden, false);
