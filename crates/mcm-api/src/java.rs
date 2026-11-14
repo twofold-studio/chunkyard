@@ -14,10 +14,13 @@ pub(crate) struct InstallRequest {
     major: u16,
 }
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(crate) struct JobsQuery {
     limit: Option<u32>,
     cursor: Option<String>,
+    server_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    active_only: bool,
 }
 
 pub(crate) async fn list(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
@@ -90,8 +93,17 @@ pub(crate) async fn jobs(
             "limit must be between 1 and 200.",
         ));
     }
+    let server_id = query.server_id.map(|id| id.to_string());
     Ok(Json(json!(
-        state.jobs.list(limit, query.cursor.as_deref()).await?
+        state
+            .jobs
+            .list_filtered(
+                limit,
+                query.cursor.as_deref(),
+                server_id.as_deref(),
+                query.active_only
+            )
+            .await?
     )))
 }
 pub(crate) async fn job(

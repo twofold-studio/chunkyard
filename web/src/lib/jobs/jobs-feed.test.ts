@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Job, JobPage } from '#lib/api/index.js';
-import { ActivityIndicator, INDICATOR_THROTTLE_MS } from './activity-indicator.svelte';
+import {
+	ACTIVE_CHECK_LIMIT,
+	ActivityIndicator,
+	INDICATOR_THROTTLE_MS
+} from './activity-indicator.svelte';
 import { JobsFeed } from './jobs-feed.svelte';
 import { job } from './jobs.fixture';
 
@@ -139,7 +143,17 @@ describe('ActivityIndicator', () => {
 		expect(fetchPage).toHaveBeenCalledTimes(2);
 	});
 
-	it('re-checks promptly while jobs are active and accepts observed lists', async () => {
+	it('asks the backend for active jobs only, with the bounded maximum page', async () => {
+		const fetchPage = vi.fn().mockResolvedValue(page([]));
+		const indicator = new ActivityIndicator(fetchPage, () => 0);
+		await indicator.check();
+		expect(fetchPage).toHaveBeenCalledWith(
+			expect.objectContaining({ limit: ACTIVE_CHECK_LIMIT, activeOnly: true })
+		);
+		expect(ACTIVE_CHECK_LIMIT).toBe(200);
+	});
+
+	it('re-checks promptly while jobs are active', async () => {
 		const fetchPage = vi
 			.fn()
 			.mockResolvedValue(page([at('q', 1, { state: 'queued', startedAt: null })]));
@@ -148,13 +162,73 @@ describe('ActivityIndicator', () => {
 		expect(indicator.active).toBe(1);
 		await indicator.check();
 		expect(fetchPage).toHaveBeenCalledTimes(2);
-		indicator.observe([at('a', 1)]);
-		expect(indicator.active).toBe(0);
+	});
+
+	it('never takes a view’s scoped count; changes trigger one global re-check', async () => {
+		const running = (id: string) => at(id, 1, { state: 'running', finishedAt: null });
+		// Globally three jobs run, one of them on the scoped server.
+		const fetchPage = vi.fn().mockResolvedValue(page([running('a'), running('b'), running('c')]));
+		const indicator = new ActivityIndicator(fetchPage, () => 0);
+		await indicator.check();
+		expect(indicator.active).toBe(3);
+
+		indicator.observe('server:s1', [running('a')]); // first report: baseline only
+		expect(indicator.active).toBe(3);
+		expect(fetchPage).toHaveBeenCalledTimes(1);
+
+		fetchPage.mockResolvedValue(page([running('b'), running('c')]));
+		indicator.observe('server:s1', [at('a', 1)]); // 'a' finished in the scoped view
+		await vi.waitFor(() => expect(indicator.active).toBe(2)); // global, not the scoped 0
+		expect(fetchPage).toHaveBeenCalledTimes(2);
+
+		indicator.observe('server:s1', [at('a', 1)]); // unchanged: no request
+		expect(fetchPage).toHaveBeenCalledTimes(2);
+	});
+
+	it('coalesces forced checks requested while one is in flight', async () => {
+		let release!: (p: JobPage) => void;
+		const fetchPage = vi.fn(
+			() =>
+				new Promise<JobPage>((resolve) => {
+					release = resolve;
+				})
+		);
+		const indicator = new ActivityIndicator(fetchPage, () => 0);
+		const first = indicator.check(true);
+		void indicator.check(true);
+		void indicator.check(true);
+		expect(fetchPage).toHaveBeenCalledTimes(1);
+		release(page([]));
+		await vi.waitFor(() => expect(fetchPage).toHaveBeenCalledTimes(2));
+		release(page([]));
+		await first;
+		expect(fetchPage).toHaveBeenCalledTimes(2);
 	});
 
 	it('leaves the count unchanged on failure', async () => {
 		const indicator = new ActivityIndicator(vi.fn().mockRejectedValue(new Error('x')), () => 0);
 		await indicator.check();
 		expect(indicator.active).toBeNull();
+	});
+});
+
+describe('JobsFeed server-scoped history', () => {
+	it('sends the same server filter with the first page and every cursor page', async () => {
+		const listJobs = vi
+			.fn()
+			.mockResolvedValueOnce(page([at('b', 2, { serverId: 's1' })], 'cur-1'))
+			.mockResolvedValueOnce(page([at('a', 1, { serverId: 's1' })], null));
+		const feed = make(null, { listJobs, filter: { serverId: 's1' }, pageSize: 1 });
+		expect(feed.loaded).toBe(false);
+		await feed.refresh();
+		expect(feed.loaded).toBe(true);
+		expect(feed.nextCursor).toBe('cur-1');
+		await feed.loadMore();
+		expect(listJobs.mock.calls.map(([o]) => [o.serverId, o.cursor ?? null, o.limit])).toEqual([
+			['s1', null, 1],
+			['s1', 'cur-1', 1]
+		]);
+		expect(feed.items.map((j) => j.id)).toEqual(['b', 'a']);
+		expect(feed.nextCursor).toBeNull();
 	});
 });

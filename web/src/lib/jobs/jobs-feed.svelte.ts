@@ -9,6 +9,7 @@ import {
 	isJobActive,
 	listJobs as defaultListJobs,
 	type Job,
+	type JobListFilter,
 	type JobPage
 } from '#lib/api/index.js';
 import { poll } from '#lib/polling.js';
@@ -19,11 +20,15 @@ export const JOBS_PAGE_SIZE = 50;
 export interface JobsFeedOptions {
 	pageSize?: number;
 	intervalMs?: number;
-	listJobs?: (o: {
-		limit: number;
-		cursor?: string | null;
-		signal?: AbortSignal;
-	}) => Promise<JobPage>;
+	/** Server-side filters, sent unchanged with every page request. */
+	filter?: JobListFilter;
+	listJobs?: (
+		o: JobListFilter & {
+			limit: number;
+			cursor?: string | null;
+			signal?: AbortSignal;
+		}
+	) => Promise<JobPage>;
 	getJob?: (id: string, o: { signal?: AbortSignal }) => Promise<Job>;
 	isVisible?: () => boolean;
 	/** Called after every change to `items` (e.g. to update the shell indicator). */
@@ -35,6 +40,8 @@ export class JobsFeed {
 	nextCursor = $state<string | null>(null);
 	loadingMore = $state(false);
 	refreshing = $state(false);
+	/** True once a first page is known (passed in or fetched). */
+	loaded = $state(false);
 	/** Last load-more/refresh failure; cleared on the next success. */
 	error = $state.raw<unknown>(null);
 	/** Number of jobs fetched on the first page, for "loaded N" labels. */
@@ -54,6 +61,7 @@ export class JobsFeed {
 		if (initial) {
 			this.items = mergeJobs([], initial.items);
 			this.nextCursor = initial.nextCursor;
+			this.loaded = true;
 		}
 	}
 
@@ -75,11 +83,16 @@ export class JobsFeed {
 		if (this.refreshing || this.destroyed) return;
 		this.refreshing = true;
 		try {
-			const page = await this.#listJobs({ limit: this.pageSize, signal: this.#abort.signal });
+			const page = await this.#listJobs({
+				...this.#options.filter,
+				limit: this.pageSize,
+				signal: this.#abort.signal
+			});
 			if (this.destroyed) return;
 			const empty = this.items.length === 0;
 			this.#set(mergeJobs(this.items, page.items));
 			if (empty) this.nextCursor = page.nextCursor;
+			this.loaded = true;
 			this.error = null;
 		} catch (cause) {
 			if (!isAbortError(cause) && !this.destroyed) this.error = cause;
@@ -95,6 +108,7 @@ export class JobsFeed {
 		this.loadingMore = true;
 		try {
 			const page = await this.#listJobs({
+				...this.#options.filter,
 				limit: this.pageSize,
 				cursor,
 				signal: this.#abort.signal

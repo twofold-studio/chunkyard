@@ -46,6 +46,35 @@ describe('ActivityView', () => {
 		expect(page.getByRole('button', { name: /cancel/i }).elements()).toHaveLength(0);
 	});
 
+	it('server-scoped view fetches its own pages with the server filter', async () => {
+		const listJobs = vi
+			.fn()
+			.mockResolvedValueOnce({
+				items: [at('s2', 2, { kind: 'server.install', state: 'running', finishedAt: null })],
+				nextCursor: 'cur-s'
+			})
+			.mockResolvedValueOnce({ items: [at('s1', 1, { kind: 'server.export' })], nextCursor: null });
+		const getJob = vi.fn();
+		render(ActivityView, {
+			initial: null,
+			servers,
+			serverId: 'srv-1',
+			feedOptions: { listJobs, getJob, intervalMs: 60_000 }
+		});
+		const rows = page.getByTestId('job-row');
+		await expect.element(rows.first()).toHaveTextContent('Install server software');
+		// Scope is implicit: no server picker and no server name per row.
+		expect(page.getByRole('combobox', { name: 'Filter by server' }).elements()).toHaveLength(0);
+		await expect.element(rows.first()).not.toHaveTextContent('Survival');
+		await page.getByRole('button', { name: 'Load older jobs' }).click();
+		await expect.element(rows.nth(1)).toHaveTextContent('Export server');
+		expect(listJobs.mock.calls.map(([o]) => [o.serverId, o.cursor ?? null])).toEqual([
+			['srv-1', null],
+			['srv-1', 'cur-s']
+		]);
+		expect(rows.first().element().getAttribute('href')).toMatch(/\/activity\/s2$/);
+	});
+
 	it('loads older pages with the cursor', async () => {
 		const listJobs = vi.fn().mockResolvedValue({ items: [at('old', 0)], nextCursor: null });
 		render(ActivityView, {

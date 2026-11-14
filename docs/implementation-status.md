@@ -15,7 +15,7 @@ The phase specs describe the long-term product. This page records the smaller, s
 | Console | Authenticated same-origin WebSocket stream with bounded buffers, reconnect/fallback and commands. Client-side filter, wrap/follow controls, text download/copy and per-instance command recall. | No persisted searchable console history. |
 | Monitoring | On-demand Docker CPU/memory/IO/network snapshots; configurable polling; bounded CPU/RAM charts from samples collected while Overview is open. | Charts reset on leaving Overview. No persisted history, host metrics, TPS/MSPT or player-session collection. |
 | Exports and storage | Stopped-instance world/full/selected `.tar.gz` exports, checksum verification, local or S3-compatible storage, retained archives after instance deletion. RustFS verified over NetBird. | Restore is manual extraction. No one-click restore, schedules, retention or hot backups. See [export contract](exports-contract.md). |
-| Activity | Cursor-paged jobs, loaded-record filters, active-job refresh, safe result summaries and job details linked to existing instances. | Sidebar count checks only the newest 20 jobs on navigation. No cancellation or percentage progress. |
+| Activity | Global and per-instance cursor-paged jobs, loaded-record state/type filters, safe result summaries and job details. Returning server pages reconnect to active operations without resubmitting them. | Sidebar count queries active jobs globally on navigation and observed changes; no separate polling timer. No cancellation or percentage progress. |
 | Deployment | Version/changelog badge, local OpenAPI viewer, static UI serving, Gitadel-to-Dokploy deployment on Oracle ARM64. | No multi-node agents, relay or automatic router configuration. |
 
 ## Next useful milestones

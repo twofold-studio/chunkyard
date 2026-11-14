@@ -179,15 +179,27 @@ export const installJava = (major: number, o: Opts = {}) =>
 		body: { major }
 	});
 
-/** Newest first; `limit` 1–200 (backend default 50). */
+/** Server-side filters for `GET /api/v1/jobs`; keep them identical across cursor pages. */
+export interface JobListFilter {
+	/** Only jobs recorded for this server (the record may since have been deleted). */
+	serverId?: string;
+	/** Only `queued`/`running` jobs. */
+	activeOnly?: boolean;
+}
+
+/** Newest first; `limit` 1–200 (backend default 50). Filters apply before paging. */
 export const listJobs = ({
 	limit,
 	cursor,
+	serverId,
+	activeOnly,
 	...o
-}: Opts & { limit?: number; cursor?: string | null } = {}) => {
+}: Opts & JobListFilter & { limit?: number; cursor?: string | null } = {}) => {
 	const params = new URLSearchParams();
 	if (limit !== undefined) params.set('limit', String(limit));
 	if (cursor) params.set('cursor', cursor);
+	if (serverId) params.set('serverId', serverId);
+	if (activeOnly) params.set('activeOnly', 'true');
 	const query = params.toString();
 	return request<JobPage>(`/api/v1/jobs${query ? `?${query}` : ''}`, o);
 };

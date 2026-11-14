@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
@@ -150,7 +151,14 @@
 	</div>
 
 	{#if failed}
-		<ErrorAlert {error} />
+		<ErrorAlert {error}>
+			{#if job && job.state !== 'queued' && job.state !== 'running'}
+				<a
+					href={resolve(`activity/${job.id}`)}
+					class="mt-1 inline-block text-xs underline underline-offset-4">Job details in Activity</a
+				>
+			{/if}
+		</ErrorAlert>
 	{/if}
 
 	{#if advancedAvailable}

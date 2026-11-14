@@ -4,6 +4,18 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## 0.7.0 - 2026-11-14
+
+
+### Added
+
+- REST API: GET /api/v1/jobs accepts optional serverId and activeOnly filters before cursor pagination, including history for deleted instances. Indexed instance and active-job queries support reconnecting to ongoing work without scanning unrelated history; existing query contracts remain compatible.
+- Frontend: server pages reconnect to their queued or running install, start/stop/restart/kill, export and delete jobs after a reload, server switch or returning to the tab (GET /api/v1/jobs?serverId=…&activeOnly=true&limit=200, then GET /api/v1/jobs/{id}). Nothing is resubmitted; completion refreshes the server record and archive list, failures (including job.interrupted) link to Activity, and recovered polling stops while the tab is hidden.
+- Frontend: each server page has an Activity tab listing that server's job history, filtered server-side with serverId and cursor-paged, reusing the global Activity rows and detail links.
+
+### Fixed
+
+- Frontend: the shell active-job indicator counts all queued/running jobs via GET /api/v1/jobs?activeOnly=true&limit=200 instead of scanning the newest 20 jobs; job views only trigger a re-check and never overwrite the global count with a scoped or partially loaded one.
 ## 0.6.0 - 2026-11-14
 
 

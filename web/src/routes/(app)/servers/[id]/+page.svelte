@@ -27,6 +27,8 @@
 	import SlidersIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import FileCogIcon from '@lucide/svelte/icons/file-cog';
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
+	import HistoryIcon from '@lucide/svelte/icons/history';
+	import ActivityView from '#lib/components/jobs/activity-view.svelte';
 	import ServerExports from '#lib/components/exports/server-exports.svelte';
 	import ServerProperties from '#lib/components/properties/server-properties.svelte';
 	import EulaDialog from '#lib/components/servers/eula-dialog.svelte';
@@ -64,6 +66,30 @@
 	});
 	$effect(() => () => controller.destroy());
 
+	// Re-attach to queued/running work after a reload, server switch or returning to the tab.
+	// Only existing jobs are followed; nothing is ever resubmitted.
+	const serverId = $derived(controller.server.id);
+	$effect(() => {
+		void serverId;
+		untrack(() => {
+			if (document.visibilityState !== 'hidden' && !removed && !deleting) void controller.recover();
+		});
+	});
+	$effect(() => {
+		const onVisibility = () => {
+			if (document.visibilityState === 'hidden') controller.suspend();
+			else if (!removed && !deleting) void controller.recover();
+		};
+		document.addEventListener('visibilitychange', onVisibility);
+		return () => document.removeEventListener('visibilitychange', onVisibility);
+	});
+	// A recovered export finishing changes the archive list; the Exports tab reloads it.
+	// A recovered delete that succeeded removed this record.
+	$effect(() => {
+		const deleted = controller.deleted;
+		if (deleted) untrack(() => void onDeleted(deleted));
+	});
+
 	const server = $derived(controller.server);
 	const running = $derived(server.status.state === 'running');
 	const created = $derived(page.url.searchParams.has('created'));
@@ -77,6 +103,7 @@
 		{ value: 'properties', label: 'Properties', icon: FileCogIcon },
 		{ value: 'files', label: 'Files', icon: FolderTreeIcon },
 		{ value: 'exports', label: 'Exports', icon: ArchiveIcon },
+		{ value: 'activity', label: 'Activity', icon: HistoryIcon },
 		{ value: 'settings', label: 'Settings', icon: SlidersIcon }
 	] as const;
 	type TabValue = (typeof TABS)[number]['value'];
@@ -91,8 +118,11 @@
 	let propertiesVisited = $state(initialTab === 'properties');
 	/** Exports stays mounted after its first visit so a running export keeps its progress. */
 	let exportsVisited = $state(initialTab === 'exports');
-	/** An export job holds the instance lock until compression/upload finishes. */
+	/** An export started from the Exports tab holds the instance lock until it finishes. */
 	let exporting = $state(false);
+	$effect(() => controller.setExternalTracking('export', exporting));
+	/** Export started here or recovered after a reload. */
+	const exportBusy = $derived(exporting || controller.exportActive);
 	/** Properties autosave is queued or in flight (flushed on unmount, never prompted). */
 	let propertiesPending = $state(false);
 	let propertiesEditor = $state<{
@@ -242,7 +272,7 @@
 	}
 
 	async function onDeleted(deleted: DeletedServer) {
-		if (deleted.id !== server.id) return;
+		if (removed || deleted.id !== server.id) return;
 		removed = true;
 		controller.destroy();
 		const name = server.name;
@@ -282,6 +312,15 @@
 			{#if controller.busy && controller.job && controller.action}
 				<Spinner class="size-3" />
 				<span class="truncate">{labels[controller.action]}… job {controller.job.state}</span>
+			{:else if controller.deleteActive}
+				<Spinner class="size-3" />
+				<span class="truncate">Deleting… job {controller.deleteJob?.state}</span>
+			{:else if controller.installing}
+				<Spinner class="size-3" />
+				<span class="truncate">Installing… job {controller.installJob?.state}</span>
+			{:else if controller.exportActive}
+				<Spinner class="size-3" />
+				<span class="truncate">Exporting… job {controller.exportJob?.state}</span>
 			{:else}
 				<span class="truncate">
 					{#if softwareSummary}{softwareSummary} ·
@@ -294,7 +333,7 @@
 		<ServerActions
 			compact
 			serverState={server.status.state}
-			busy={controller.busy || deleting || removed || exporting}
+			busy={controller.busy || deleting || removed || exportBusy}
 			pending={controller.action}
 			startBlocked={notInstalled}
 			{onAction}
@@ -302,7 +341,7 @@
 		<DeleteServerDialog
 			compact
 			{server}
-			disabled={controller.busy || removed || propertiesPending || exporting}
+			disabled={controller.busy || removed || propertiesPending || exportBusy}
 			bind:deleting
 			ondeleted={onDeleted}
 		/>
@@ -376,6 +415,37 @@
 	/>
 {/if}
 
+{#snippet activityLink(id: string | null)}
+	{#if id}
+		<a
+			href={resolve(`activity/${id}`)}
+			class="mt-1 inline-block text-xs underline underline-offset-4"
+			data-testid="error-activity-link">Job details in Activity</a
+		>
+	{/if}
+{/snippet}
+
+{#if controller.recoveryError}
+	<ErrorAlert
+		error={controller.recoveryError}
+		hint="Running installs, starts, stops or exports of this server could not be checked. They may still be running."
+	>
+		<div class="mt-2 flex flex-wrap items-center gap-3">
+			<Button
+				size="sm"
+				variant="outline"
+				disabled={controller.recovering}
+				onclick={() => controller.recover()}>Check again</Button
+			>
+			<button
+				type="button"
+				class="text-xs underline underline-offset-4"
+				onclick={() => selectTab('activity')}>Open Activity</button
+			>
+		</div>
+	</ErrorAlert>
+{/if}
+
 {#if controller.error}
 	{#if errorKind === 'server.jar_missing'}
 		<ErrorAlert
@@ -398,7 +468,7 @@
 			</Button>
 		</ErrorAlert>
 	{:else}
-		<ErrorAlert error={controller.error} />
+		<ErrorAlert error={controller.error}>{@render activityLink(controller.errorJobId)}</ErrorAlert>
 	{/if}
 {/if}
 
@@ -416,7 +486,7 @@
 				{item.label}
 				{#if (item.value === 'files' && filesDirty) || (item.value === 'properties' && propertiesPending)}
 					<span class="size-1.5 rounded-full bg-warning" aria-label="Unsaved changes"></span>
-				{:else if item.value === 'exports' && exporting}
+				{:else if item.value === 'exports' && exportBusy}
 					<Spinner class="size-3" aria-label="Export running" />
 				{/if}
 			</Tabs.Trigger>
@@ -476,10 +546,22 @@
 					serverState={server.status.state}
 					busy={controller.busy || deleting || removed}
 					bind:exporting
+					recoveredJob={controller.exportJob}
+					recoveredError={controller.exportError}
+					archivesVersion={controller.exportsVersion}
 					{selectionFocus}
 					onChooseFiles={() => selectTab('files')}
 				/>
 			{/key}
+		{/if}
+	</Tabs.Content>
+	<Tabs.Content value="activity">
+		{#if tab === 'activity'}
+			<Reveal preset="step" direction={tabDirection}>
+				{#key server.id}
+					<ActivityView initial={null} servers={null} serverId={server.id} />
+				{/key}
+			</Reveal>
 		{/if}
 	</Tabs.Content>
 	<Tabs.Content value="settings">

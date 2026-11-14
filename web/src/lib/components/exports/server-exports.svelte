@@ -21,6 +21,7 @@
 		createExport,
 		getStorage,
 		isAbortError,
+		isJobActive,
 		listExports,
 		waitForJob,
 		type ExportDestination,
@@ -57,6 +58,12 @@
 		selectionFocus?: number;
 		/** Opens the Files tab to pick paths. */
 		onChooseFiles?: () => void;
+		/** Export job of this server recovered after a reload; followed by the page. */
+		recoveredJob?: Job | null;
+		/** Failure of {@link recoveredJob}. */
+		recoveredError?: unknown;
+		/** Bumped when a recovered export finishes; reloads the archive list. */
+		archivesVersion?: number;
 		/** Injected in tests. */
 		jobIntervalMs?: number;
 	}
@@ -68,6 +75,9 @@
 		exporting = $bindable(false),
 		selectionFocus = 0,
 		onChooseFiles,
+		recoveredJob = null,
+		recoveredError = null,
+		archivesVersion = 0,
 		jobIntervalMs = 1000
 	}: Props = $props();
 	const pathsId = $props.id();
@@ -100,8 +110,14 @@
 
 	$effect(() => {
 		const id = serverId;
+		void archivesVersion;
 		untrack(() => load(id));
 	});
+
+	const recoveredActive = $derived(recoveredJob !== null && isJobActive(recoveredJob));
+	/** Local or recovered export in progress. */
+	const working = $derived(exporting || recoveredActive);
+	const shownJob = $derived(exporting ? job : recoveredActive ? recoveredJob : null);
 
 	async function load(id: string) {
 		loadError = null;
@@ -376,12 +392,26 @@
 			</Button>
 		</div>
 
-		{#if exporting}
+		{#if working}
 			<p class="flex items-center gap-2 px-4 py-2.5 text-sm" role="status" transition:collapse>
 				<Spinner class="size-3.5" />
-				<span>{job ? (job.state === 'queued' ? 'Queued' : 'Compressing') : 'Requesting'}</span>
-				{#if job?.message}<span class="truncate text-xs text-muted-foreground">{job.message}</span
+				<span
+					>{shownJob
+						? shownJob.state === 'queued'
+							? 'Queued'
+							: 'Compressing'
+						: 'Requesting'}</span
+				>
+				{#if shownJob?.message}<span class="truncate text-xs text-muted-foreground"
+						>{shownJob.message}</span
 					>{/if}
+				{#if !exporting && shownJob}
+					<a
+						href={resolve(`activity/${shownJob.id}`)}
+						class="ml-auto shrink-0 text-xs text-muted-foreground underline underline-offset-4"
+						>Started earlier · details</a
+					>
+				{/if}
 			</p>
 		{:else if completed}
 			<p
@@ -404,6 +434,16 @@
 		<div transition:collapse>
 			<ErrorAlert error={jobError}>
 				<p class="text-muted-foreground">Server files were not changed.</p>
+			</ErrorAlert>
+		</div>
+	{:else if recoveredError && recoveredJob && !exporting}
+		<div transition:collapse>
+			<ErrorAlert error={recoveredError}>
+				<p class="text-muted-foreground">Server files were not changed.</p>
+				<a
+					href={resolve(`activity/${recoveredJob.id}`)}
+					class="text-xs underline underline-offset-4">Job details in Activity</a
+				>
 			</ErrorAlert>
 		</div>
 	{/if}

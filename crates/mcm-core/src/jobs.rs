@@ -58,6 +58,8 @@ pub trait JobRepo: Send + Sync {
         &self,
         limit: u32,
         cursor: Option<&JobCursor>,
+        server_id: Option<&str>,
+        active_only: bool,
     ) -> Result<Vec<Job>, RepositoryError>;
     async fn recover(&self, finished_at: &str) -> Result<(), RepositoryError>;
 }
@@ -82,5 +84,14 @@ pub trait JobService: Send + Sync {
         task: JobTask,
     ) -> Result<Job, JobError>;
     async fn get(&self, id: &str) -> Result<Option<Job>, JobError>;
-    async fn list(&self, limit: u32, cursor: Option<&str>) -> Result<JobPage, JobError>;
+    async fn list(&self, limit: u32, cursor: Option<&str>) -> Result<JobPage, JobError> {
+        self.list_filtered(limit, cursor, None, false).await
+    }
+    async fn list_filtered(
+        &self,
+        limit: u32,
+        cursor: Option<&str>,
+        server_id: Option<&str>,
+        active_only: bool,
+    ) -> Result<JobPage, JobError>;
 }

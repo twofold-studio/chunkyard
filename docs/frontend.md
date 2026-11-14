@@ -83,11 +83,11 @@ For an opt-in production UI check using a real local Docker engine and an offici
 CHUNKYARD_TEST_LIVE_INSTALL=1 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/run/current-system/sw/bin/google-chrome-stable node scripts/smoke-ui.mjs
 ```
 
-With the flag, the smoke also exercises text editing, downloads, uploads, the unsaved-navigation guard and network settings against real APIs. Without it, a fixed version-list fixture and disabled Docker verify real create/install failure and same-record retry without upstream access. Leaving the creation page stops job tracking; installation continues on the backend, and the server detail page refreshes its saved installation state.
+With the flag, the smoke also exercises text editing, downloads, uploads, the unsaved-navigation guard and network settings against real APIs. Without it, a fixed version-list fixture and disabled Docker verify real create/install failure and same-record retry without upstream access. Leaving the creation page stops that page’s job tracking, while installation continues on the backend. Opening the server page discovers active jobs for that instance and follows their existing IDs without resubmitting work.
 
 ## Activity, selection exports and resource history
 
-Activity lists cursor-paged background jobs, filters the loaded records and refreshes active jobs while visible. Detail pages show safe summaries of known result fields; there is no raw JSON, cancellation or percentage progress. The sidebar indicator samples the newest 20 jobs on navigation and is not a live count of all history.
+Activity lists cursor-paged background jobs, filters the loaded records and refreshes active jobs while visible. Detail pages show safe summaries of known result fields; there is no raw JSON, cancellation or percentage progress. The sidebar indicator queries active jobs globally on navigation and when a job view observes a change; scoped views never replace the global count with their own. It has no independent polling timer.
 
 Files offers up to 100 selected file/folder paths per instance. Selecting a folder includes its contents. Export selected opens the existing Exports tab; a confirmation lists the paths and local/S3 destination before submitting the stopped-only export. Selections survive in-app navigation, but a reload clears them. Typed paths remain available.
 
@@ -98,3 +98,9 @@ Overview charts reuse the existing resource snapshot polling, hold at most 120 s
 Files and the Properties raw view load CodeMirror only when an editor opens, with a plain-textarea fallback if loading fails. Line numbers, undo/redo, find/replace, line/column status and JSON/YAML/TOML/properties/shell modes are available. Generic files still save explicitly with Ctrl/Command+S and etags; Properties keeps its autosave. BOM, line endings and a missing trailing newline survive edits; an untouched file is never rewritten. Edited mixed-ending files use their first line ending. Press Esc then Tab to move focus out of the editor.
 
 Console filtering and highlighting are local to the current buffer. Wrap and Follow controls change the view; scrolling up pauses following and offers Jump to latest. Copy and text download use the currently displayed lines, including an active filter, with at most 1,000 lines retained. Up/Down recalls at most 50 previously sent commands per instance in memory; recalling never sends a command. Nothing claims persisted log history or changes logs on the server.
+
+## Recovering ongoing work
+
+Server pages discover active jobs on entry, server switches and returning to a visible tab through the filtered jobs API. Installs reuse their panel, lifecycle work appears in the compact header, recovered exports block conflicting actions and refresh archives on completion, and recovered deletions leave the deleted instance. Failure links open Activity. A per-instance Activity tab provides server-filtered, cursor-paged history; state/type filters still apply only to loaded jobs.
+
+Recovered polling stops while hidden and resumes by job ID, so work that finished while hidden still reaches a terminal state. Jobs started locally retain their existing polling behavior. Local and recovered trackers share ownership bookkeeping; an existing tracker is not duplicated on visibility changes. See [the recovery contract](jobs-recovery-contract.md).

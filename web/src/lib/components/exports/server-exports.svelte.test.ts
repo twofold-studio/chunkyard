@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import ServerExports from './server-exports.svelte';
+import type { Job } from '#lib/api/index.js';
 import { exportSelection } from '#lib/exports/export-selection.svelte.js';
 
 type Reply = { status: number; body?: unknown };
@@ -33,7 +34,7 @@ const archive = (id: string, serverId = 'srv-1', destination = 'local') => ({
 	objectKey: destination === 's3' ? `survival-${id}.tar.gz` : null
 });
 
-const job = (state: string, extra: Record<string, unknown> = {}) => ({
+const job = (state: Job['state'], extra: Partial<Job> = {}): Job => ({
 	id: 'job-x',
 	kind: 'server.export',
 	serverId: 'srv-1',
@@ -243,5 +244,59 @@ describe('ServerExports', () => {
 			await page.getByRole('button', { name: 'Choose in Files' }).click();
 			expect(onChooseFiles).toHaveBeenCalledOnce();
 		});
+	});
+});
+
+describe('ServerExports recovered export', () => {
+	it('shows a recovered export as running, blocks a new one and reloads archives when done', async () => {
+		reply(
+			'GET',
+			'/api/v1/storage',
+			{ status: 200, body: storage(false) },
+			{ status: 200, body: storage(false) }
+		);
+		reply(
+			'GET',
+			'/api/v1/exports',
+			{ status: 200, body: { items: [] } },
+			{ status: 200, body: { items: [archive('a1')] } }
+		);
+		const running = job('running', { id: 'job-r', message: 'Compressing world' });
+		const view = render(ServerExports, {
+			serverId: 'srv-1',
+			serverState: 'stopped',
+			busy: true,
+			recoveredJob: running,
+			archivesVersion: 0
+		});
+		await expect.element(page.getByText('Compressing world')).toBeVisible();
+		await expect.element(exportButton()).toBeDisabled();
+		const details = page.getByRole('link', { name: /Started earlier/ });
+		expect(details.element().getAttribute('href')).toMatch(/\/activity\/job-r$/);
+		expect(calls.some((c) => c.method === 'POST')).toBe(false);
+
+		await view.rerender({
+			busy: false,
+			recoveredJob: job('succeeded', { id: 'job-r' }),
+			archivesVersion: 1
+		});
+		await expect.element(page.getByText('survival-a1.tar.gz')).toBeVisible();
+		expect(calls.filter((c) => c.path === '/api/v1/exports')).toHaveLength(2);
+		expect(calls.some((c) => c.method === 'POST')).toBe(false);
+	});
+
+	it('shows a recovered failure with its Activity link', async () => {
+		reply('GET', '/api/v1/storage', { status: 200, body: storage(false) });
+		reply('GET', '/api/v1/exports', { status: 200, body: { items: [] } });
+		const failure = { code: 'job.interrupted', detail: 'The manager restarted during the export.' };
+		render(ServerExports, {
+			serverId: 'srv-1',
+			serverState: 'stopped',
+			recoveredJob: job('failed', { id: 'job-f', error: failure }),
+			recoveredError: failure
+		});
+		await expect.element(page.getByText('The manager restarted during the export.')).toBeVisible();
+		const link = page.getByRole('link', { name: 'Job details in Activity' });
+		expect(link.element().getAttribute('href')).toMatch(/\/activity\/job-f$/);
 	});
 });

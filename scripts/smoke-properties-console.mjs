@@ -1,7 +1,8 @@
 // Real Rust SPA/API + disposable Docker console fixture. Never starts Minecraft.
 import { createRequire } from "node:module";
 import { spawn, execFileSync } from "node:child_process";
-import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, rm, open } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { createServer } from "node:net";
@@ -357,6 +358,26 @@ try {
   await page.getByRole("link", { name: "Storage & exports", exact: true }).click();
   await page.getByRole("heading", { name: "Storage & exports", exact: true }).waitFor();
   await page.getByText(second.name, { exact: true }).first().waitFor();
+  // Hold a real export long enough to return to its page and recover its durable job.
+  // Random bytes avoid a trivial all-zero compression shortcut; only temporary data is used.
+  const recoveryFile=await open(resolve(second.directory,"recovery-fixture.bin"),"w");
+  try {
+    const block=randomBytes(8*1024*1024);
+    for(let i=0;i<32;i++) await recoveryFile.writeFile(block);
+  } finally { await recoveryFile.close(); }
+  const recovering=(await api(`/api/v1/servers/${second.id}/exports`,"POST",{scope:"selected",destination:"local",paths:["recovery-fixture.bin"]})).job;
+  const discovered=page.waitForResponse(r=>r.url().includes("/api/v1/jobs?") && new URL(r.url()).searchParams.get("serverId")===second.id && new URL(r.url()).searchParams.get("activeOnly")==="true");
+  await page.goto(`${base}/servers/${second.id}`);
+  const activePage=await (await discovered).json();
+  assert(activePage.items.some(job=>job.id===recovering.id));
+  await page.locator("header").getByText(/Exporting/).waitFor();
+  assert.equal(await page.getByRole("button",{name:"Delete",exact:true}).isDisabled(),true);
+  await page.getByRole("tab",{name:"Activity",exact:true}).click();
+  await page.locator(`a[href="/activity/${recovering.id}"]`).getByText("Succeeded",{exact:true}).waitFor({timeout:90000});
+  const completed=await api(`/api/v1/jobs/${recovering.id}`);
+  assert.equal(completed.state,"succeeded");
+  assert((await api("/api/v1/exports")).items.some(item=>item.id===completed.result.id));
+  console.log("PASS: real filtered active-job lookup, recovery after navigation, mutation guard and per-instance Activity completion");
   await page.goto(`${base}/java`);
   assert.equal(
     await page

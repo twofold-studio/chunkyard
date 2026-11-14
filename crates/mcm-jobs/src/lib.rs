@@ -111,7 +111,13 @@ impl JobService for JobManager {
     async fn get(&self, id: &str) -> Result<Option<Job>, JobError> {
         Ok(self.repo.get(id).await?)
     }
-    async fn list(&self, limit: u32, cursor: Option<&str>) -> Result<JobPage, JobError> {
+    async fn list_filtered(
+        &self,
+        limit: u32,
+        cursor: Option<&str>,
+        server_id: Option<&str>,
+        active_only: bool,
+    ) -> Result<JobPage, JobError> {
         use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
         let cursor: Option<JobCursor> = cursor
             .map(|value| {
@@ -130,7 +136,10 @@ impl JobService for JobManager {
             })
             .transpose()?;
         let limit = limit.clamp(1, 200) as usize;
-        let mut items = self.repo.list(limit as u32 + 1, cursor.as_ref()).await?;
+        let mut items = self
+            .repo
+            .list(limit as u32 + 1, cursor.as_ref(), server_id, active_only)
+            .await?;
         let next_cursor = if items.len() > limit {
             items.truncate(limit);
             items

@@ -33,28 +33,44 @@
 
 	interface Props {
 		initial: JobPage | null;
+		/**
+		 * Server-scoped history: pages are requested with `serverId`, the server filter is
+		 * hidden and rows omit the server name. Without it the view lists every job.
+		 */
+		serverId?: string;
 		/** Existing servers (names for display). `null` when the list could not be loaded. */
 		servers: { id: string; name: string }[] | null;
 		/** Injected in tests. */
 		feedOptions?: JobsFeedOptions;
 	}
 
-	let { initial, servers, feedOptions = {} }: Props = $props();
+	let { initial, servers, serverId, feedOptions = {} }: Props = $props();
 
+	const scope = untrack(() => serverId);
+	/** Reports active-job changes so the shell re-checks the global count; never the count itself. */
+	const source = scope ? `server:${scope}` : 'activity';
 	const feed = new JobsFeed(
 		untrack(() => initial),
 		untrack(() => ({
 			...feedOptions,
+			filter: scope ? { serverId: scope } : undefined,
 			onChange: (items) => {
-				activityIndicator.observe(items);
+				activityIndicator.observe(source, items);
 				feedOptions.onChange?.(items);
 			}
 		}))
 	);
-	activityIndicator.observe(feed.items);
+	activityIndicator.observe(source, feed.items);
 	$effect(() => {
-		feed.start();
-		return () => feed.destroy();
+		// Untracked: a re-run would destroy the feed. Server-scoped views fetch their first page here.
+		untrack(() => {
+			if (!feed.loaded) void feed.refresh();
+			feed.start();
+		});
+		return () => {
+			feed.destroy();
+			activityIndicator.forget(source);
+		};
 	});
 
 	let filters = $state<JobFilters>({ ...DEFAULT_FILTERS });
@@ -108,20 +124,22 @@
 
 <div class="flex flex-col gap-3">
 	<div class="flex flex-wrap items-center gap-2" role="group" aria-label="Filter loaded jobs">
-		<Select.Root type="single" bind:value={filters.server}>
-			<Select.Trigger size="sm" class="h-8 max-w-56 text-xs" aria-label="Filter by server">
-				<span class="truncate">{serverLabel}</span>
-			</Select.Trigger>
-			<Select.Content>
-				<Select.Item value="all" label="Any server">Any server</Select.Item>
-				{#if hasUnscoped}
-					<Select.Item value="none" label="Manager (no server)">Manager (no server)</Select.Item>
-				{/if}
-				{#each serverOptions as option (option.id)}
-					<Select.Item value={option.id} label={option.label}>{option.label}</Select.Item>
-				{/each}
-			</Select.Content>
-		</Select.Root>
+		{#if !scope}
+			<Select.Root type="single" bind:value={filters.server}>
+				<Select.Trigger size="sm" class="h-8 max-w-56 text-xs" aria-label="Filter by server">
+					<span class="truncate">{serverLabel}</span>
+				</Select.Trigger>
+				<Select.Content>
+					<Select.Item value="all" label="Any server">Any server</Select.Item>
+					{#if hasUnscoped}
+						<Select.Item value="none" label="Manager (no server)">Manager (no server)</Select.Item>
+					{/if}
+					{#each serverOptions as option (option.id)}
+						<Select.Item value={option.id} label={option.label}>{option.label}</Select.Item>
+					{/each}
+				</Select.Content>
+			</Select.Root>
+		{/if}
 		<Select.Root type="single" bind:value={filters.state}>
 			<Select.Trigger size="sm" class="h-8 text-xs" aria-label="Filter by state">
 				{stateLabel}
@@ -186,13 +204,23 @@
 		<ErrorAlert error={feed.error} />
 	{/if}
 
-	{#if feed.items.length === 0}
+	{#if !feed.loaded && !feed.error}
+		<p
+			class="flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-8 text-sm text-muted-foreground"
+			role="status"
+		>
+			<Spinner class="size-4" />
+			Loading jobs…
+		</p>
+	{:else if feed.items.length === 0}
 		<Empty.Root class="rounded-lg border border-border py-12">
 			<Empty.Header>
 				<Empty.Media variant="icon"><HistoryIcon /></Empty.Media>
-				<Empty.Title>No jobs yet</Empty.Title>
+				<Empty.Title>{scope ? 'No jobs for this server yet' : 'No jobs yet'}</Empty.Title>
 				<Empty.Description>
-					Installs, starts, stops, exports and Java downloads appear here as they run.
+					{scope
+						? 'Installs, starts, stops and exports of this server appear here as they run.'
+						: 'Installs, starts, stops, exports and Java downloads appear here as they run.'}
 				</Empty.Description>
 			</Empty.Header>
 		</Empty.Root>
@@ -220,8 +248,10 @@
 								<JobStateBadge state={job.state} />
 							</div>
 							<p class="flex min-w-0 flex-wrap gap-x-1.5 text-xs text-muted-foreground">
-								<span class="truncate">{serverName(job.serverId)}</span>
-								<span aria-hidden="true">·</span>
+								{#if !scope}
+									<span class="truncate">{serverName(job.serverId)}</span>
+									<span aria-hidden="true">·</span>
+								{/if}
 								<time datetime={job.createdAt} title={formatJobTime(job.createdAt)}
 									>{formatRelative(job.createdAt, now)}</time
 								>

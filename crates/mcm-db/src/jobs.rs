@@ -61,19 +61,35 @@ impl JobRepo for SqliteJobRepo {
         &self,
         limit: u32,
         cursor: Option<&JobCursor>,
+        server_id: Option<&str>,
+        active_only: bool,
     ) -> Result<Vec<Job>, RepositoryError> {
-        let rows: Vec<String> = if let Some(cursor) = cursor {
-            sqlx::query_scalar("SELECT document FROM jobs WHERE (created_at, id) < (?, ?) ORDER BY created_at DESC, id DESC LIMIT ?")
-                .bind(&cursor.created_at).bind(&cursor.id).bind(limit.min(201)).fetch_all(&self.pool).await.map_err(storage)?
-        } else {
-            sqlx::query_scalar(
-                "SELECT document FROM jobs ORDER BY created_at DESC, id DESC LIMIT ?",
-            )
-            .bind(limit.min(201))
+        let mut query =
+            sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT document FROM jobs WHERE 1=1");
+        if let Some(id) = server_id {
+            query
+                .push(" AND json_extract(document, '$.serverId') = ")
+                .push_bind(id);
+        }
+        if active_only {
+            query.push(" AND state IN ('queued', 'running')");
+        }
+        if let Some(cursor) = cursor {
+            query
+                .push(" AND (created_at, id) < (")
+                .push_bind(&cursor.created_at)
+                .push(", ")
+                .push_bind(&cursor.id)
+                .push(")");
+        }
+        query
+            .push(" ORDER BY created_at DESC, id DESC LIMIT ")
+            .push_bind(limit.min(201));
+        let rows: Vec<String> = query
+            .build_query_scalar()
             .fetch_all(&self.pool)
             .await
-            .map_err(storage)?
-        };
+            .map_err(storage)?;
         rows.iter()
             .map(|s| serde_json::from_str(s).map_err(storage))
             .collect()

@@ -61,7 +61,7 @@ Sessions use a 32-byte random token; only SHA-256 is stored. Cookies are HttpOnl
 | POST | `/api/v1/java/runtimes/discover` | `{items: JavaRuntime[]}` |
 | GET | `/api/v1/java/available` | `{lts: number[], all: number[], mostRecentLts: number}` |
 | POST | `/api/v1/java/runtimes/install` | 202 `{job}`; body `{major: number}` |
-| GET | `/api/v1/jobs?limit=50&cursor=...` | `{items: Job[], nextCursor: string | null}`; max limit 200 |
+| GET | `/api/v1/jobs?limit=50&cursor=...&serverId=...&activeOnly=true` | `{items: Job[], nextCursor: string | null}`; max limit 200; optional server UUID / queued-running filters |
 | GET | `/api/v1/jobs/{id}` | `Job` |
 
 When authentication is enabled, setup, token verification, login, health, setup status, and the optional version/changelog metadata are public. The remaining endpoints require the owner session. Before setup, protected endpoints return 503 `setup_required`. Errors use `application/problem+json`, with stable `code` and sanitized `detail`. JSON bodies are limited to 1 MiB, except the editor's 8 MiB envelope for escaped text up to 1 MiB. API responses include no-store, a restrictive CSP, security headers, and a generated request ID. Static UI pages have a separate page CSP and assets have cache policies; see [frontend hosting](frontend.md). Unknown `/api` routes return JSON problem responses even when UI hosting is enabled.
@@ -121,7 +121,7 @@ Server lifecycle and console routes are documented in [docker.md](docker.md). Th
 
 ## Version badge and changelog
 
-`GET /api/v1/system/version` returns `{enabled:true, version:"0.6.0", channel:"development"}` for the current build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
+`GET /api/v1/system/version` returns `{enabled:true, version:"0.7.0", channel:"development"}` for the current build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
 
 `[http] show_version = true` is the default. Set `CHUNKYARD_HTTP__SHOW_VERSION=false`, restart/redeploy, and reload the page to hide the badge: version metadata then returns `{enabled:false, version:null, channel:null}`, and the changelog endpoint returns 404 `version.disabled`. The UI fetches changelog content only when the modal opens. Completed, verified milestones batch notes and bump the project version under the authorized [changelog workflow](changelog.md); in-progress changes remain Unreleased.
 
