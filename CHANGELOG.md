@@ -4,6 +4,14 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## 0.6.0 - 2026-11-14
+
+
+### Added
+
+- Frontend: the Files editor and the Properties raw view use a lazily loaded CodeMirror editor with line numbers, undo/redo, find/replace, line/column status and JSON, YAML, TOML, properties and shell highlighting. Saves keep the file's line endings, BOM and trailing newline; unchanged files are never rewritten; read-only, stopped-only and etag conflict rules are unchanged.
+- Frontend: leaving a server page, or opening another file, with unsaved Files editor changes asks to stay or discard in an in-app dialog instead of a browser prompt; tab switches keep edits and Properties autosave still flushes on navigation.
+- Frontend: the Console has a view-only filter with match highlighting, wrap and follow toggles with a paused/jump-to-latest indicator, copy and plain-text download of the lines held in the browser, and per-server Up/Down recall of commands sent from the current tab.
 ## 0.5.0 - 2026-11-14
 
 

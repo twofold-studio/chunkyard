@@ -15,7 +15,7 @@
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { ErrorAlert } from '#lib/components/app/index.js';
 	import { isAbortError, type ServerState } from '#lib/api/index.js';
-	import { detectEol } from '#lib/files/properties.js';
+	import CodeEditor from '#lib/components/editor/code-editor.svelte';
 	import {
 		PropertiesStore,
 		type PropertiesStoreOptions
@@ -124,8 +124,6 @@
 
 	const running = $derived(serverState === 'running');
 	const doc = $derived(store.doc);
-	const fileEol = $derived(detectEol(store.saved));
-	const withFileEol = (text: string) => (fileEol === '\n' ? text : text.replace(/\n/g, fileEol));
 	const restoreBlocked = $derived(store.pending || store.saving || store.conflict);
 
 	const appliedText = $derived.by(() => {
@@ -137,14 +135,6 @@
 			return `Running v${doc.appliedVersion} · restart to apply v${doc.version}`;
 		return `Running v${doc.appliedVersion}`;
 	});
-
-	function onRawKeydown(event: KeyboardEvent) {
-		const mod = event.ctrlKey || event.metaKey;
-		if (mod && (event.key === 'Enter' || event.key.toLowerCase() === 's')) {
-			event.preventDefault();
-			void store.flush();
-		}
-	}
 
 	function onbeforeunload(event: BeforeUnloadEvent) {
 		// Only a real page unload can lose a queued save; in-app navigation flushes it.
@@ -304,14 +294,15 @@
 						onChange={() => {}}
 					/>
 				{:else}
-					<textarea
-						value={viewing.content.replace(/\r\n?/g, '\n')}
-						readonly
-						spellcheck={false}
-						wrap="off"
-						aria-label={`Contents of version ${viewing.version}`}
-						class="block min-h-96 w-full resize-y rounded-lg border border-border bg-background p-4 font-mono text-[13px] leading-relaxed text-muted-foreground outline-none"
-					></textarea>
+					<div class="overflow-hidden rounded-lg border border-border bg-background">
+						<CodeEditor
+							value={viewing.content}
+							language="properties"
+							readOnly
+							label={`Contents of version ${viewing.version}`}
+							class="h-[min(70vh,40rem)]"
+						/>
+					</div>
 				{/if}
 			{:else if viewError}
 				<ErrorAlert error={viewError} />
@@ -327,19 +318,18 @@
 				/>
 			{:else}
 				<div class="overflow-hidden rounded-lg border border-border bg-background">
-					<textarea
-						value={store.content.replace(/\r\n?/g, '\n')}
-						oninput={(event) => store.edit(withFileEol(event.currentTarget.value))}
-						onkeydown={onRawKeydown}
-						readonly={!store.editable}
-						spellcheck={false}
-						autocomplete="off"
-						autocapitalize="off"
-						wrap="off"
-						aria-label="Contents of server.properties"
-						class="block min-h-96 w-full resize-y bg-transparent p-4 font-mono text-[13px] leading-relaxed outline-none read-only:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/40"
-						style:height="min(70vh, {Math.max(24, store.content.split('\n').length + 2) * 1.625}em)"
-					></textarea>
+					<CodeEditor
+						value={store.content}
+						onChange={(next) => store.edit(next)}
+						language="properties"
+						readOnly={!store.editable}
+						label="Contents of server.properties"
+						shortcuts={[
+							{ key: 'Mod-Enter', run: () => void store.flush() },
+							{ key: 'Mod-s', run: () => void store.flush() }
+						]}
+						class="h-[min(70vh,40rem)]"
+					/>
 					<p class="border-t border-border px-4 py-2 text-xs text-muted-foreground">
 						Saves after a pause · Ctrl/⌘ + Enter saves now
 					</p>

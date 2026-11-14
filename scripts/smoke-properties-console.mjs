@@ -202,6 +202,15 @@ try {
   document = await api(route);
   assert.equal(document.appliedVersion, appliedBeforeRestore);
   assert.equal(document.restartRequired, true);
+  await page.getByRole("button", {name:"Raw text",exact:true}).click();
+  const rawProperties=page.getByRole("textbox",{name:"Contents of server.properties",exact:true});
+  await rawProperties.fill("# raw CodeMirror integration\nmotd=Raw autosave\n");
+  const rawSaved=page.waitForResponse(r=>r.url().endsWith(route) && r.request().method()==="PUT");
+  await rawProperties.press("ControlOrMeta+s");
+  assert.equal((await rawSaved).status(),200);
+  const rawEol=document.content.includes("\r\n") ? "\r\n" : "\n";
+  assert.equal((await api(route)).content,`# raw CodeMirror integration${rawEol}motd=Raw autosave${rawEol}`);
+  await page.getByRole("button",{name:"Form",exact:true}).click();
   const socketOpened = page.waitForEvent("websocket");
   await page.getByRole("tab", { name: "Console", exact: true }).click();
   const socket = await socketOpened;
@@ -218,6 +227,22 @@ try {
   await page
     .getByText(/command: say streamed-through-real-websocket/)
     .waitFor();
+  const commandInput=page.getByLabel("Console command",{exact:true});
+  await commandInput.press("ArrowUp");
+  assert.equal(await commandInput.inputValue(),"say streamed-through-real-websocket");
+  await commandInput.press("ArrowDown");
+  const consoleFilter=page.getByLabel("Filter console output",{exact:true});
+  await consoleFilter.fill("streamed-through-real-websocket");
+  const log=page.getByRole("log",{name:"Server console",exact:true});
+  assert.match(await log.innerText(),/streamed-through-real-websocket/);
+  assert.doesNotMatch(await log.innerText(),/Done/);
+  await page.context().grantPermissions(["clipboard-read","clipboard-write"],{origin:base});
+  await page.getByRole("button",{name:"Copy",exact:true}).click();
+  assert.match(await page.evaluate(()=>navigator.clipboard.readText()),/streamed-through-real-websocket/);
+  const consoleDownload=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Download",exact:true}).click();
+  assert.match(await readFile(await (await consoleDownload).path(),"utf8"),/streamed-through-real-websocket/);
+  await consoleFilter.press("Escape");
   await page.getByRole("tab", { name: "Overview", exact: true }).click();
   await page
     .getByRole("combobox", { name: "Metrics refresh interval", exact: true })
@@ -239,7 +264,8 @@ try {
     .getByRole("heading", { name: "Java runtimes", exact: true })
     .waitFor();
   assert.match((await api(route)).content, /Flushed before navigation/);
-  await page.goto(`${base}/servers/${second.id}`);
+  await page.getByRole("link",{name:"Servers",exact:true}).click();
+  await page.locator(`a[href="/servers/${second.id}"]`).first().click();
   await page
     .locator("header")
     .getByRole("heading", { name: "Second UI fixture", exact: true })
@@ -284,8 +310,30 @@ try {
   const attachment = await page.request.get(`${base}/api/v1/exports/${exported.id}/download`);
   assert.equal(attachment.status(), 200);
   assert.equal((await attachment.body()).length, exported.size);
-  await api(`/api/v1/servers/${second.id}/files/content?path=selected-marker.txt`, "PUT", {content:"Selected export integration marker\n",etag:null});
+  await api(`/api/v1/servers/${second.id}/files/content?path=selected-marker.txt`, "PUT", {content:"\ufeffSelected export integration marker\r\n",etag:null});
   await page.getByRole("tab", { name: "Files", exact: true }).click();
+  await page.getByRole("button",{name:"selected-marker.txt",exact:true}).click();
+  const fileEditor=page.getByRole("textbox",{name:"Contents of selected-marker.txt",exact:true});
+  await fileEditor.fill("Unsaved CodeMirror edit\n");
+  await page.getByRole("tab",{name:"Overview",exact:true}).click();
+  await page.getByRole("tab",{name:/^Files\b/}).click();
+  assert.equal(await page.getByRole("alertdialog").count(),0);
+  await page.getByRole("link",{name:"Java runtimes",exact:true}).click();
+  await page.getByRole("alertdialog").getByRole("button",{name:"Stay",exact:true}).click();
+  assert.equal(new URL(page.url()).pathname,`/servers/${second.id}`);
+  const fileSaved=page.waitForResponse(r=>r.url().includes("/files/content?") && r.request().method()==="PUT");
+  await fileEditor.press("ControlOrMeta+s");
+  assert.equal((await fileSaved).status(),200);
+  assert.equal((await api(`/api/v1/servers/${second.id}/files/content?path=selected-marker.txt`)).content,"\ufeffUnsaved CodeMirror edit\r\n");
+  await fileEditor.fill("Discard this edit\n");
+  await page.evaluate(()=>history.back());
+  await page.getByRole("alertdialog").getByRole("button",{name:"Stay",exact:true}).click();
+  await page.waitForFunction(id=>location.pathname===`/servers/${id}`,second.id);
+  await page.evaluate(()=>history.back());
+  await page.getByRole("alertdialog").getByRole("button",{name:"Discard and leave",exact:true}).click();
+  await page.getByRole("heading",{name:"Servers",exact:true}).waitFor();
+  await page.goto(`${base}/servers/${second.id}?tab=files`);
+  await page.getByRole("checkbox",{name:"Select selected-marker.txt for export",exact:true}).waitFor();
   await page.getByRole("checkbox", {name:"Select selected-marker.txt for export",exact:true}).click();
   await page.getByRole("button", {name:"Export selected",exact:true}).click();
   await page.getByRole("list", {name:"Paths selected in Files",exact:true}).getByText("selected-marker.txt",{exact:true}).waitFor();

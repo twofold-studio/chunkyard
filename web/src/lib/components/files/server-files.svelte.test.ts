@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import ServerFiles from './server-files.svelte';
+import { editorDoc, setEditorDoc } from '#lib/components/editor/test-utils.js';
 import { exportSelection } from '#lib/exports/export-selection.svelte.js';
 
 type Reply = { status: number; body?: unknown };
@@ -181,10 +182,10 @@ describe('ServerFiles', () => {
 		reply('PUT', `${BASE}/content?${q('server.properties')}`, problem(409, 'files.conflict'));
 		setup();
 		await page.getByRole('button', { name: 'server.properties', exact: true }).first().click();
-		const editor = page.getByLabelText('Contents of server.properties');
-		await expect.element(editor).toHaveValue('motd=A\n');
+		const label = 'Contents of server.properties';
+		await vi.waitFor(() => expect(editorDoc(label)).toBe('motd=A\n'));
 		await expect.element(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-		await editor.fill('motd=B\n');
+		setEditorDoc(label, 'motd=B\n');
 		await expect.element(page.getByText('Unsaved')).toBeVisible();
 		await page.getByRole('button', { name: 'Save', exact: true }).click();
 		await expect.element(page.getByText(/^Saved/)).toBeVisible();
@@ -193,13 +194,13 @@ describe('ServerFiles', () => {
 			body: { content: 'motd=B\n', etag: 'e1' }
 		});
 
-		await editor.fill('motd=C\n');
+		setEditorDoc(label, 'motd=C\n');
 		await page.getByRole('button', { name: 'Save', exact: true }).click();
 		await expect.element(page.getByText('This file changed since you opened it')).toBeVisible();
 		expect(mutations()[1].body).toEqual({ content: 'motd=C\n', etag: 'e2' });
 		// Further saves are blocked and local edits stay until the owner reloads.
 		await expect.element(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-		await expect.element(editor).toHaveValue('motd=C\n');
+		expect(editorDoc(label)).toBe('motd=C\n');
 	});
 
 	it('opens server.properties on request from Settings', async () => {
@@ -217,9 +218,35 @@ describe('ServerFiles', () => {
 			})
 		);
 		setup({ openRequest: { path: 'server.properties', nonce: 1 } });
-		await expect
-			.element(page.getByLabelText('Contents of server.properties'))
-			.toHaveValue('pvp=true\n');
+		await vi.waitFor(() => expect(editorDoc('Contents of server.properties')).toBe('pvp=true\n'));
+	});
+
+	it('asks before opening another file over unsaved edits: stay keeps them, discard opens', async () => {
+		reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES)));
+		const content = (path: string, text: string) =>
+			reply(
+				'GET',
+				`${BASE}/content?${q(path)}`,
+				ok({ path, content: text, etag: 'e', size: text.length, readOnly: false, canWrite: true })
+			);
+		content('server.properties', 'pvp=true\n');
+		content('ops.json', '[]\n');
+		const view = setup({ openRequest: { path: 'server.properties', nonce: 1 } });
+		const label = 'Contents of server.properties';
+		await vi.waitFor(() => expect(editorDoc(label)).toBe('pvp=true\n'));
+		setEditorDoc(label, 'pvp=false\n');
+		await view.rerender({ openRequest: { path: 'ops.json', nonce: 2 } });
+		const dialog = page.getByRole('alertdialog', { name: 'Open another file?' });
+		await expect.element(dialog).toBeVisible();
+		await page.getByRole('button', { name: 'Keep editing' }).click();
+		await expect.element(dialog).not.toBeInTheDocument();
+		expect(editorDoc(label)).toBe('pvp=false\n');
+
+		await view.rerender({ openRequest: { path: 'ops.json', nonce: 3 } });
+		await page.getByRole('button', { name: 'Discard and open' }).click();
+		await vi.waitFor(() => expect(editorDoc('Contents of ops.json')).toBe('[]\n'));
+		await expect.element(page.getByText('Unsaved')).not.toBeInTheDocument();
+		expect(mutations()).toHaveLength(0);
 	});
 
 	it('sends server.properties to the Properties tab when one is provided', async () => {

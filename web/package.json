@@ -1,6 +1,6 @@
 {
 	"name": "chunkyard-web",
-	"version": "0.5.0",
+	"version": "0.6.0",
 	"private": true,
 	"type": "module",
 	"imports": {
@@ -20,9 +20,17 @@
 		"test": "npm run test:unit -- --run"
 	},
 	"devDependencies": {
+		"@codemirror/commands": "^6.11.1",
+		"@codemirror/lang-json": "^6.0.2",
+		"@codemirror/language": "^6.13.1",
+		"@codemirror/legacy-modes": "^6.5.5",
+		"@codemirror/search": "^6.7.2",
+		"@codemirror/state": "^6.7.6",
+		"@codemirror/view": "^6.43.15",
 		"@eslint/js": "^10.0.1",
 		"@fontsource-variable/inter": "^5.3.0",
 		"@internationalized/date": "^3.12.4",
+		"@lezer/highlight": "^1.2.5",
 		"@lucide/svelte": "^1.72.0",
 		"@sveltejs/adapter-static": "^4.0.0",
 		"@sveltejs/kit": "^3.0.0",

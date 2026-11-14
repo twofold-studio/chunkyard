@@ -11,3 +11,4 @@ export type { Crumb } from './types';
 export { default as AddTile } from './add-tile.svelte';
 export { default as VersionBadge } from './version-badge.svelte';
 export { TopbarSlot, provideTopbarSlot, useTopbarContent } from './topbar-context.svelte.js';
+export { default as UnsavedChangesDialog } from './unsaved-changes-dialog.svelte';

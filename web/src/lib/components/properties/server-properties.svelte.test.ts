@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
+import { editorDoc, setEditorDoc } from '#lib/components/editor/test-utils.js';
 import ServerProperties from './server-properties.svelte';
 import { ApiError, type PropertiesDocument, type ServerState } from '#lib/api/index.js';
 import type { PropertiesApi } from '#lib/properties/properties-store.svelte.js';
@@ -153,10 +154,10 @@ describe('Properties tab', () => {
 		await page.getByRole('option', { name: 'On', exact: true }).click();
 		await vi.waitFor(() => expect(api.saveProperties).toHaveBeenCalledOnce());
 		await page.getByRole('button', { name: 'Raw text' }).click();
-		const area = page.getByLabelText('Contents of server.properties');
+		const label = 'Contents of server.properties';
 		const lf = `${FILE}hardcore=true\r\n`.replace(/\r\n/g, '\n');
-		await expect.element(area).toHaveValue(lf);
-		await area.fill(`${lf}difficulty=hard\n`);
+		await vi.waitFor(() => expect(editorDoc(label)).toBe(lf));
+		setEditorDoc(label, `${lf}difficulty=hard\n`);
 		await vi.waitFor(() => expect(api.saveProperties).toHaveBeenCalledTimes(2));
 		expect(lastSaved(api).content).toBe(`${FILE}hardcore=true\r\ndifficulty=hard\r\n`);
 		await page.getByRole('button', { name: 'Form' }).click();
@@ -220,8 +221,8 @@ describe('Properties tab', () => {
 		setup({ content: 'motd=bad \\uZZZZ\r\npvp=true\r\n' });
 		await expect.element(page.getByLabelText('Message of the day')).toBeDisabled();
 		await page.getByRole('button', { name: 'Edit as raw text' }).click();
-		await expect
-			.element(page.getByLabelText('Contents of server.properties'))
-			.toHaveValue('motd=bad \\uZZZZ\npvp=true\n');
+		await vi.waitFor(() =>
+			expect(editorDoc('Contents of server.properties')).toBe('motd=bad \\uZZZZ\npvp=true\n')
+		);
 	});
 });

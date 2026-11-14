@@ -71,7 +71,7 @@ Properties provides a searchable grouped form and a raw-text view. Booleans, cho
 
 Files supports breadcrumbs, sorting/filtering, new files/folders, uploads, downloads, rename/move/copy and confirmed permanent deletion. Generic file mutations require a stopped instance; `server.properties` opens the dedicated versioned Properties tab. Upload conflicts require explicit replacement. Text saves use the last-read etag and stop on conflicts. Limits and protected paths are described in [instance files](http-api.md#instance-files).
 
-Editors remain mounted across management tabs. The generic file editor asks before discarding unsaved edits; Properties autosaves without that prompt. Uploads run sequentially and cancel when leaving the instance page. Downloads are single files; folder ZIP, resumable uploads and syntax highlighting are not implemented.
+Editors remain mounted across management tabs. The generic file editor uses a reusable in-app Stay/Discard dialog when closing dirty content, choosing another file or leaving the instance; tab switches preserve edits without a prompt. Properties autosaves and flushes before navigation. Uploads run sequentially and cancel when leaving the instance page. Downloads are single files; folder ZIP and resumable uploads are not implemented.
 
 Resources has a refresh preference for Off, 1, 2, 5, 10, 30 or 60 seconds. It is saved in this browser and reused across instances. Polls never overlap and pause when hidden. Off retains the last snapshot and supports manual Refresh.
 
@@ -92,3 +92,9 @@ Activity lists cursor-paged background jobs, filters the loaded records and refr
 Files offers up to 100 selected file/folder paths per instance. Selecting a folder includes its contents. Export selected opens the existing Exports tab; a confirmation lists the paths and local/S3 destination before submitting the stopped-only export. Selections survive in-app navigation, but a reload clears them. Typed paths remain available.
 
 Overview charts reuse the existing resource snapshot polling, hold at most 120 samples, and break lines for missing samples and pauses. This is temporary history collected while Overview is open, not stored backend history. Leaving Overview resets the charts. See [implementation status](implementation-status.md) for remaining monitoring and backup work.
+
+## Code editing and console tools
+
+Files and the Properties raw view load CodeMirror only when an editor opens, with a plain-textarea fallback if loading fails. Line numbers, undo/redo, find/replace, line/column status and JSON/YAML/TOML/properties/shell modes are available. Generic files still save explicitly with Ctrl/Command+S and etags; Properties keeps its autosave. BOM, line endings and a missing trailing newline survive edits; an untouched file is never rewritten. Edited mixed-ending files use their first line ending. Press Esc then Tab to move focus out of the editor.
+
+Console filtering and highlighting are local to the current buffer. Wrap and Follow controls change the view; scrolling up pauses following and offers Jump to latest. Copy and text download use the currently displayed lines, including an active filter, with at most 1,000 lines retained. Up/Down recalls at most 50 previously sent commands per instance in memory; recalling never sends a command. Nothing claims persisted log history or changes logs on the server.

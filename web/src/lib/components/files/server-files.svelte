@@ -37,7 +37,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
-	import { ErrorAlert } from '#lib/components/app/index.js';
+	import { ErrorAlert, UnsavedChangesDialog } from '#lib/components/app/index.js';
 	import { Reveal } from '#lib/components/motion/index.js';
 	import { collapse } from '#lib/motion/index.js';
 	import FileEditor from './file-editor.svelte';
@@ -245,13 +245,15 @@
 		}
 		if (editing === target) return;
 		if (editing && dirty) {
-			toast.warning('Save or discard your changes first', {
-				description: `${baseName(editing)} has unsaved changes.`
-			});
+			// Ask first; the current editor stays open (with its edits) until the user decides.
+			pendingOpen = target;
 			return;
 		}
 		editing = target;
 	}
+
+	/** Another file was chosen while the editor holds unsaved changes. */
+	let pendingOpen = $state<string | null>(null);
 
 	function openEntry(entry: FileEntry) {
 		if (entry.kind === 'directory') return navigate(entry.path);
@@ -415,6 +417,27 @@
 		return FileIcon;
 	}
 </script>
+
+<UnsavedChangesDialog
+	open={pendingOpen !== null}
+	title="Open another file?"
+	stayLabel="Keep editing"
+	discardLabel="Discard and open"
+	onStay={() => (pendingOpen = null)}
+	onDiscard={() => {
+		const target = pendingOpen;
+		pendingOpen = null;
+		if (!target) return;
+		dirty = false;
+		editing = target;
+	}}
+>
+	{#snippet description()}
+		Your edits to <code class="font-mono">{baseName(editing ?? '')}</code> have not been saved.
+		Opening
+		<code class="font-mono">{baseName(pendingOpen ?? '')}</code> discards them.
+	{/snippet}
+</UnsavedChangesDialog>
 
 {#if editing}
 	{#key editing}

@@ -11,6 +11,7 @@
 		CopyText,
 		ErrorAlert,
 		StatusBadge,
+		UnsavedChangesDialog,
 		useTopbarContent
 	} from '#lib/components/app/index.js';
 	import ServerActions from '#lib/components/servers/server-actions.svelte';
@@ -42,7 +43,8 @@
 	import { ServerController } from '#lib/servers/server-controller.svelte.js';
 	import { poll } from '#lib/polling.js';
 	import { formatMemoryRange } from '#lib/format.js';
-	import { beforeNavigate, goto } from '$app/navigation';
+	import { afterNavigate, beforeNavigate, goto } from '$app/navigation';
+	import { LeaveGuard } from '#lib/navigation/leave-guard.svelte.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import type { PageProps } from './$types';
@@ -56,6 +58,8 @@
 		if (next && untrack(() => controller.server.id) !== next.id) {
 			controller.reset(next);
 			selectionFocus = 0;
+			// The Files editor is re-keyed per server, so its unsaved state is gone.
+			filesDirty = false;
 		}
 	});
 	$effect(() => () => controller.destroy());
@@ -104,14 +108,22 @@
 	let launchFocus = $state(0);
 	let tabDirection = $state<1 | -1>(1);
 
+	/** Unsaved generic file edits: confirm before leaving this server page in-app. */
+	const leaveGuard = new LeaveGuard({
+		isDirty: () => filesDirty && !removed,
+		proceed: (target) => {
+			if (target.type === 'popstate' && target.delta) history.go(target.delta);
+			// eslint-disable-next-line svelte/no-navigation-without-resolve -- SvelteKit supplied this resolved destination.
+			else void goto(target.href);
+		}
+	});
+	afterNavigate(() => leaveGuard.settled());
+
 	beforeNavigate((navigation) => {
 		if (removed || navigation.willUnload) return;
 		if (navigation.to?.url.pathname === page.url.pathname) return;
 		// Tab switches keep the editor mounted; leaving the instance discards it.
-		if (filesDirty && !window.confirm('Leave this server and discard unsaved file changes?')) {
-			navigation.cancel();
-			return;
-		}
+		if (leaveGuard.intercept(navigation)) return;
 		if (propertiesPending && propertiesEditor && navigation.to) {
 			navigation.cancel();
 			if (leavingAfterAutosave) return;
@@ -421,7 +433,12 @@
 	<Tabs.Content value="console">
 		{#if tab === 'console'}
 			<Reveal preset="step" direction={tabDirection}>
-				<ServerConsole serverId={server.id} {running} refreshKey={consoleKey} />
+				<ServerConsole
+					serverId={server.id}
+					serverName={server.name}
+					{running}
+					refreshKey={consoleKey}
+				/>
 			</Reveal>
 		{/if}
 	</Tabs.Content>
@@ -486,3 +503,13 @@
 </Tabs.Root>
 
 <EulaDialog bind:open={eulaOpen} onAccept={() => setEula(true)} />
+
+<UnsavedChangesDialog
+	open={leaveGuard.pending !== null}
+	title="Leave with unsaved file changes?"
+	description="Your edits in the Files editor have not been saved. Leaving this server discards them."
+	stayLabel="Stay"
+	discardLabel="Discard and leave"
+	onStay={() => leaveGuard.stay()}
+	onDiscard={() => leaveGuard.discard()}
+/>

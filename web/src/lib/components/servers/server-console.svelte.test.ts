@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import ServerConsole from './server-console.svelte';
 import type { SocketLike } from '#lib/console/console-stream.js';
@@ -154,5 +154,160 @@ describe('ServerConsole', () => {
 		await vi.waitFor(() => expect(FakeSocket.all).toHaveLength(2));
 		screen.unmount();
 		expect(FakeSocket.all[1].closed).toBe(true);
+	});
+});
+
+async function liveConsole(serverId = 's1') {
+	const fetch = vi.fn(async (_path: string, init?: RequestInit) =>
+		init?.method === 'POST' ? new Response(null, { status: 204 }) : snapshot([])
+	);
+	vi.stubGlobal('fetch', fetch);
+	const screen = render(ServerConsole, { serverId, running: true, createSocket });
+	await vi.waitFor(() => expect(FakeSocket.all.length).toBeGreaterThan(0));
+	const socket = FakeSocket.all.at(-1)!;
+	socket.open();
+	return { fetch, screen, socket };
+}
+
+const posts = (fetch: ReturnType<typeof vi.fn>) =>
+	fetch.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
+
+describe('ServerConsole tools', () => {
+	it('filters the view only: the live buffer keeps streaming and snapshots still replace', async () => {
+		const { socket } = await liveConsole();
+		socket.send({ type: 'snapshot', lines: [out('Player joined'), out('Saving world')] });
+		const log = page.getByRole('log');
+		await expect.element(log).toHaveTextContent('Saving world');
+		await page.getByLabelText('Filter console output').fill('PLAYER');
+		await expect.element(log).not.toHaveTextContent('Saving world');
+		await expect.element(page.getByText('1 of 2 lines')).toBeVisible();
+		expect(log.element().querySelector('mark')?.textContent).toBe('Player');
+		socket.send({ type: 'line', line: out('player left') });
+		await expect.element(page.getByText('2 of 3 lines')).toBeVisible();
+		socket.send({ type: 'snapshot', lines: [out('Saving world')] });
+		await expect.element(page.getByText('No lines match “PLAYER”.')).toBeVisible();
+		await userEvent.keyboard('{Escape}');
+		await expect.element(log).toHaveTextContent('Saving world');
+		expect(log.element().textContent?.match(/Saving world/g)).toHaveLength(1);
+	});
+
+	it('renders and exports hostile output as plain text', async () => {
+		const { socket } = await liveConsole();
+		const writeText = vi.fn(async () => {});
+		vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+		const blobs: Blob[] = [];
+		const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+			blobs.push(blob as Blob);
+			return 'blob:test';
+		});
+		const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+		socket.send({ type: 'snapshot', lines: [out('<img src=x onerror=alert(1)>'), out('a & b')] });
+		const log = page.getByRole('log');
+		await expect.element(log).toHaveTextContent('<img src=x onerror=alert(1)>');
+		expect(log.element().querySelector('img')).toBeNull();
+		await page.getByRole('button', { name: 'Copy' }).click();
+		await vi.waitFor(() =>
+			expect(writeText).toHaveBeenCalledWith('<img src=x onerror=alert(1)>\na & b\n')
+		);
+		await page.getByRole('button', { name: 'Download' }).click();
+		expect(blobs[0].type).toBe('text/plain;charset=utf-8');
+		expect(await blobs[0].text()).toBe('<img src=x onerror=alert(1)>\na & b\n');
+		const anchor = click.mock.contexts[0] as HTMLAnchorElement;
+		expect(anchor.download).toMatch(/^s1-console-\d{8}-\d{6}\.txt$/);
+		createObjectURL.mockRestore();
+		click.mockRestore();
+	});
+
+	it('copies only the bounded buffer the browser holds', async () => {
+		const { socket } = await liveConsole();
+		const writeText = vi.fn(async () => {});
+		vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+		socket.send({
+			type: 'snapshot',
+			lines: Array.from({ length: 1005 }, (_, i) => out(`line ${i}`))
+		});
+		await expect.element(page.getByRole('log')).toHaveTextContent('line 1004');
+		await page.getByRole('button', { name: 'Copy' }).click();
+		await vi.waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+		const copied = (writeText.mock.calls[0] as unknown as [string])[0].trimEnd().split('\n');
+		expect(copied).toHaveLength(1000);
+		expect(copied[0]).toBe('line 5');
+	});
+
+	it('toggles wrapping', async () => {
+		const { socket } = await liveConsole();
+		socket.send({ type: 'snapshot', lines: [out('x'.repeat(400))] });
+		const wrap = page.getByRole('button', { name: 'Wrap' });
+		await expect.element(wrap).toHaveAttribute('aria-pressed', 'true');
+		const row = () => page.getByRole('log').element().querySelector('div')!;
+		await vi.waitFor(() => expect(row().className).toContain('whitespace-pre-wrap'));
+		await wrap.click();
+		await expect.element(wrap).toHaveAttribute('aria-pressed', 'false');
+		expect(row().className).not.toContain('whitespace-pre-wrap');
+	});
+
+	it('pauses following on scroll up, counts new lines and jumps back to the latest', async () => {
+		const { socket } = await liveConsole();
+		socket.send({
+			type: 'snapshot',
+			lines: Array.from({ length: 200 }, (_, i) => out(`line ${i}`))
+		});
+		const log = page.getByRole('log');
+		await expect.element(log).toHaveTextContent('line 199');
+		const viewport = log.element() as HTMLElement;
+		// Component tests run without the app stylesheet: give the log a real height.
+		Object.assign(viewport.style, { height: '200px', overflow: 'auto' });
+		await page.getByRole('button', { name: 'Follow' }).click();
+		await page.getByRole('button', { name: /jump to latest/ }).click();
+		await vi.waitFor(() =>
+			expect(viewport.scrollTop + viewport.clientHeight).toBeGreaterThan(viewport.scrollHeight - 30)
+		);
+		viewport.scrollTop = 0;
+		viewport.dispatchEvent(new Event('scroll'));
+		const follow = page.getByRole('button', { name: 'Follow' });
+		await expect.element(follow).toHaveAttribute('aria-pressed', 'false');
+		socket.send({ type: 'line', line: out('new one') });
+		socket.send({ type: 'line', line: out('new two') });
+		const jump = page.getByRole('button', { name: /Paused · 2 new/ });
+		await expect.element(jump).toBeVisible();
+		expect(viewport.scrollTop).toBe(0);
+		await jump.click();
+		await expect.element(follow).toHaveAttribute('aria-pressed', 'true');
+		await vi.waitFor(() =>
+			expect(viewport.scrollTop + viewport.clientHeight).toBeGreaterThan(viewport.scrollHeight - 30)
+		);
+		await expect.element(page.getByRole('button', { name: /Paused/ })).not.toBeInTheDocument();
+	});
+
+	it('recalls commands per server with Up/Down without sending them', async () => {
+		const { fetch, screen } = await liveConsole('hist-a');
+		const input = page.getByLabelText('Console command');
+		for (const line of ['list', 'say hi']) {
+			await input.fill(line);
+			await userEvent.keyboard('{Enter}');
+			await expect.element(input).toHaveValue('');
+		}
+		expect(posts(fetch)).toHaveLength(2);
+		await input.fill('dra');
+		await userEvent.keyboard('{ArrowUp}');
+		await expect.element(input).toHaveValue('say hi');
+		await userEvent.keyboard('{ArrowUp}');
+		await expect.element(input).toHaveValue('list');
+		await userEvent.keyboard('{ArrowUp}');
+		await expect.element(input).toHaveValue('list');
+		await userEvent.keyboard('{ArrowDown}{ArrowDown}');
+		await expect.element(input).toHaveValue('dra');
+		// Typing still edits normally after recall.
+		await userEvent.keyboard('{ArrowUp}{Backspace}{Backspace}x');
+		await expect.element(input).toHaveValue('say x');
+		expect(posts(fetch)).toHaveLength(2);
+		screen.unmount();
+
+		// Another server has its own (empty) history; the first one's survives remounts.
+		FakeSocket.all = [];
+		await liveConsole('hist-b');
+		await userEvent.click(page.getByLabelText('Console command'));
+		await userEvent.keyboard('{ArrowUp}');
+		await expect.element(page.getByLabelText('Console command')).toHaveValue('');
 	});
 });

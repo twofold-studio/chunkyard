@@ -7,17 +7,18 @@
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import { untrack } from 'svelte';
 	import * as Alert from '#lib/components/ui/alert/index.js';
-	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import { ErrorAlert } from '#lib/components/app/index.js';
+	import { ErrorAlert, UnsavedChangesDialog } from '#lib/components/app/index.js';
 	import { Reveal } from '#lib/components/motion/index.js';
 	import { fileDownloadUrl } from '#lib/api/index.js';
 	import { TextFileEditor, type EditorApi } from '#lib/files/text-editor.svelte.js';
 	import { baseName, formatBytes, SERVER_PROPERTIES } from '#lib/files/paths.js';
-	import { detectEol } from '#lib/files/properties.js';
+	import { detectFormat, eolLabel, languageFor, LANGUAGE_LABELS } from '#lib/files/editor-text.js';
+	import CodeEditor from '#lib/components/editor/code-editor.svelte';
+	import type { EditorStatus } from '#lib/components/editor/codemirror.js';
 	import { collapse, fadeIn } from '#lib/motion/index.js';
 	import { formatTime } from '#lib/format.js';
 
@@ -69,7 +70,9 @@
 
 	const canEdit = $derived(editor.editable && writable);
 	const isProperties = $derived(path === SERVER_PROPERTIES);
-	const lineCount = $derived(editor.content ? editor.content.split('\n').length : 1);
+	const language = languageFor(untrack(() => path));
+	const format = $derived(detectFormat(editor.original));
+	let status = $state<EditorStatus | null>(null);
 	let confirmClose = $state(false);
 
 	const readOnlyReason = $derived.by(() => {
@@ -92,34 +95,12 @@
 		else onClose();
 	}
 
-	/** Set by Escape so the next Tab leaves the editor (keyboard trap escape hatch). */
-	let tabEscapes = false;
-
-	// Textareas report every line break as LF. Map them back to the file's own line ending
-	// so editing a CRLF file as raw text does not silently convert it.
-	const fileEol = $derived(detectEol(editor.original));
-	const withFileEol = (text: string) => (fileEol === '\n' ? text : text.replace(/\n/g, fileEol));
-
-	function onkeydown(event: KeyboardEvent) {
+	/** Ctrl/⌘+S anywhere inside the editor view saves instead of opening the browser dialog. */
+	function onSaveShortcut(event: KeyboardEvent) {
+		if (event.defaultPrevented || event.altKey) return;
 		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
 			event.preventDefault();
 			void save();
-			return;
-		}
-		if (event.key === 'Escape') {
-			tabEscapes = true;
-			return;
-		}
-		// Tab inserts a tab character; press Escape first (or Shift+Tab) to move focus out.
-		const escaping = tabEscapes;
-		tabEscapes = false;
-		if (event.key === 'Tab' && !escaping && !event.shiftKey && !event.altKey && canEdit) {
-			const area = event.currentTarget as HTMLTextAreaElement;
-			event.preventDefault();
-			const { selectionStart: start, selectionEnd: end } = area;
-			const text = area.value;
-			editor.content = withFileEol(`${text.slice(0, start)}\t${text.slice(end)}`);
-			queueMicrotask(() => area.setSelectionRange(start + 1, start + 1));
 		}
 	}
 
@@ -130,7 +111,7 @@
 
 <svelte:window {onbeforeunload} />
 
-<Reveal preset="fade" class="flex flex-col gap-4">
+<Reveal preset="fade" class="flex flex-col gap-4" onkeydown={onSaveShortcut}>
 	<div class="flex flex-wrap items-center gap-2">
 		<Button variant="ghost" size="sm" onclick={requestClose}>
 			<ArrowLeftIcon data-icon="inline-start" />
@@ -218,50 +199,46 @@
 				on the next start.
 			</p>
 		{/if}
-		<div class="overflow-hidden rounded-lg border border-border bg-background">
-			<textarea
-				value={editor.content.replace(/\r\n?/g, '\n')}
-				oninput={(event) => (editor.content = withFileEol(event.currentTarget.value))}
-				{onkeydown}
-				readonly={!canEdit}
-				spellcheck={false}
-				autocomplete="off"
-				autocapitalize="off"
-				wrap="off"
-				aria-label={`Contents of ${path}`}
-				class="block min-h-96 w-full resize-y bg-transparent p-4 font-mono text-[13px] leading-relaxed [tab-size:4] outline-none read-only:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/40"
-				style:height="min(70vh, {Math.max(24, lineCount + 2) * 1.625}em)"></textarea>
+		<div class="flex flex-col overflow-hidden rounded-lg border border-border bg-background">
+			<CodeEditor
+				value={editor.content}
+				onChange={(next) => (editor.content = next)}
+				{language}
+				readOnly={!canEdit}
+				label={`Contents of ${path}`}
+				bind:status
+				class="h-[min(70vh,48rem)]"
+			/>
 			<div
-				class="flex flex-wrap justify-between gap-2 border-t border-border px-4 py-2 text-xs text-muted-foreground"
+				class="flex flex-wrap justify-between gap-x-4 gap-y-1 border-t border-border px-4 py-2 text-xs text-muted-foreground"
 			>
-				<span
-					>{lineCount}
-					{lineCount === 1 ? 'line' : 'lines'} · {formatBytes(editor.size)} on disk</span
-				>
-				<span>UTF-8 · Ctrl/⌘ + S saves · Esc then Tab leaves the editor</span>
+				<span class="flex flex-wrap gap-x-3 tabular-nums" data-testid="editor-status">
+					{#if status}
+						<span>Ln {status.line}, Col {status.column}</span>
+						{#if status.selected}<span>{status.selected} selected</span>{/if}
+						<span>{status.lines} {status.lines === 1 ? 'line' : 'lines'}</span>
+					{/if}
+					<span>{formatBytes(editor.size)} on disk</span>
+				</span>
+				<span class="flex flex-wrap gap-x-3">
+					<span>{LANGUAGE_LABELS[language]}</span>
+					<span>UTF-8{format.bom ? ' with BOM' : ''} · {eolLabel(format.eol)}</span>
+					<span class="max-md:hidden">Ctrl/⌘+S saves · Ctrl/⌘+F finds · Esc then Tab leaves</span>
+				</span>
 			</div>
 		</div>
 	{/if}
 </Reveal>
 
-<AlertDialog.Root bind:open={confirmClose}>
-	<AlertDialog.Content>
-		<AlertDialog.Header>
-			<AlertDialog.Title>Discard unsaved changes?</AlertDialog.Title>
-			<AlertDialog.Description>
-				Your edits to <code class="font-mono">{baseName(path)}</code> have not been saved.
-			</AlertDialog.Description>
-		</AlertDialog.Header>
-		<AlertDialog.Footer>
-			<AlertDialog.Cancel>Keep editing</AlertDialog.Cancel>
-			<AlertDialog.Action
-				onclick={() => {
-					confirmClose = false;
-					onClose();
-				}}
-			>
-				Discard
-			</AlertDialog.Action>
-		</AlertDialog.Footer>
-	</AlertDialog.Content>
-</AlertDialog.Root>
+<UnsavedChangesDialog
+	open={confirmClose}
+	onStay={() => (confirmClose = false)}
+	onDiscard={() => {
+		confirmClose = false;
+		onClose();
+	}}
+>
+	{#snippet description()}
+		Your edits to <code class="font-mono">{baseName(path)}</code> have not been saved.
+	{/snippet}
+</UnsavedChangesDialog>

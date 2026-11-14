@@ -283,17 +283,13 @@ async function test(enabled, showVersion = true) {
       await page.getByRole("tab", { name: "Overview", exact: true }).click();
       await page.getByRole("tab", { name: /^Files\b/ }).click();
       assert.equal(
-        await editor.inputValue(),
+        await editor.innerText(),
         "motd=Production UI smoke\nonline-mode=true\n",
       );
-      const blockedNavigation = page.waitForEvent("dialog");
-      const leave = page
+      await page
         .getByRole("link", { name: "Java runtimes", exact: true })
         .click();
-      const prompt = await blockedNavigation;
-      assert.equal(prompt.type(), "confirm");
-      await prompt.dismiss();
-      await leave;
+      await page.getByRole("alertdialog").getByRole("button", {name:"Stay",exact:true}).click();
       assert.equal(new URL(page.url()).pathname, `/servers/${server.id}`);
       const saved = page.waitForResponse(
         (response) =>
