@@ -33,4 +33,16 @@ changie merge --include-unreleased '## Unreleased'
 
 Use the actual next project version in place of the example. Batching combines pending fragments into a version file under `.changes/` and consumes those fragments; that file retains their notes. Changie only manages release notes: package versions, lockfiles, commits, pushes and deployment checks are separate steps.
 
+Update project metadata with the field-aware helper; a global version replacement can accidentally change dependency ranges:
+
+```sh
+node scripts/bump-version.mjs 0.9.1
+cargo update --workspace --offline
+node scripts/bump-version.mjs 0.9.1 --check
+pnpm --dir web install --lockfile-only --frozen-lockfile --ignore-scripts
+node --test scripts/bump-version.test.mjs
+```
+
+Substitute the intended numeric version. The helper changes only the Cargo workspace version, frontend project version, OpenAPI info version and HTTP version-response example. It leaves dependency requirements and other examples alone. Run the frozen-lockfile check before pushing, and generate the changelog before compiling: the API and its tests embed it at build time, so do not regenerate it during a Cargo test run.
+
 Use `changie batch 0.2.0 --dry-run` to preview notes without consuming fragments. Keep work under Unreleased while any requested implementation or verification remains unfinished.

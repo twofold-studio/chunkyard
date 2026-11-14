@@ -4,6 +4,12 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## 0.9.1 - 2026-11-14
+
+
+### Fixed
+
+- Packaging: release tooling updates only project-version fields and checks the frozen frontend lockfile, preserving dependency requirements that match the previous project version. Corrects the unintended Tailwind Prettier plugin range change that blocked the 0.9.0 Docker build.
 ## 0.9.0 - 2026-11-14
 
 
