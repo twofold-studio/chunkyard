@@ -138,6 +138,13 @@
 	let launchFocus = $state(0);
 	let tabDirection = $state<1 | -1>(1);
 
+	// Full navigation (palette/history) and shallow tab changes share one source.
+	$effect(() => {
+		const url = page.shallow?.url ?? page.url;
+		const requested = url.searchParams.get('tab');
+		untrack(() => selectTab(isTab(requested) ? requested : 'overview', false));
+	});
+
 	/** Unsaved generic file edits: confirm before leaving this server page in-app. */
 	const leaveGuard = new LeaveGuard({
 		isDirty: () => filesDirty && !removed,
@@ -177,15 +184,28 @@
 		}
 	});
 
-	function selectTab(next: string) {
-		if (!isTab(next) || next === tab) return;
-		const from = TABS.findIndex((t) => t.value === tab);
-		const to = TABS.findIndex((t) => t.value === next);
-		tabDirection = to >= from ? 1 : -1;
-		tab = next;
+	function selectTab(next: string, updateUrl = true) {
+		if (!isTab(next)) return;
+		if (next !== tab) {
+			const from = TABS.findIndex((t) => t.value === tab);
+			const to = TABS.findIndex((t) => t.value === next);
+			tabDirection = to >= from ? 1 : -1;
+			tab = next;
+		}
 		if (next === 'files') filesVisited = true;
 		if (next === 'properties') propertiesVisited = true;
 		if (next === 'exports') exportsVisited = true;
+		if (updateUrl) {
+			const current = page.shallow?.url ?? page.url;
+			const url = new URL(current.href);
+			if (next === 'overview') url.searchParams.delete('tab');
+			else url.searchParams.set('tab', next);
+			if (url.href !== current.href) {
+				// SvelteKit supplied this same-server URL; shallow changes keep editors mounted.
+				// eslint-disable-next-line svelte/no-navigation-without-resolve
+				void goto(url, { shallow: true, replace: true, reset: false, state: page.state });
+			}
+		}
 	}
 
 	function exportSelected() {

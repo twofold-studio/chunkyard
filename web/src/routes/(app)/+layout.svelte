@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import SearchIcon from '@lucide/svelte/icons/search';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
@@ -16,6 +17,9 @@
 
 	let { data, children }: LayoutProps = $props();
 	let signingOut = $state(false);
+	let paletteOpen = $state(false);
+	// Lazy-loaded so the palette never weighs on first paint or chart/console hot paths.
+	const paletteModule = import('#lib/components/app/command-palette.svelte');
 	// Scoped to this shell instance: pages render their header content through it.
 	const topbar = provideTopbarSlot();
 
@@ -50,6 +54,10 @@
 		}
 	}
 
+	/** Palette caches are scoped to this session; a different sign-in starts empty. */
+	const paletteSession = $derived(
+		data.auth?.mode === 'session' ? `session:${data.auth.user.id}` : 'auth-disabled'
+	);
 	const crumbs = $derived(page.data.crumbs ?? []);
 	const onCreatePage = $derived(page.url.pathname === resolve('servers/new'));
 </script>
@@ -73,6 +81,18 @@
 		<Sidebar.Inset class="min-w-0">
 			<AppTopbar {crumbs} context={topbar.content}>
 				{#snippet actions()}
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={() => (paletteOpen = true)}
+						aria-label="Quick navigation"
+						aria-keyshortcuts="Control+K Meta+K"
+						title="Quick navigation (Ctrl/⌘ K)"
+					>
+						<SearchIcon data-icon="inline-start" />
+						<span class="hidden md:inline">Go to</span>
+						<kbd class="hidden font-mono text-[10px] text-muted-foreground md:inline">⌘K</kbd>
+					</Button>
 					{#if !onCreatePage}
 						<Button href={resolve('servers/new')} size="sm">
 							<PlusIcon data-icon="inline-start" />
@@ -91,4 +111,7 @@
 			</main>
 		</Sidebar.Inset>
 	</Sidebar.Provider>
+	{#await paletteModule then { default: CommandPalette }}
+		<CommandPalette bind:open={paletteOpen} sessionKey={paletteSession} />
+	{/await}
 {/if}

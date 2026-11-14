@@ -7,6 +7,7 @@ The phase specs describe the long-term product. This page records the smaller, s
 | Area | Current behavior | Limits / remaining work |
 | --- | --- | --- |
 | Setup and authentication | Two-step setup token and owner creation; email/password sessions; environment-controlled auth bypass; same-origin and CSRF checks in both modes. | Multi-user roles, 2FA and API tokens are deferred. |
+| Navigation | Keyboard quick-navigation palette with tab deep links; server-list search, state/software filters and deterministic sorting. | Search covers the returned server inventory, currently up to 100 records. Only the sort preference persists in the browser. |
 | Lifecycle | Docker instances, shared configured ports with one running instance per port, start/stop/restart/kill, stopped-instance deletion, editable CPU/RAM and publish address. | No native runtime, cloning, auto-start or crash-restart policy yet. |
 | Software | Vanilla/Paper version selection and verified automatic downloads; CurseForge linked server packs with Forge/NeoForge/Fabric detection and isolated loader preparation. | No general client-pack conversion, Modrinth imports, mod/plugin marketplace or software version switching. See [CurseForge limits](curseforge.md). |
 | Java and launch | Host runtime discovery/managed downloads; Docker Java image selection; editable JAR, argument-file or Bash launch profiles. | Host Java inventory is separate from Docker runtimes. Windows host support is not production-verified. |

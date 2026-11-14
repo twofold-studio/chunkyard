@@ -104,3 +104,11 @@ Console filtering and highlighting are local to the current buffer. Wrap and Fol
 Server pages discover active jobs on entry, server switches and returning to a visible tab through the filtered jobs API. Installs reuse their panel, lifecycle work appears in the compact header, recovered exports block conflicting actions and refresh archives on completion, and recovered deletions leave the deleted instance. Failure links open Activity. A per-instance Activity tab provides server-filtered, cursor-paged history; state/type filters still apply only to loaded jobs.
 
 Recovered polling stops while hidden and resumes by job ID, so work that finished while hidden still reaches a terminal state. Jobs started locally retain their existing polling behavior. Local and recovered trackers share ownership bookkeeping; an existing tracker is not duplicated on visibility changes. See [the recovery contract](jobs-recovery-contract.md).
+
+## Quick navigation and server-list controls
+
+Ctrl/Command+K or the top-bar Go to button opens a navigation-only palette. It searches app destinations and loaded server names/software/versions/ports, including links to individual management tabs. Arrows/Home/End select, Enter opens and Escape closes. Server data is fetched on open, cached in app memory for 15 seconds and cleared across authentication context changes; there is no background palette polling. Unsaved Files navigation and Properties flush still run for links that leave the server.
+
+The server list searches names/software/versions/ports, filters by state/software and sorts by name/state/port. Only the sort preference is saved locally. Counts and filters cover the records returned by GET /servers, not a separate global search service. The create tile stays first, and no-match results can clear filters without losing that tile.
+
+Management tabs stay synchronized with URL deep links and palette navigation. Clicking a tab updates its URL through same-server shallow routing, keeping editors mounted and preserving unsaved edits.

@@ -4,6 +4,17 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## 0.8.0 - 2026-11-14
+
+
+### Added
+
+- Web UI: the Servers page can search the servers returned by GET /api/v1/servers by name, software, version or port, filter by state and software, and sort by name, state or port. A count shows how many of the loaded servers match, a no-match state offers Clear filters, the create tile stays first, and only the sort order is remembered in local storage.
+- Web UI: a quick-navigation palette opens with Ctrl/Cmd+K or the Go to button in the top bar. It searches app pages (Servers, New server, Activity, Java runtimes, Storage & exports, API reference) and the servers from GET /api/v1/servers by name, software, version or port, and opens their Overview, Console, Properties, Files, Exports, Activity or Settings tab. It only navigates, through the normal unsaved-changes guard. The server list is fetched when the palette opens, cached in memory for 15 seconds per session, and the request is cancelled when the palette closes.
+
+### Fixed
+
+- Frontend: management tabs follow same-server and cross-server deep links, including palette navigation and browser history; tab clicks update the URL without reloading editors or discarding unsaved changes.
 ## 0.7.0 - 2026-11-14
 
 

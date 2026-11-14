@@ -85,6 +85,12 @@ try {
       { path, method, body },
     );
   }
+  async function quickGo(query,label) {
+    await page.keyboard.press("ControlOrMeta+k");
+    const palette=page.getByRole("dialog",{name:"Quick navigation",exact:true});
+    await palette.getByRole("combobox",{name:"Search pages and servers",exact:true}).fill(query);
+    await palette.getByRole("option").filter({hasText:label}).click();
+  }
   // EULA flag is fixture bookkeeping: the image is a shell console, not Minecraft.
   fixture = (
     await api("/api/v1/servers", "POST", {
@@ -109,6 +115,15 @@ try {
     })
   ).server;
   const route = `/api/v1/servers/${fixture.id}/properties`;
+  await page.reload();
+  const listSearch=page.getByRole("searchbox",{name:"Search loaded servers",exact:true});
+  await listSearch.fill("Second UI fixture");
+  assert.equal(await page.getByTestId("server-card").count(),1);
+  await listSearch.fill("no-loaded-server-matches-this");
+  await page.getByText("No loaded servers match these filters.",{exact:true}).waitFor();
+  await page.getByRole("button",{name:"Clear filters",exact:true}).click();
+  assert.equal(await page.getByTestId("server-card").count(),2);
+  await page.getByLabel("Sort servers",{exact:true}).selectOption("port");
   let document = await api(route);
   document = await api(route, "PUT", {
     content:
@@ -127,7 +142,17 @@ try {
       .count(),
     1,
   );
-  await page.getByRole("tab", { name: "Properties", exact: true }).click();
+  await quickGo("Live UI fixture Console","Live UI fixture — Console");
+  await page.getByRole("tab",{name:"Console",exact:true,selected:true}).waitFor();
+  assert.equal(await page.getByRole("tab",{name:"Console",exact:true}).getAttribute("aria-selected"),"true");
+  await quickGo("Second UI fixture Settings","Second UI fixture — Settings");
+  await page.locator("header").getByRole("heading",{name:second.name,exact:true}).waitFor();
+  await page.getByRole("tab",{name:"Settings",exact:true,selected:true}).waitFor();
+  assert.equal(await page.getByRole("tab",{name:"Settings",exact:true}).getAttribute("aria-selected"),"true");
+  await quickGo("Live UI fixture Properties","Live UI fixture — Properties");
+  await page.locator("header").getByRole("heading",{name:fixture.name,exact:true}).waitFor();
+  await page.getByRole("tab",{name:"Properties",exact:true,selected:true}).waitFor();
+  assert.equal(await page.getByRole("tab",{name:"Properties",exact:true}).getAttribute("aria-selected"),"true");
   const search = page.getByRole("searchbox", {
     name: "Search settings",
     exact: true,
@@ -319,6 +344,10 @@ try {
   await page.getByRole("tab",{name:"Overview",exact:true}).click();
   await page.getByRole("tab",{name:/^Files\b/}).click();
   assert.equal(await page.getByRole("alertdialog").count(),0);
+  await fileEditor.focus();
+  await quickGo("Java runtimes","Java runtimes");
+  await page.getByRole("alertdialog").getByRole("button",{name:"Stay",exact:true}).click();
+  assert.equal(new URL(page.url()).pathname,`/servers/${second.id}`);
   await page.getByRole("link",{name:"Java runtimes",exact:true}).click();
   await page.getByRole("alertdialog").getByRole("button",{name:"Stay",exact:true}).click();
   assert.equal(new URL(page.url()).pathname,`/servers/${second.id}`);

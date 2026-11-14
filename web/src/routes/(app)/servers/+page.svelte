@@ -3,7 +3,7 @@
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { ErrorAlert, PageHeader } from '#lib/components/app/index.js';
-	import ServerGrid from '#lib/components/servers/server-grid.svelte';
+	import ServerList from '#lib/components/servers/server-list.svelte';
 	import { listServers } from '#lib/api/index.js';
 	import { poll } from '#lib/polling.js';
 	import { resolve } from '$app/paths';
@@ -31,15 +31,12 @@
 		);
 		return () => controller.abort();
 	});
-
-	const count = $derived(`${servers.length} ${servers.length === 1 ? 'server' : 'servers'}`);
 </script>
 
 <PageHeader
 	title="Servers"
 	icon={ServerIcon}
 	description="Minecraft servers running in Docker containers managed by this instance."
-	meta={servers.length ? count : undefined}
 />
 
 {#if data.docker && !data.docker.available}
@@ -57,4 +54,4 @@
 	<ErrorAlert error={refreshError} />
 {/if}
 
-<ServerGrid {servers} createHref={resolve('servers/new')} />
+<ServerList {servers} createHref={resolve('servers/new')} />
