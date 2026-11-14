@@ -193,4 +193,68 @@ describe('ServerMetrics', () => {
 		await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
 		screen.unmount();
 	});
+
+	describe('session history', () => {
+		const at = (ms: number, extra: Record<string, unknown> = {}) =>
+			sample({ sampledAt: new Date(Date.now() + ms).toISOString(), ...extra });
+
+		it('charts samples collected while open, labelled as not stored', async () => {
+			metricsInterval.set(1);
+			let n = 0;
+			const fetch = vi.fn(async () => json(at(n * 1000, { cpuPercent: 10 + 10 * n++ })));
+			vi.stubGlobal('fetch', fetch);
+			const { unmount } = render(ServerMetrics, {
+				serverId: 's1',
+				serverState: 'running',
+				cpus: 2
+			});
+			const history = page.getByTestId('metrics-history');
+			await expect.element(history).toHaveTextContent('History collected while this view is open');
+			await expect.element(history).toHaveTextContent('not stored');
+			await vi.waitFor(() => expect(fetch.mock.calls.length).toBeGreaterThanOrEqual(2), {
+				timeout: 4000
+			});
+			const cpu = page.getByRole('img', { name: /^CPU over/ });
+			await expect
+				.element(cpu)
+				.toHaveAttribute('aria-label', expect.stringMatching(/lowest 10\.0%/));
+			expect(cpu.element().getAttribute('data-runs')).toBe('1');
+			unmount();
+		});
+
+		it('starts empty for another server and shows stopped gaps instead of zeros', async () => {
+			const fetch = vi
+				.fn()
+				.mockResolvedValueOnce(json(at(0, { cpuPercent: 40 })))
+				.mockResolvedValueOnce(
+					json({ ...STOPPED, sampledAt: new Date(Date.now() + 1000).toISOString() })
+				)
+				.mockResolvedValueOnce(json(at(2000, { cpuPercent: 60 })))
+				.mockImplementation(async () => json(at(3000, { serverId: 's2', cpuPercent: 5 })));
+			vi.stubGlobal('fetch', fetch);
+			const { rerender, unmount } = render(ServerMetrics, {
+				serverId: 's1',
+				serverState: 'running'
+			});
+			await expect.element(page.getByTestId('metric-cpu')).toHaveTextContent('40.0%');
+			await rerender({ serverId: 's1', serverState: 'stopped' });
+			await expect.element(page.getByTestId('metric-cpu')).toHaveTextContent('—');
+			// Let the stopped snapshot land before starting again.
+			await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+			await expect.element(page.getByRole('button', { name: 'Refresh metrics' })).toBeEnabled();
+			await rerender({ serverId: 's1', serverState: 'running' });
+			await expect.element(page.getByTestId('metric-cpu')).toHaveTextContent('60.0%');
+			const cpu = page.getByRole('img', { name: /^CPU over/ });
+			await expect.element(cpu).toHaveAttribute('data-runs', '2');
+			await expect.element(cpu).toHaveAttribute('aria-label', expect.stringContaining('1 gap'));
+			expect(cpu.element().getAttribute('aria-label')).not.toMatch(/(^|[^\d.])0(\.0)?%/);
+
+			await rerender({ serverId: 's2', serverState: 'running' });
+			await expect.element(page.getByTestId('metric-cpu')).toHaveTextContent('5.0%');
+			await expect
+				.element(page.getByRole('img', { name: /^CPU over/ }))
+				.toHaveAttribute('aria-label', expect.stringContaining('1 sample,'));
+			unmount();
+		});
+	});
 });

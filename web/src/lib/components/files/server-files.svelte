@@ -21,6 +21,12 @@
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import SettingsIcon from '@lucide/svelte/icons/settings-2';
+	import ArchiveIcon from '@lucide/svelte/icons/archive';
+	import XIcon from '@lucide/svelte/icons/x';
+	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
+	import { exportSelection } from '#lib/exports/export-selection.svelte.js';
+	import { MAX_SELECTED_PATHS } from '#lib/exports/exports.js';
+	import { coveringFolder, headerState, isSelectable } from '#lib/exports/selection.js';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import * as Alert from '#lib/components/ui/alert/index.js';
@@ -33,6 +39,7 @@
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { ErrorAlert } from '#lib/components/app/index.js';
 	import { Reveal } from '#lib/components/motion/index.js';
+	import { collapse } from '#lib/motion/index.js';
 	import FileEditor from './file-editor.svelte';
 	import UploadQueuePanel from './upload-queue-panel.svelte';
 	import FileNameDialog, { type NameDialogRequest } from './file-name-dialog.svelte';
@@ -83,6 +90,8 @@
 		dirty?: boolean;
 		/** Opens the versioned Properties tab instead of editing server.properties as a file. */
 		onOpenProperties?: () => void;
+		/** Opens the Exports tab with the current selection. Hides selection when absent. */
+		onExportSelected?: () => void;
 	}
 
 	let {
@@ -90,7 +99,8 @@
 		serverState,
 		openRequest = null,
 		dirty = $bindable(false),
-		onOpenProperties
+		onOpenProperties,
+		onExportSelected
 	}: Props = $props();
 
 	let path = $state(ROOT);
@@ -135,6 +145,7 @@
 			(result) => {
 				listing = result;
 				loading = false;
+				pruneSelection(id, result);
 			},
 			(cause) => {
 				if (isAbortError(cause)) return;
@@ -163,6 +174,60 @@
 	const hasProperties = $derived(
 		path === ROOT && (listing?.entries.some((e) => e.path === SERVER_PROPERTIES) ?? false)
 	);
+
+	// Export selection --------------------------------------------------------------
+	const selecting = $derived(onExportSelected !== undefined);
+	const selection = $derived(exportSelection.items(serverId));
+	const selectableVisible = $derived(entries.filter(isSelectable));
+	const allState = $derived(headerState(selection, selectableVisible));
+	const outsideFolder = $derived(selection.filter((item) => parentPath(item.path) !== path).length);
+
+	/** Drops selected paths of this folder that no longer exist (deleted, renamed, moved). */
+	function pruneSelection(id: string, result: DirectoryListing) {
+		if (result.truncated) return;
+		const present = new Set(result.entries.map((e) => e.path));
+		const stale = exportSelection
+			.items(id)
+			.filter((item) => parentPath(item.path) === result.path && !present.has(item.path))
+			.map((item) => item.path);
+		if (stale.length) exportSelection.remove(id, stale);
+	}
+
+	/** Forgets a path (and anything under it) that was deleted, renamed or moved. */
+	function dropSelected(target: string) {
+		const gone = exportSelection
+			.paths(serverId)
+			.filter((p) => p === target || p.startsWith(`${target}/`));
+		if (gone.length) exportSelection.remove(serverId, gone);
+	}
+
+	function warnOverflow(skipped: number) {
+		toast.warning(`Selection is limited to ${MAX_SELECTED_PATHS} paths`, {
+			description: `${skipped} ${skipped === 1 ? 'entry was' : 'entries were'} not added. Select a parent folder instead.`
+		});
+	}
+
+	function toggleEntry(entry: FileEntry, checked: boolean) {
+		if (!isSelectable(entry)) return;
+		if (!checked) return exportSelection.remove(serverId, [entry.path]);
+		const result = exportSelection.add(serverId, [{ path: entry.path, kind: entry.kind }]);
+		if (result.overflow.length) warnOverflow(result.overflow.length);
+	}
+
+	function toggleAllVisible() {
+		if (allState === 'all') {
+			exportSelection.remove(
+				serverId,
+				selectableVisible.map((e) => e.path)
+			);
+			return;
+		}
+		const result = exportSelection.add(
+			serverId,
+			selectableVisible.map((e) => ({ path: e.path, kind: e.kind as 'file' | 'directory' }))
+		);
+		if (result.overflow.length) warnOverflow(result.overflow.length);
+	}
 
 	function navigate(next: string) {
 		if (next === path) {
@@ -266,6 +331,7 @@
 			submit: async (name) => {
 				const target = joinPath(parentPath(entry.path), name);
 				await moveFile(serverId, entry.path, target);
+				dropSelected(entry.path);
 				changed(target, `Renamed to ${name}`);
 			}
 		};
@@ -291,8 +357,10 @@
 			submit: async (value) => {
 				const parsed = parseRelativePath(value);
 				if (!parsed.ok) throw new Error(parsed.error);
-				if (mode === 'move') await moveFile(serverId, entry.path, parsed.path);
-				else await copyFile(serverId, entry.path, parsed.path);
+				if (mode === 'move') {
+					await moveFile(serverId, entry.path, parsed.path);
+					dropSelected(entry.path);
+				} else await copyFile(serverId, entry.path, parsed.path);
 				const where = parentPath(parsed.path);
 				highlight = parsed.path;
 				toast.success(`${mode === 'move' ? 'Moved' : 'Copied'} ${entry.name}`, {
@@ -484,6 +552,40 @@
 			</button>
 		{/if}
 
+		{#if selecting && selection.length > 0}
+			<div
+				class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border bg-card px-4 py-2"
+				role="region"
+				aria-label="Export selection"
+				transition:collapse
+			>
+				<span
+					class="text-sm font-medium tabular-nums"
+					aria-live="polite"
+					data-testid="selection-count"
+				>
+					{selection.length} selected
+				</span>
+				<span class="text-xs text-muted-foreground">
+					{#if outsideFolder > 0}{outsideFolder} in other folders ·
+					{/if}folders include their contents
+				</span>
+				{#if !stopped}
+					<span class="text-xs text-warning">Exports need a stopped server</span>
+				{/if}
+				<div class="ml-auto flex items-center gap-2">
+					<Button variant="ghost" size="sm" onclick={() => exportSelection.clear(serverId)}>
+						<XIcon data-icon="inline-start" />
+						Clear
+					</Button>
+					<Button size="sm" onclick={onExportSelected}>
+						<ArchiveIcon data-icon="inline-start" />
+						Export selected
+					</Button>
+				</div>
+			</div>
+		{/if}
+
 		<UploadQueuePanel queue={uploads} />
 
 		{#if error}
@@ -533,7 +635,24 @@
 				<table class="w-full table-fixed text-sm">
 					<thead class="border-b border-border text-xs text-muted-foreground">
 						<tr>
-							<th scope="col" class="px-4 py-2 text-left font-medium" aria-sort={ariaSort('name')}>
+							{#if selecting}
+								<th scope="col" class="w-10 py-2 pl-4">
+									<Checkbox
+										checked={allState === 'all'}
+										indeterminate={allState === 'some'}
+										disabled={selectableVisible.length === 0}
+										onCheckedChange={toggleAllVisible}
+										aria-label={allState === 'all'
+											? 'Clear selection of visible entries'
+											: 'Select all visible entries for export'}
+									/>
+								</th>
+							{/if}
+							<th
+								scope="col"
+								class={['py-2 pr-4 text-left font-medium', selecting ? 'pl-2' : 'pl-4']}
+								aria-sort={ariaSort('name')}
+							>
 								{@render sortButton('name', 'Name')}
 							</th>
 							<th
@@ -562,7 +681,26 @@
 									highlight === entry.path && 'motion-highlight'
 								)}
 							>
-								<td class="px-4 py-1.5">
+								{#if selecting}
+									{@const covered = coveringFolder(selection, entry.path)}
+									{@const picked = exportSelection.has(serverId, entry.path)}
+									<td class="py-1.5 pl-4">
+										<Checkbox
+											checked={picked || covered !== null}
+											disabled={!isSelectable(entry) || covered !== null}
+											onCheckedChange={(checked) => toggleEntry(entry, checked)}
+											aria-label={covered
+												? `${entry.name} is included with folder ${covered}`
+												: `Select ${entry.name} for export`}
+											title={covered
+												? `Included with /${covered}`
+												: isSelectable(entry)
+													? undefined
+													: 'Links and special files cannot be exported'}
+										/>
+									</td>
+								{/if}
+								<td class={['py-1.5 pr-4', selecting ? 'pl-2' : 'pl-4']}>
 									{#if entry.kind === 'directory' || entry.kind === 'file'}
 										<button
 											type="button"
@@ -696,6 +834,7 @@
 	bind:entry={deleteEntry}
 	ondeleted={(entry) => {
 		toast.success(`Deleted ${entry.name}`);
+		dropSelected(entry.path);
 		nonce += 1;
 	}}
 />

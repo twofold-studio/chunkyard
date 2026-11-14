@@ -53,7 +53,10 @@
 	// Navigating between servers reuses this component: swap the tracked record.
 	$effect.pre(() => {
 		const next = data.server;
-		if (next && untrack(() => controller.server.id) !== next.id) controller.reset(next);
+		if (next && untrack(() => controller.server.id) !== next.id) {
+			controller.reset(next);
+			selectionFocus = 0;
+		}
 	});
 	$effect(() => () => controller.destroy());
 
@@ -93,6 +96,8 @@
 		refreshMetadata(): Promise<void>;
 	} | null>(null);
 	let leavingAfterAutosave = false;
+	/** Bumped when Files → "Export selected" opens the Exports tab. */
+	let selectionFocus = $state(0);
 	/** Bumped to expand and scroll to Settings → Network. */
 	let networkFocus = $state(0);
 	/** Bumped to expand and scroll to Settings → Launch. */
@@ -139,6 +144,11 @@
 		if (next === 'files') filesVisited = true;
 		if (next === 'properties') propertiesVisited = true;
 		if (next === 'exports') exportsVisited = true;
+	}
+
+	function exportSelected() {
+		selectionFocus += 1;
+		selectTab('exports');
 	}
 
 	function editNetwork() {
@@ -436,6 +446,7 @@
 					serverState={server.status.state}
 					bind:dirty={filesDirty}
 					onOpenProperties={() => selectTab('properties')}
+					onExportSelected={exportSelected}
 				/>
 			{/key}
 		{/if}
@@ -448,6 +459,8 @@
 					serverState={server.status.state}
 					busy={controller.busy || deleting || removed}
 					bind:exporting
+					{selectionFocus}
+					onChooseFiles={() => selectTab('files')}
 				/>
 			{/key}
 		{/if}

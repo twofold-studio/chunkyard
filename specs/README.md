@@ -6,6 +6,8 @@ A self-hosted Minecraft server manager shipped as **one Rust binary** with an em
 
 ## How to read the specs
 
+Start with the [implementation status and current priorities](../docs/implementation-status.md). The phase files below describe a broader roadmap; several routes and features remain unimplemented, and multi-user authentication is deferred for the current single-owner product. Existing API contracts in `docs/` describe the running implementation.
+
 1. [architecture/overview.md](architecture/overview.md) — system shape and technology choices.
 2. [architecture/patterns.md](architecture/patterns.md) — **binding conventions**; every phase follows them.
 3. [architecture/workspace-layout.md](architecture/workspace-layout.md) — crates and dependency rules.

@@ -28,6 +28,7 @@ import type {
 	Items,
 	JavaRuntime,
 	Job,
+	JobPage,
 	LoginResponse,
 	Me,
 	ServerAction,
@@ -177,6 +178,19 @@ export const installJava = (major: number, o: Opts = {}) =>
 		method: 'POST',
 		body: { major }
 	});
+
+/** Newest first; `limit` 1–200 (backend default 50). */
+export const listJobs = ({
+	limit,
+	cursor,
+	...o
+}: Opts & { limit?: number; cursor?: string | null } = {}) => {
+	const params = new URLSearchParams();
+	if (limit !== undefined) params.set('limit', String(limit));
+	if (cursor) params.set('cursor', cursor);
+	const query = params.toString();
+	return request<JobPage>(`/api/v1/jobs${query ? `?${query}` : ''}`, o);
+};
 
 export const getJob = (id: string, o: Opts = {}) => request<Job>(`/api/v1/jobs/${enc(id)}`, o);
 

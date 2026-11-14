@@ -228,6 +228,9 @@ try {
     .getByRole("button", { name: "Refresh metrics", exact: true })
     .click();
   assert.equal((await manual).status(), 200);
+  await page.getByTestId("metrics-history").waitFor();
+  assert.match(await page.getByTestId("metrics-history").innerText(), /samples, not\s+stored/);
+  assert.equal(await page.getByTestId("metrics-history").locator("figure").count(), 2);
   await page.getByRole("tab", { name: /^Properties\b/ }).click();
   await search.fill("motd");
   await motd.fill("Flushed before navigation");
@@ -281,6 +284,28 @@ try {
   const attachment = await page.request.get(`${base}/api/v1/exports/${exported.id}/download`);
   assert.equal(attachment.status(), 200);
   assert.equal((await attachment.body()).length, exported.size);
+  await api(`/api/v1/servers/${second.id}/files/content?path=selected-marker.txt`, "PUT", {content:"Selected export integration marker\n",etag:null});
+  await page.getByRole("tab", { name: "Files", exact: true }).click();
+  await page.getByRole("checkbox", {name:"Select selected-marker.txt for export",exact:true}).click();
+  await page.getByRole("button", {name:"Export selected",exact:true}).click();
+  await page.getByRole("list", {name:"Paths selected in Files",exact:true}).getByText("selected-marker.txt",{exact:true}).waitFor();
+  await page.getByRole("button", {name:"Export",exact:true}).click();
+  const confirmation = page.getByRole("alertdialog");
+  await confirmation.getByRole("heading",{name:"Export 1 path?",exact:true}).waitFor();
+  assert.match(await confirmation.innerText(), /manager host/);
+  const selectedRequest = page.waitForResponse(r=>r.url().endsWith(`/servers/${second.id}/exports`) && r.request().method()==="POST");
+  await confirmation.getByRole("button",{name:"Start export",exact:true}).click();
+  const selectedResponse = await selectedRequest;
+  assert.equal(selectedResponse.status(),202);
+  assert.deepEqual(selectedResponse.request().postDataJSON(),{scope:"selected",destination:"local",paths:["selected-marker.txt"]});
+  const selectedJob=(await selectedResponse.json()).job;
+  await page.getByText("Export verified",{exact:true}).first().waitFor();
+  await page.getByRole("link",{name:/^Activity/}).first().click();
+  await page.getByRole("heading",{name:"Activity",exact:true}).waitFor();
+  await page.locator(`a[href="/activity/${selectedJob.id}"]`).click();
+  await page.getByRole("heading",{name:"Export server",exact:true}).waitFor();
+  await page.getByText("Succeeded",{exact:true}).first().waitFor();
+  await page.getByRole("link",{name:`Open ${second.name}`,exact:true}).waitFor();
   await page.getByRole("link", { name: "Storage & exports", exact: true }).click();
   await page.getByRole("heading", { name: "Storage & exports", exact: true }).waitFor();
   await page.getByText(second.name, { exact: true }).first().waitFor();
@@ -295,7 +320,7 @@ try {
   assert.deepEqual(errors, [], "script errors");
   assert.deepEqual(violations, [], "CSP violations");
   console.log(
-    "PASS: contextual header, structured autosave, running-version isolation, restart application, WebSocket console, metrics preference, CPU/RAM editing and archive export/download",
+    "PASS: contextual header, properties autosave, live console, resource charts, launch/resources editing, selected file export confirmation/payload, activity list/detail and archive download",
   );
 } finally {
   if (fixture) {

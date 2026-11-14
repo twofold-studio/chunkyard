@@ -288,6 +288,12 @@ export interface Job {
 	finishedAt: string | null;
 }
 
+/** `GET /api/v1/jobs`: newest first; pass `nextCursor` back as `cursor` for older jobs. */
+export interface JobPage {
+	items: Job[];
+	nextCursor: string | null;
+}
+
 export interface JavaRuntime {
 	id: string;
 	vendor: string;

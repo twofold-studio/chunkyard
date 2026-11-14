@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import ServerExports from './server-exports.svelte';
+import { exportSelection } from '#lib/exports/export-selection.svelte.js';
 
 type Reply = { status: number; body?: unknown };
 let calls: { path: string; method: string; body?: unknown }[];
@@ -69,7 +70,10 @@ beforeEach(() => {
 	);
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+	vi.unstubAllGlobals();
+	exportSelection.clear('srv-1');
+});
 
 const exportButton = () => page.getByRole('button', { name: 'Export', exact: true });
 
@@ -108,6 +112,8 @@ describe('ServerExports', () => {
 		await page.getByRole('textbox').fill('world\n/plugins/\nworld');
 		await page.getByRole('radio', { name: 'S3' }).click();
 		await exportButton().click();
+		await expect.element(page.getByRole('alertdialog')).toHaveTextContent('To S3 bucket mc');
+		await page.getByRole('button', { name: 'Start export' }).click();
 
 		await expect.element(page.getByText('Export verified', { exact: true })).toBeVisible();
 		await expect.element(page.getByRole('listitem')).toHaveTextContent('survival-new.tar.gz');
@@ -156,5 +162,86 @@ describe('ServerExports', () => {
 		await expect
 			.element(page.getByRole('link', { name: 'Download survival-s.tar.gz' }))
 			.toHaveAttribute('href', '/api/v1/exports/s/download');
+	});
+
+	describe('Files selection', () => {
+		it('confirms the exact selected paths and destination, then clears them', async () => {
+			exportSelection.add('srv-1', [
+				{ path: 'world', kind: 'directory' },
+				{ path: 'ops.json', kind: 'file' }
+			]);
+			reply('GET', '/api/v1/storage', { status: 200, body: storage(false) });
+			reply('GET', '/api/v1/exports', { status: 200, body: { items: [] } });
+			reply('POST', '/api/v1/servers/srv-1/exports', {
+				status: 202,
+				body: { job: job('queued') }
+			});
+			reply('GET', '/api/v1/jobs/job-x', {
+				status: 200,
+				body: job('succeeded', { result: archive('sel') })
+			});
+			render(ServerExports, { serverId: 'srv-1', serverState: 'stopped', jobIntervalMs: 5 });
+
+			// A pending selection opens the selected scope without typing.
+			await expect
+				.element(page.getByRole('radio', { name: 'Selected paths' }))
+				.toHaveAttribute('aria-checked', 'true');
+			await expect.element(page.getByTestId('selected-count')).toHaveTextContent('2 selected');
+			await page.getByRole('textbox').fill('plugins/LuckPerms');
+			await exportButton().click();
+
+			const dialog = page.getByRole('alertdialog');
+			await expect.element(dialog).toHaveTextContent('Export 3 paths?');
+			await expect.element(dialog).toHaveTextContent('To the manager host');
+			const listed = [...dialog.element().querySelectorAll('li')].map((li) => li.textContent);
+			expect(listed).toEqual(['ops.json', 'world', 'plugins/LuckPerms']);
+			expect(calls.some((c) => c.method === 'POST')).toBe(false);
+
+			await page.getByRole('button', { name: 'Start export' }).click();
+			await expect.element(page.getByText('Export verified', { exact: true })).toBeVisible();
+			expect(calls.find((c) => c.method === 'POST')?.body).toEqual({
+				scope: 'selected',
+				destination: 'local',
+				paths: ['ops.json', 'world', 'plugins/LuckPerms']
+			});
+			expect(exportSelection.count('srv-1')).toBe(0);
+		});
+
+		it('cancelling the confirmation sends nothing and keeps the selection', async () => {
+			exportSelection.add('srv-1', [{ path: 'world', kind: 'directory' }]);
+			reply('GET', '/api/v1/storage', { status: 200, body: storage(false) });
+			reply('GET', '/api/v1/exports', { status: 200, body: { items: [] } });
+			render(ServerExports, { serverId: 'srv-1', serverState: 'stopped' });
+			await exportButton().click();
+			await page.getByRole('button', { name: 'Cancel' }).click();
+			await expect.element(page.getByRole('alertdialog')).not.toBeInTheDocument();
+			expect(calls.some((c) => c.method === 'POST')).toBe(false);
+			expect(exportSelection.paths('srv-1')).toEqual(['world']);
+		});
+
+		it('blocks exporting a selection while the server runs', async () => {
+			exportSelection.add('srv-1', [{ path: 'world', kind: 'directory' }]);
+			reply('GET', '/api/v1/storage', { status: 200, body: storage(false) });
+			reply('GET', '/api/v1/exports', { status: 200, body: { items: [] } });
+			render(ServerExports, { serverId: 'srv-1', serverState: 'running' });
+			await expect.element(page.getByText('Stop the server to export')).toBeVisible();
+			await expect.element(exportButton()).toBeDisabled();
+		});
+
+		it('removes individual paths and offers a way back to Files', async () => {
+			exportSelection.add('srv-1', [
+				{ path: 'world', kind: 'directory' },
+				{ path: 'ops.json', kind: 'file' }
+			]);
+			reply('GET', '/api/v1/storage', { status: 200, body: storage(false) });
+			reply('GET', '/api/v1/exports', { status: 200, body: { items: [] } });
+			const onChooseFiles = vi.fn();
+			render(ServerExports, { serverId: 'srv-1', serverState: 'stopped', onChooseFiles });
+			await page.getByRole('button', { name: 'Remove world from the selection' }).click();
+			expect(exportSelection.paths('srv-1')).toEqual(['ops.json']);
+			await page.getByRole('button', { name: 'Clear selection' }).click();
+			await page.getByRole('button', { name: 'Choose in Files' }).click();
+			expect(onChooseFiles).toHaveBeenCalledOnce();
+		});
 	});
 });

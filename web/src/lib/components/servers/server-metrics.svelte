@@ -31,6 +31,16 @@
 		UNAVAILABLE
 	} from '#lib/metrics.js';
 	import { cn } from '#lib/utils.js';
+	import {
+		appendSample,
+		gapThresholdMs,
+		latestMemoryLimit,
+		MAX_HISTORY_POINTS,
+		segments,
+		seriesStats,
+		type HistoryPoint
+	} from '#lib/metrics-history.js';
+	import HistorySparkline from '#lib/components/charts/history-sparkline.svelte';
 
 	interface Props {
 		serverId: string;
@@ -45,6 +55,14 @@
 	let error = $state.raw<unknown>(null);
 	let loading = $state(false);
 	let manual: AbortController | null = null;
+	/** Samples observed while this panel is open, for this server only (never persisted). */
+	let history = $state.raw<HistoryPoint[]>([]);
+	let historyFor = untrack(() => serverId);
+
+	function record(id: string, sample: ServerMetrics | null) {
+		if (id !== historyFor || (sample && sample.serverId !== id)) return;
+		history = appendSample(history, sample, Date.now());
+	}
 
 	const live = $derived(serverState === 'running');
 	// Browser-wide preference; 0 pauses automatic refresh (manual Refresh still works).
@@ -58,11 +76,15 @@
 			if (signal.aborted) return;
 			metrics = sample;
 			error = null;
+			record(id, sample);
 		} catch (cause) {
 			if (isAbortError(cause) || signal.aborted) return;
 			error = cause;
 			// A busy sampler is transient; anything else means the old values are no longer trustworthy.
-			if (errorCode(cause) !== 'metrics.busy') metrics = null;
+			if (errorCode(cause) !== 'metrics.busy') {
+				metrics = null;
+				record(id, null); // a failed sample is a gap, not a zero
+			}
 		} finally {
 			if (!signal.aborted) loading = false;
 		}
@@ -74,6 +96,11 @@
 		const every = seconds;
 		const controller = new AbortController();
 		untrack(() => {
+			if (historyFor !== id) {
+				// Another server: its history starts empty.
+				historyFor = id;
+				history = [];
+			}
 			manual?.abort();
 			loading = false;
 			error = null;
@@ -107,6 +134,19 @@
 	const cpuRatio = $derived(ratio(metrics?.cpuPercent, cpus && cpus > 0 ? cpus * 100 : null));
 	const memoryRatio = $derived(ratio(memoryUsed, metrics?.memoryLimitBytes));
 	const busy = $derived(errorCode(error) === 'metrics.busy');
+
+	const gapMs = $derived(gapThresholdMs(seconds));
+	const windowStart = $derived(history[0]?.t ?? 0);
+	const windowEnd = $derived(history.at(-1)?.t ?? 0);
+	const cpuStats = $derived(seriesStats(history, 'cpu'));
+	const memoryStats = $derived(seriesStats(history, 'memory'));
+	const windowText = $derived.by(() => {
+		const minutes = Math.round((windowEnd - windowStart) / 60_000);
+		if (history.length < 2) return 'the time this view has been open';
+		return minutes < 1
+			? 'the last minute'
+			: `the last ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+	});
 	const message = $derived(error ? describeError(error) : null);
 	const errorText = $derived.by(() => {
 		if (!message) return '';
@@ -224,6 +264,39 @@
 			</p>
 		</div>
 	</div>
+
+	{#if cpuStats.count + memoryStats.count > 0}
+		<div class="flex flex-col gap-2 border-t border-border pt-3" data-testid="metrics-history">
+			<p class="text-xs text-muted-foreground">
+				History collected while this view is open · {history.length}/{MAX_HISTORY_POINTS} samples, not
+				stored. Gaps mean no measurement.
+			</p>
+			<div class="grid gap-4 sm:grid-cols-2">
+				<HistorySparkline
+					label="CPU"
+					runs={segments(history, 'cpu', gapMs)}
+					start={windowStart}
+					end={windowEnd}
+					ceiling={cpus && cpus > 0 ? cpus * 100 : 100}
+					ceilingLabel={cpus ? `CPU limit (${cpus * 100}%)` : 'One core (100%)'}
+					stats={cpuStats}
+					format={formatCpu}
+					{windowText}
+				/>
+				<HistorySparkline
+					label="Memory (working set)"
+					runs={segments(history, 'memory', gapMs)}
+					start={windowStart}
+					end={windowEnd}
+					ceiling={latestMemoryLimit(history)}
+					ceilingLabel="Memory limit"
+					stats={memoryStats}
+					format={formatBytes}
+					{windowText}
+				/>
+			</div>
+		</div>
+	{/if}
 
 	<dl
 		class="flex flex-wrap gap-x-6 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground"

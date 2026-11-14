@@ -1,0 +1,129 @@
+/**
+ * Session-local resource history built from the samples the Resources panel already
+ * fetches. The backend keeps no history, so this only covers the time the view has been
+ * open. Missing values stay missing: stopped containers, failed samples and long pauses
+ * become gaps, never interpolated or zero-filled points.
+ */
+import type { ServerMetrics } from '#lib/api/index.js';
+
+/** Bounded buffer: ~10 minutes at the default 5 s interval. */
+export const MAX_HISTORY_POINTS = 120;
+
+export interface HistoryPoint {
+	/** Sample time in ms since the epoch. */
+	t: number;
+	cpu: number | null;
+	memory: number | null;
+	memoryLimit: number | null;
+}
+
+export type HistoryKey = 'cpu' | 'memory';
+
+function finite(value: number | null | undefined): number | null {
+	return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function isGap(point: HistoryPoint | undefined): boolean {
+	return !!point && point.cpu === null && point.memory === null;
+}
+
+/**
+ * Appends one observation. `sample === null` records a failed sample as a gap; a
+ * non-running container is also a gap. Duplicate or out-of-order sample times are
+ * ignored, consecutive gaps collapse, and the buffer never exceeds `max` points.
+ */
+export function appendSample(
+	points: readonly HistoryPoint[],
+	sample: ServerMetrics | null,
+	now: number,
+	max = MAX_HISTORY_POINTS
+): HistoryPoint[] {
+	const sampled = sample ? Date.parse(sample.sampledAt) : NaN;
+	const t = Number.isNaN(sampled) ? now : sampled;
+	const last = points.at(-1);
+	if (last && t <= last.t) return points as HistoryPoint[];
+
+	const running = sample?.status?.state === 'running';
+	const point: HistoryPoint = running
+		? {
+				t,
+				cpu: finite(sample.cpuPercent),
+				memory: finite(sample.memoryWorkingSetBytes),
+				memoryLimit: finite(sample.memoryLimitBytes)
+			}
+		: { t, cpu: null, memory: null, memoryLimit: null };
+
+	// A run of gaps carries no extra information; keep only the first.
+	if (isGap(point) && (isGap(last) || !last)) return points as HistoryPoint[];
+
+	const next = [...points, point];
+	return next.length > max ? next.slice(next.length - max) : next;
+}
+
+export interface XY {
+	t: number;
+	v: number;
+}
+
+/**
+ * Splits a series into drawable runs. Runs break at missing values and wherever two
+ * consecutive samples are more than `maxGapMs` apart (hidden tab, paused refresh).
+ */
+export function segments(
+	points: readonly HistoryPoint[],
+	key: HistoryKey,
+	maxGapMs: number
+): XY[][] {
+	const runs: XY[][] = [];
+	let run: XY[] = [];
+	let prevT: number | null = null;
+	for (const point of points) {
+		const v = point[key];
+		const broken = prevT !== null && point.t - prevT > maxGapMs;
+		if (v === null || broken) {
+			if (run.length) runs.push(run);
+			run = [];
+		}
+		if (v !== null) run.push({ t: point.t, v });
+		prevT = point.t;
+	}
+	if (run.length) runs.push(run);
+	return runs;
+}
+
+export interface SeriesStats {
+	latest: number | null;
+	min: number | null;
+	max: number | null;
+	/** Number of real (non-gap) values. */
+	count: number;
+}
+
+export function seriesStats(points: readonly HistoryPoint[], key: HistoryKey): SeriesStats {
+	let min: number | null = null;
+	let max: number | null = null;
+	let count = 0;
+	for (const point of points) {
+		const v = point[key];
+		if (v === null) continue;
+		count++;
+		min = min === null ? v : Math.min(min, v);
+		max = max === null ? v : Math.max(max, v);
+	}
+	const last = points.at(-1);
+	return { latest: last ? last[key] : null, min, max, count };
+}
+
+/** Allowed spacing before a line breaks: generous for sampling jitter, strict for pauses. */
+export function gapThresholdMs(intervalSeconds: number): number {
+	const base = intervalSeconds > 0 ? intervalSeconds : 30;
+	return base * 1000 * 2.5 + 2000;
+}
+
+/** Latest known hard memory limit in the window, used as the chart ceiling. */
+export function latestMemoryLimit(points: readonly HistoryPoint[]): number | null {
+	for (let i = points.length - 1; i >= 0; i--) {
+		if (points[i].memoryLimit !== null) return points[i].memoryLimit;
+	}
+	return null;
+}

@@ -25,12 +25,18 @@ export const DESTINATION_LABELS: Record<ExportDestination, string> = {
 export type PathsResult = { ok: true; paths: string[] } | { ok: false; error: string };
 
 /**
- * Parses newline-separated, instance-relative paths. Blank lines are ignored and duplicates
- * collapse; every path must pass {@link parseRelativePath} (no `..`, absolute or empty
- * segments). The backend still enforces containment and rejects symlinks.
+ * Parses newline-separated, instance-relative paths and merges them after `selected`
+ * (paths chosen in Files). Blank lines are ignored and duplicates collapse; every typed
+ * path must pass {@link parseRelativePath} (no `..`, absolute or empty segments). The
+ * backend still enforces containment and rejects symlinks.
  */
-export function parseExportPaths(input: string): PathsResult {
+export function parseExportPaths(input: string, selected: readonly string[] = []): PathsResult {
 	const paths: string[] = [];
+	for (const path of selected) {
+		const parsed = parseRelativePath(path);
+		if (!parsed.ok) return { ok: false, error: `Selected path ${path}: ${parsed.error}` };
+		if (!paths.includes(parsed.path)) paths.push(parsed.path);
+	}
 	const lines = input.split(/\r?\n/);
 	for (const [index, line] of lines.entries()) {
 		if (!line.trim()) continue;
@@ -40,7 +46,10 @@ export function parseExportPaths(input: string): PathsResult {
 	}
 	if (paths.length === 0) return { ok: false, error: 'Enter at least one path.' };
 	if (paths.length > MAX_SELECTED_PATHS) {
-		return { ok: false, error: `Select at most ${MAX_SELECTED_PATHS} paths.` };
+		return {
+			ok: false,
+			error: `Select at most ${MAX_SELECTED_PATHS} paths (currently ${paths.length}).`
+		};
 	}
 	return { ok: true, paths };
 }
@@ -48,10 +57,11 @@ export function parseExportPaths(input: string): PathsResult {
 export function buildExportRequest(
 	scope: ExportScope,
 	destination: ExportDestination,
-	pathsInput: string
+	pathsInput: string,
+	selected: readonly string[] = []
 ): { ok: true; request: CreateExportRequest } | { ok: false; error: string } {
 	if (scope !== 'selected') return { ok: true, request: { scope, destination } };
-	const parsed = parseExportPaths(pathsInput);
+	const parsed = parseExportPaths(pathsInput, selected);
 	if (!parsed.ok) return parsed;
 	return { ok: true, request: { scope, destination, paths: parsed.paths } };
 }

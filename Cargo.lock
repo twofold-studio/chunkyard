@@ -1513,7 +1513,7 @@ checksum = "4facc753ae494aeb6e3c22f839b158aebd4f9270f55cd3c79906c45476c47ab4"
 
 [[package]]
 name = "mcm-api"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "axum",
  "futures-util",
@@ -1532,7 +1532,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-api-tests"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -1559,7 +1559,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-auth"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "argon2",
  "base64 0.22.1",
@@ -1576,7 +1576,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-config"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "mcm-process",
  "serde",
@@ -1589,7 +1589,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-core"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -1601,7 +1601,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-db"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "mcm-core",
@@ -1615,7 +1615,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-download"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "futures-util",
  "reqwest",
@@ -1630,7 +1630,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-fs"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -1647,7 +1647,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-install"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -1665,7 +1665,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-java"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "fs2",
@@ -1685,7 +1685,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-jobs"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -1702,7 +1702,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-process"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "bollard",
@@ -1727,7 +1727,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-server"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "axum",

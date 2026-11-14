@@ -3,6 +3,7 @@
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
 	import CoffeeIcon from '@lucide/svelte/icons/coffee';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
+	import HistoryIcon from '@lucide/svelte/icons/history';
 	import PanelLeftCloseIcon from '@lucide/svelte/icons/panel-left-close';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import ShieldOffIcon from '@lucide/svelte/icons/shield-off';
@@ -18,13 +19,17 @@
 		auth: AuthContext;
 		onSignOut: () => void;
 		signingOut?: boolean;
+		/** Jobs queued or running among the newest jobs; hidden when 0 or unknown. */
+		activeJobs?: number | null;
 	}
 
-	let { auth, onSignOut, signingOut = false }: Props = $props();
+	let { auth, onSignOut, signingOut = false, activeJobs = null }: Props = $props();
+	const activityHref = resolve('activity');
 	const sidebar = Sidebar.useSidebar();
 
 	const nav = [
 		{ label: 'Servers', href: resolve('servers'), icon: ServerIcon },
+		{ label: 'Activity', href: resolve('activity'), icon: HistoryIcon },
 		{ label: 'Storage & exports', href: resolve('exports'), icon: ArchiveIcon },
 		{ label: 'Java runtimes', href: resolve('java'), icon: CoffeeIcon },
 		{ label: 'API reference', href: resolve('api-docs'), icon: BookOpenIcon }
@@ -65,6 +70,16 @@
 									>
 										<item.icon />
 										<span>{item.label}</span>
+										{#if item.href === activityHref && activeJobs}
+											<span
+												class="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums group-data-[collapsible=icon]:hidden"
+												title="{activeJobs} {activeJobs === 1 ? 'job' : 'jobs'} queued or running"
+											>
+												<span class="size-1.5 rounded-full bg-warning" aria-hidden="true"></span>
+												{activeJobs}
+												<span class="sr-only">{activeJobs === 1 ? 'job' : 'jobs'} in progress</span>
+											</span>
+										{/if}
 									</a>
 								{/snippet}
 							</Sidebar.MenuButton>

@@ -7,6 +7,9 @@
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import ListChecksIcon from '@lucide/svelte/icons/list-checks';
 	import OctagonPauseIcon from '@lucide/svelte/icons/octagon-pause';
+	import FolderTreeSelectIcon from '@lucide/svelte/icons/mouse-pointer-click';
+	import XIcon from '@lucide/svelte/icons/x';
+	import * as AlertDialog from '#lib/components/ui/alert-dialog/index.js';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -22,6 +25,7 @@
 		waitForJob,
 		type ExportDestination,
 		type ExportRecord,
+		type CreateExportRequest,
 		type ExportScope,
 		type Job,
 		type ServerState,
@@ -34,6 +38,7 @@
 		shortHash,
 		upsertExport
 	} from '#lib/exports/exports.js';
+	import { exportSelection } from '#lib/exports/export-selection.svelte.js';
 	import { formatBytes } from '#lib/metrics.js';
 	import { collapse, fadeIn } from '#lib/motion/index.js';
 	import { resolve } from '$app/paths';
@@ -48,6 +53,10 @@
 		busy?: boolean;
 		/** True while an export job for this server is queued or running. */
 		exporting?: boolean;
+		/** Bumped by Files → "Export selected" to switch to the selected-paths scope. */
+		selectionFocus?: number;
+		/** Opens the Files tab to pick paths. */
+		onChooseFiles?: () => void;
 		/** Injected in tests. */
 		jobIntervalMs?: number;
 	}
@@ -57,6 +66,8 @@
 		serverState,
 		busy = false,
 		exporting = $bindable(false),
+		selectionFocus = 0,
+		onChooseFiles,
 		jobIntervalMs = 1000
 	}: Props = $props();
 	const pathsId = $props.id();
@@ -66,7 +77,16 @@
 	let archives = $state.raw<ExportRecord[] | null>(null);
 	let loadError = $state.raw<unknown>(null);
 
-	let scope = $state<ExportScope>('world');
+	// Paths picked in Files (shared per server); typed paths below are merged after them.
+	const selected = $derived(exportSelection.paths(serverId));
+	let scope = $state<ExportScope>(
+		untrack(() => (exportSelection.count(serverId) > 0 ? 'selected' : 'world'))
+	);
+	$effect(() => {
+		if (selectionFocus > 0) untrack(() => (scope = 'selected'));
+	});
+	/** Request awaiting confirmation of its exact paths and destination. */
+	let confirming = $state.raw<CreateExportRequest | null>(null);
 	let destination = $state<ExportDestination>('local');
 	let pathsInput = $state('');
 	let attempted = $state(false);
@@ -99,7 +119,7 @@
 
 	const stopped = $derived(serverState === 'stopped');
 	const s3Ready = $derived(storage?.configured === true);
-	const built = $derived(buildExportRequest(scope, destination, pathsInput));
+	const built = $derived(buildExportRequest(scope, destination, pathsInput, selected));
 	const pathsError = $derived(attempted && !built.ok ? built.error : null);
 	const canSubmit = $derived(
 		stopped && !busy && !exporting && (destination === 'local' || s3Ready)
@@ -141,17 +161,34 @@
 		}
 	]);
 
-	async function start(event: SubmitEvent) {
+	function start(event: SubmitEvent) {
 		event.preventDefault();
 		attempted = true;
 		if (!canSubmit || !built.ok) return;
+		// Selected paths are confirmed explicitly; world/full scopes are self-describing.
+		if (built.request.scope === 'selected') confirming = built.request;
+		else void run(built.request, []);
+	}
+
+	function confirmExport() {
+		const request = confirming;
+		confirming = null;
+		if (!request || !canSubmit) return;
+		// Only paths that came from the Files selection are cleared after success.
+		void run(
+			request,
+			selected.filter((path) => request.paths?.includes(path))
+		);
+	}
+
+	async function run(request: CreateExportRequest, fromSelection: string[]) {
 		const target = serverId;
 		exporting = true;
 		jobError = null;
 		completed = null;
 		job = null;
 		try {
-			const { job: initial } = await createExport(target, built.request, { signal: abort.signal });
+			const { job: initial } = await createExport(target, request, { signal: abort.signal });
 			const final = await waitForJob(initial, {
 				signal: abort.signal,
 				intervalMs: jobIntervalMs,
@@ -161,6 +198,7 @@
 				const record = exportFromResult(final.result);
 				completed = record;
 				attempted = false;
+				if (fromSelection.length) exportSelection.remove(target, fromSelection);
 				if (record && record.serverId === target) {
 					archives = upsertExport(archives ?? [], record);
 				} else {
@@ -221,18 +259,72 @@
 			/>
 
 			{#if scope === 'selected'}
+				<span class="self-start pt-1 text-xs font-medium text-muted-foreground">From Files</span>
+				<div class="flex min-w-0 flex-col gap-1.5" transition:collapse>
+					{#if selected.length}
+						<ul class="flex flex-wrap gap-1.5" aria-label="Paths selected in Files">
+							{#each selected as path (path)}
+								<li
+									class="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-muted/40 py-0.5 pr-0.5 pl-2 font-mono text-xs"
+								>
+									<span class="truncate" title={path}>{path}</span>
+									<Button
+										variant="ghost"
+										size="icon-xs"
+										class="size-5"
+										aria-label={`Remove ${path} from the selection`}
+										disabled={exporting}
+										onclick={() => exportSelection.remove(serverId, [path])}
+									>
+										<XIcon />
+									</Button>
+								</li>
+							{/each}
+						</ul>
+						<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+							<span data-testid="selected-count"
+								>{selected.length} selected · folders include everything inside them</span
+							>
+							{#if onChooseFiles}
+								<button
+									type="button"
+									class="underline underline-offset-4 hover:text-foreground"
+									onclick={onChooseFiles}>Change in Files</button
+								>
+							{/if}
+							<button
+								type="button"
+								class="underline underline-offset-4 hover:text-foreground disabled:opacity-50"
+								disabled={exporting}
+								onclick={() => exportSelection.clear(serverId)}>Clear selection</button
+							>
+						</div>
+					{:else}
+						<p
+							class="flex flex-wrap items-center gap-x-2 gap-y-1 pt-1 text-xs text-muted-foreground"
+						>
+							<span>Nothing selected.</span>
+							{#if onChooseFiles}
+								<Button variant="outline" size="xs" onclick={onChooseFiles}>
+									<FolderTreeSelectIcon data-icon="inline-start" />
+									Choose in Files
+								</Button>
+							{/if}
+						</p>
+					{/if}
+				</div>
 				<label for={pathsId} class="self-start pt-1.5 text-xs font-medium text-muted-foreground"
-					>Paths</label
+					>Typed paths</label
 				>
 				<div class="flex min-w-0 flex-col gap-1.5" transition:collapse>
 					<Textarea
 						id={pathsId}
 						bind:value={pathsInput}
-						rows={3}
+						rows={selected.length ? 2 : 3}
 						spellcheck={false}
 						autocomplete="off"
 						placeholder={PATHS_PLACEHOLDER}
-						class="min-h-20 font-mono text-xs md:text-xs"
+						class="min-h-16 font-mono text-xs md:text-xs"
 						aria-invalid={pathsError ? true : undefined}
 						aria-describedby={`${pathsId}-hint`}
 						disabled={exporting}
@@ -242,7 +334,7 @@
 						class={['text-xs', pathsError ? 'text-destructive' : 'text-muted-foreground']}
 					>
 						{pathsError ??
-							`One file or folder per line, relative to the server directory (up to ${MAX_SELECTED_PATHS}). Symbolic links fail the export.`}
+							`${selected.length ? 'Optional extra paths, one' : 'One file or folder'} per line, relative to the server directory (up to ${MAX_SELECTED_PATHS} in total). Symbolic links fail the export.`}
 					</p>
 				</div>
 			{/if}
@@ -344,3 +436,32 @@
 
 	<RestoreNote />
 </div>
+
+<AlertDialog.Root bind:open={() => confirming !== null, (open) => !open && (confirming = null)}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>
+				Export {confirming?.paths?.length ?? 0}
+				{confirming?.paths?.length === 1 ? 'path' : 'paths'}?
+			</AlertDialog.Title>
+			<AlertDialog.Description>
+				To {confirming?.destination === 's3'
+					? `S3 bucket ${storage?.bucket ?? ''}${storage?.prefix ? `/${storage.prefix}` : ''}`
+					: 'the manager host'}. Folders are archived with everything inside them. The server stays
+				locked until the archive is verified.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<ul
+			class="max-h-60 overflow-y-auto rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs"
+			aria-label="Paths to export"
+		>
+			{#each confirming?.paths ?? [] as path (path)}
+				<li class="truncate py-0.5" title={path}>{path}</li>
+			{/each}
+		</ul>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={confirmExport}>Start export</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

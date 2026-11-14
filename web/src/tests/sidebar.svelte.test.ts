@@ -51,9 +51,25 @@ describe('app sidebar', () => {
 		expect(links).toEqual([
 			'Chunkyard',
 			'Servers',
+			'Activity',
 			'Storage & exports',
 			'Java runtimes',
 			'API reference'
 		]);
+	});
+
+	it('shows a discreet active-job count only when jobs are in progress', async () => {
+		const screen = render(Harness, {
+			auth: { mode: 'disabled' },
+			onSignOut: vi.fn(),
+			activeJobs: 2
+		});
+		await expect
+			.element(page.getByRole('link', { name: /Activity/ }))
+			.toHaveTextContent('2 jobs in progress');
+		await screen.rerender({ activeJobs: 0 });
+		await expect
+			.element(page.getByRole('link', { name: /Activity/ }))
+			.not.toHaveTextContent('in progress');
 	});
 });

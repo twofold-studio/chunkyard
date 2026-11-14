@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import ServerFiles from './server-files.svelte';
+import { exportSelection } from '#lib/exports/export-selection.svelte.js';
 
 type Reply = { status: number; body?: unknown };
 interface Call {
@@ -79,7 +80,11 @@ beforeEach(() => {
 	);
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+	vi.unstubAllGlobals();
+	exportSelection.clear('srv-1');
+	exportSelection.clear('srv-2');
+});
 
 function setup(props: Record<string, unknown> = {}) {
 	return render(ServerFiles, { serverId: 'srv-1', serverState: 'stopped', ...props });
@@ -283,5 +288,85 @@ describe('ServerFiles', () => {
 		await vi.waitFor(() => expect(signal).toBeDefined());
 		screen.unmount();
 		expect(signal?.aborted).toBe(true);
+	});
+
+	describe('export selection', () => {
+		it('selects from the real listing, skips links and hands off to Exports', async () => {
+			reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES)));
+			const onExportSelected = vi.fn();
+			setup({ onExportSelected });
+			await page.getByRole('checkbox', { name: 'Select world for export' }).click();
+			await page.getByRole('checkbox', { name: 'Select eula.txt for export' }).click();
+			await expect.element(page.getByTestId('selection-count')).toHaveTextContent('2 selected');
+			await expect
+				.element(page.getByRole('checkbox', { name: 'Select link for export' }))
+				.toBeDisabled();
+			await page.getByRole('button', { name: 'Export selected' }).click();
+			expect(onExportSelected).toHaveBeenCalledOnce();
+			expect(exportSelection.paths('srv-1')).toEqual(['eula.txt', 'world']);
+			// Selecting never mutates anything on the server.
+			expect(mutations()).toEqual([]);
+		});
+
+		it('selects all visible entries (respecting the filter) and clears them', async () => {
+			reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES)));
+			setup({ onExportSelected: () => {} });
+			await page.getByRole('searchbox', { name: 'Filter this folder' }).fill('.txt');
+			await page.getByRole('checkbox', { name: 'Select all visible entries for export' }).click();
+			expect(exportSelection.paths('srv-1')).toEqual([
+				'<img src=x onerror=alert(1)>.txt',
+				'eula.txt'
+			]);
+			await expect
+				.element(page.getByRole('checkbox', { name: 'Clear selection of visible entries' }))
+				.toHaveAttribute('aria-checked', 'true');
+			await page.getByRole('checkbox', { name: 'Clear selection of visible entries' }).click();
+			expect(exportSelection.count('srv-1')).toBe(0);
+		});
+
+		it('keeps the selection across folders and marks contents of selected folders', async () => {
+			reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES)));
+			reply(
+				'GET',
+				`${BASE}?${q('world')}`,
+				ok(listing('world', [entry('level.dat', { path: 'world/level.dat' })]))
+			);
+			setup({ onExportSelected: () => {} });
+			await page.getByRole('checkbox', { name: 'Select world for export' }).click();
+			await page.getByRole('button', { name: 'world', exact: true }).click();
+			const covered = page.getByRole('checkbox', {
+				name: 'level.dat is included with folder world'
+			});
+			await expect.element(covered).toBeDisabled();
+			await expect.element(covered).toHaveAttribute('aria-checked', 'true');
+			await expect.element(page.getByText('1 in other folders', { exact: false })).toBeVisible();
+		});
+
+		it('allows selecting while running but explains the stop requirement', async () => {
+			reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES, false)));
+			setup({ serverState: 'running', onExportSelected: () => {} });
+			await page.getByRole('checkbox', { name: 'Select plugins for export' }).click();
+			await expect.element(page.getByText('Exports need a stopped server')).toBeVisible();
+		});
+
+		it('drops paths that disappeared from the folder listing', async () => {
+			exportSelection.add('srv-1', [
+				{ path: 'old.txt', kind: 'file' },
+				{ path: 'world', kind: 'directory' }
+			]);
+			reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES)));
+			setup({ onExportSelected: () => {} });
+			await expect.element(page.getByTestId('selection-count')).toHaveTextContent('1 selected');
+			expect(exportSelection.paths('srv-1')).toEqual(['world']);
+		});
+
+		it('caps the selection at 100 paths', async () => {
+			const many = Array.from({ length: 105 }, (_, i) => entry(`f${String(i).padStart(3, '0')}`));
+			reply('GET', `${BASE}?${q('')}`, ok(listing('', many)));
+			setup({ onExportSelected: () => {} });
+			await page.getByRole('checkbox', { name: 'Select all visible entries for export' }).click();
+			await expect.element(page.getByTestId('selection-count')).toHaveTextContent('100 selected');
+			expect(exportSelection.count('srv-1')).toBe(100);
+		});
 	});
 });

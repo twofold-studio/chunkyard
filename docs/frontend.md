@@ -5,7 +5,7 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 ## What it does
 
 - **Authentication.** Reads `/api/v1/setup/status`. First-run setup in two steps (verify the setup token, then create the owner with email and password) and email/password sign-in when authentication is enabled; sign-out from the sidebar. When the backend runs with `CHUNKYARD_AUTH__ENABLED=false`, setup and login are skipped and the sidebar shows "Authentication disabled"; no user is shown or invented. An expired session on any request returns the browser to sign-in.
-- **Servers.** List with container status, refreshed every 10 s while the tab is visible. Staged Vanilla/Paper creation with version/build selection, automatic verified installation, Java image selection, name, port, heap, CPUs and explicit EULA acceptance. Custom JAR/image fields remain an advanced choice. Management tabs provide lifecycle controls, console, files, network settings and EULA acceptance while stopped.
+- **Servers.** List with container status, refreshed every 10 s while the tab is visible. Staged Vanilla/Paper/CurseForge creation with version/build or pack-release selection, automatic verified installation, Java image selection, name, port, heap, CPUs and explicit EULA acceptance. Custom JAR/image fields remain an advanced choice. Management tabs provide lifecycle controls, console, properties, files, exports, launch/network/resources settings and EULA acceptance. Generic file and runtime-setting changes require a stopped instance.
 - **Java runtimes.** Inventory, system discovery, and Temurin install from `/api/v1/java/available` with job polling.
 - **API reference.** A searchable, locally rendered view of the live OpenAPI document, including request/response schemas and examples; no request execution.
 - **Resources.** A compact server-detail panel shows on-demand CPU, memory, uptime, PIDs and cumulative I/O; it polls every five seconds while running and visible, clears stale measurements on stop, and marks unknown values with a dash. See [monitoring](monitoring.md).
@@ -61,11 +61,11 @@ After building the UI and `cargo build -p mcm-server --locked`, run `node script
 
 ## Vanilla/Paper creation
 
-The creation wizard guides software, version/build, name/port, resources, review/EULA and installation. The current backend supports Vanilla/Paper; Forge/Fabric/CurseForge are research for later. Custom JAR skips the version/install stages. Back keeps entered values; review rows link back to their step. Docker image overrides are optional. Creation happens only after review, and failed installs retry against the same saved ID. Start remains unavailable until managed installation succeeds. EULA acceptance is always explicit. See [API contracts](http-api.md) and [installation details](docker.md#managed-vanilla-and-paper-installation-rest-api).
+The creation wizard guides software, version/build, name/port, resources, review/EULA and installation. The backend supports Vanilla/Paper and CurseForge linked server packs, including Forge/NeoForge/Fabric loader preparation. Standalone Forge/Fabric catalog entries remain unavailable. Custom JAR skips the version/install stages. Back keeps entered values; review rows link back to their step. Docker image overrides are optional. Creation happens only after review, and failed installs retry against the same saved ID. Start remains unavailable until managed installation succeeds. EULA acceptance is always explicit. See [API contracts](http-api.md) and [installation details](docker.md#managed-vanilla-and-paper-installation-rest-api).
 
 ## Instance management and motion
 
-The selected instance's name, status, concise software/port/memory summary and lifecycle controls occupy the main top bar. They update on server changes and clear when leaving the instance. Overview keeps secondary container details. Management tabs are Overview, Console, Properties, Files and Settings; compact Settings rows expand networking and EULA controls.
+The selected instance's name, status, concise software/port/memory summary and lifecycle controls occupy the main top bar. They update on server changes and clear when leaving the instance. Overview keeps secondary container details. Management tabs are Overview, Console, Properties, Files, Exports and Settings; compact Settings rows expand networking, CPU/RAM and launch controls alongside EULA acceptance.
 
 Properties provides a searchable grouped form and a raw-text view. Booleans, choices, numbers and unknown keys can be edited without rewriting unrelated comments/formatting. Changes autosave after about 900 ms of inactivity, immediately on Enter in a single-line input, or after changing a switch/select. There is no Save button or ordinary save confirmation. Navigation and start/restart flush queued edits first; conflicts and failures remain visible instead of overwriting another saved version. Editing works while Minecraft runs: the tab distinguishes the saved and running versions and marks restart-required changes. History can preview and restore earlier content as a new version without restarting.
 
@@ -84,3 +84,11 @@ CHUNKYARD_TEST_LIVE_INSTALL=1 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/run/current-s
 ```
 
 With the flag, the smoke also exercises text editing, downloads, uploads, the unsaved-navigation guard and network settings against real APIs. Without it, a fixed version-list fixture and disabled Docker verify real create/install failure and same-record retry without upstream access. Leaving the creation page stops job tracking; installation continues on the backend, and the server detail page refreshes its saved installation state.
+
+## Activity, selection exports and resource history
+
+Activity lists cursor-paged background jobs, filters the loaded records and refreshes active jobs while visible. Detail pages show safe summaries of known result fields; there is no raw JSON, cancellation or percentage progress. The sidebar indicator samples the newest 20 jobs on navigation and is not a live count of all history.
+
+Files offers up to 100 selected file/folder paths per instance. Selecting a folder includes its contents. Export selected opens the existing Exports tab; a confirmation lists the paths and local/S3 destination before submitting the stopped-only export. Selections survive in-app navigation, but a reload clears them. Typed paths remain available.
+
+Overview charts reuse the existing resource snapshot polling, hold at most 120 samples, and break lines for missing samples and pauses. This is temporary history collected while Overview is open, not stored backend history. Leaving Overview resets the charts. See [implementation status](implementation-status.md) for remaining monitoring and backup work.

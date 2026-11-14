@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -10,6 +11,7 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { provideTopbarSlot } from '#lib/components/app/topbar-context.svelte.js';
+	import { activityIndicator } from '#lib/jobs/activity-indicator.svelte.js';
 	import type { LayoutProps } from './$types';
 
 	let { data, children }: LayoutProps = $props();
@@ -25,6 +27,14 @@
 			});
 		})
 	);
+
+	// Discreet active-job count: one throttled check per route change, no timer.
+	$effect(() => {
+		void page.url.pathname;
+		if (!data.auth || data.unavailable) return;
+		untrack(() => void activityIndicator.check());
+	});
+	$effect(() => () => activityIndicator.cancel());
 
 	async function signOut() {
 		if (signingOut) return;
@@ -54,7 +64,12 @@
 	</main>
 {:else}
 	<Sidebar.Provider style="--sidebar-width: 16.5rem;">
-		<AppSidebar auth={data.auth} onSignOut={signOut} {signingOut} />
+		<AppSidebar
+			auth={data.auth}
+			onSignOut={signOut}
+			{signingOut}
+			activeJobs={activityIndicator.active}
+		/>
 		<Sidebar.Inset class="min-w-0">
 			<AppTopbar {crumbs} context={topbar.content}>
 				{#snippet actions()}
