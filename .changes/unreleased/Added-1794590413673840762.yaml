@@ -1,3 +1,0 @@
-kind: Added
-body: 'REST API: GET /api/v1/openapi.json serves an OpenAPI 3.1.1 contract for the implemented routes, request/response schemas, cookie authentication and CSRF requirements, protected by the current authentication mode.'
-time: 2026-11-13T19:20:13.673840762+02:00

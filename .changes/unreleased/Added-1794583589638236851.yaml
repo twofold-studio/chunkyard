@@ -1,3 +1,0 @@
-kind: Added
-body: 'Backend: persist Docker server records and expose /api/v1/servers lifecycle jobs, console snapshots/commands, and /api/v1/system/isolation. Containers survive manager restarts and are checked against persistent ownership labels.'
-time: 2026-11-13T17:26:29.638236851+02:00

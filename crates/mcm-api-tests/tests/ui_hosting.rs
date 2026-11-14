@@ -19,6 +19,10 @@ async fn root_and_deep_links_serve_the_same_html_with_a_hashed_bootstrap_policy(
         );
         assert!(csp.contains(&hash));
         assert!(csp.contains("script-src 'self'"));
+        assert!(csp.contains(&format!(
+            "connect-src 'self' {}",
+            app.base.replacen("http://", "ws://", 1)
+        )));
         assert!(!csp.contains("unsafe-eval"));
         assert!(response.text().await?.contains("window.test=1"));
     }

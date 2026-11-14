@@ -10,6 +10,9 @@ import type {
 	DirectoryListing,
 	FileContent,
 	FileEntry,
+	PropertiesDocument,
+	PropertiesVersion,
+	PropertiesVersionPage,
 	Isolation,
 	SavedFile,
 	ServerNetwork,
@@ -229,3 +232,37 @@ export const updateServerNetwork = (id: string, body: UpdateNetworkRequest, o: O
 		method: 'PATCH',
 		body
 	});
+
+// Server properties (desired versions) --------------------------------------------
+// Editable while the server runs; saved versions apply on the next explicit start/restart.
+
+const propertiesUrl = (id: string, suffix = '') => `/api/v1/servers/${enc(id)}/properties${suffix}`;
+
+export const getProperties = (id: string, o: Opts = {}) =>
+	request<PropertiesDocument>(propertiesUrl(id), o);
+
+/** Saves a new version; `etag` must match the latest (409 `properties.conflict`). */
+export const saveProperties = (id: string, body: { content: string; etag: string }, o: Opts = {}) =>
+	request<PropertiesDocument>(propertiesUrl(id), { ...o, method: 'PUT', body });
+
+export const listPropertiesVersions = (
+	id: string,
+	params: { limit?: number; before?: number | null } = {},
+	o: Opts = {}
+) => {
+	const query = new URLSearchParams();
+	if (params.limit) query.set('limit', String(params.limit));
+	if (params.before != null) query.set('before', String(params.before));
+	const suffix = query.size ? `/versions?${query}` : '/versions';
+	return request<PropertiesVersionPage>(propertiesUrl(id, suffix), o);
+};
+
+export const getPropertiesVersion = (id: string, version: number, o: Opts = {}) =>
+	request<PropertiesVersion>(propertiesUrl(id, `/versions/${version}`), o);
+
+/** Copies `version` into a new latest version. Never restarts the server. */
+export const restoreProperties = (
+	id: string,
+	body: { version: number; etag: string },
+	o: Opts = {}
+) => request<PropertiesDocument>(propertiesUrl(id, '/restore'), { ...o, method: 'POST', body });

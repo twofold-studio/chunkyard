@@ -29,7 +29,8 @@ export default defineConfig({
 		proxy: {
 			// Keep the browser's Host header (changeOrigin: false): the backend checks Host and
 			// Origin against CHUNKYARD_HTTP__PUBLIC_URL and has no CORS support.
-			'/api': { target: BACKEND, changeOrigin: false },
+			// `ws` forwards the live console WebSocket (same Host/Origin rules apply).
+			'/api': { target: BACKEND, changeOrigin: false, ws: true },
 			'/healthz': { target: BACKEND, changeOrigin: false }
 		}
 	},

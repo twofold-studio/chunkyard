@@ -1,3 +1,0 @@
-kind: Added
-body: 'REST API: DELETE /api/v1/servers/{id} queues stopped-instance deletion, removes only owned containers and retains server files by default; deleteFiles=true explicitly removes worlds and other managed files. Completed jobs report retained paths; deleted instances stop consuming automatic port assignments.'
-time: 2026-11-13T23:21:19.24337738+02:00

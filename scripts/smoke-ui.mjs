@@ -330,6 +330,7 @@ async function test(enabled, showVersion = true) {
         "uploaded through the real UI",
       );
       await page.getByRole("tab", { name: "Settings", exact: true }).click();
+      await page.getByRole("button", { name: "Edit", exact: true }).click();
       await page.getByLabel("Host port", { exact: true }).fill("25568");
       await page.getByLabel("Bind address", { exact: true }).fill("127.0.0.1");
       const network = page.waitForResponse(
@@ -347,9 +348,8 @@ async function test(enabled, showVersion = true) {
       );
       assert.equal(configured.port, 25568);
       assert.equal(configured.publishIp, "127.0.0.1");
-      await page
-        .getByRole("button", { name: "Edit server.properties", exact: true })
-        .click();
+      await page.getByRole("button", { name: /Minecraft settings/ }).click();
+      await page.getByRole("button", { name: "Raw text", exact: true }).click();
       await page
         .getByRole("textbox", {
           name: "Contents of server.properties",
@@ -387,7 +387,8 @@ async function test(enabled, showVersion = true) {
         .waitFor();
       await page
         .getByRole("dialog")
-        .getByText("Unreleased", { exact: true })
+        .getByRole("heading", { name: /^(Unreleased|\d+\.\d+\.\d+)/ })
+        .first()
         .waitFor();
       await page.keyboard.press("Escape");
     } else {

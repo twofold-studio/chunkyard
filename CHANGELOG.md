@@ -4,7 +4,7 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
-## Unreleased
+## 0.2.0 - 2026-11-14
 
 
 ### Added
@@ -40,6 +40,11 @@ Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fr
 - REST API: GET/PATCH /api/v1/servers/{id}/network expose current/effective game-port binding and stopped-instance port/address overrides; null publishIp restores the manager default. Saving preserves server data and refreshes only the owned stopped container.
 - REST API: add /api/v1/servers/{id}/files routes for bounded browsing, UTF-8 editing with stale-save checks, streaming uploads/downloads, mkdir, move, copy and confirmed recursive deletion. Mutations require a stopped instance and share its lifecycle lock; managed artifacts and EULA remain protected.
 - Web UI: staged new-server wizard (software, version/modpack, name & port, resources, review with EULA, install) with back/next validation and same-ID install retries; server pages gain Overview, Console, Files and Settings tabs; a file browser with breadcrumbs, sorting/filter, upload (raw bytes, explicit replace), download, text editor with etag conflict protection, new file/folder, rename/move/copy and confirmed permanent delete; Settings edits host port and bind address (e.g. 0.0.0.0 or a NetBird IP) and opens server.properties; shared reduced-motion-aware transitions across the app. Uses the /files and /network routes.
+- Web UI: Properties tab for server.properties with grouped, searchable switches, selects and inputs (plus raw text view). Edits autosave after a short pause (Enter, switches and selects save at once), also while the server runs, with conflict, retry and busy-backoff states and no save prompts. Shows the saved version against the running one, says when a restart is needed (or that the running version is unknown for older containers), and lists version history; an old version is read-only until Restore, which saves it as a new version without restarting. The lossless editor keeps comments, unknown keys, CRLF, escapes, continuations and duplicate keys. Uses GET/PUT /api/v1/servers/{id}/properties, GET .../properties/versions[/{version}] and POST .../properties/restore; Files and Settings open this tab for server.properties.
+- Web UI: live console over the WebSocket GET /api/v1/servers/{id}/console/stream (snapshot replaces, new lines append, 1000-line buffer). Reconnects with bounded backoff while the server runs and the tab is visible, closes when hidden, stopped or left, and falls back to polling GET .../console if WebSockets fail. Commands still use POST .../console/commands. The dev server proxies WebSockets.
+- Web UI: refresh interval for CPU/RAM metrics (Off, 1, 2, 5, 10, 30 or 60 seconds), remembered in this browser for all servers. Off keeps the last sample and allows manual refresh.
+- REST API: add versioned /api/v1/servers/{id}/properties, /versions and /restore routes. Save desired configuration while running, retain immutable history with etag conflicts, and apply the latest revision only on explicit start/restart with saved-versus-applied runtime tracking.
+- REST API: GET /api/v1/servers/{id}/console/stream now provides bounded same-origin WebSocket console output, reconnectable history, heartbeat cleanup and periodic session revalidation; commands remain on the CSRF-protected POST route.
 
 ### Changed
 
@@ -49,11 +54,16 @@ Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fr
 - Web UI: the setup page lists where to read the setup token (Docker host, a container terminal such as Dokploy, or the data-directory file) as labelled monospace blocks, and shows a subtle animated copper "Threads" background ported from React Bits. The background is decorative only, pauses when hidden or with reduced motion, and falls back to a static pattern without WebGL2.
 - REST API: POST /api/v1/servers accepts omitted/null ports for atomic automatic selection and permits explicitly shared ports. Start/restart jobs enforce one running or paused instance per port with server.port_in_use; SQLite migration preserves existing records while removing creation-time port uniqueness.
 - Networking: game ports now bind to 0.0.0.0 by default, retaining CHUNKYARD_DOCKER__PUBLISH_IP for host-only or VPN-interface overrides. Existing owned stopped containers with outdated bindings are recreated on their next explicit start/restart while preserving server files.
+- Web UI: the selected server name, status, summary and lifecycle/delete controls now live in the main top bar instead of a second page header, and update when switching servers or leaving the page. Settings is compact: a one-line Network summary that expands to edit, and a one-line EULA switch.
+- Root server.properties file reads/writes now use desired versioned configuration; use the Properties API instead of uploading, moving, copying or deleting that managed path. Retained instance directories receive the latest desired properties before deletion. Legacy or externally restarted containers report an unknown applied revision until a managed restart.
+- Completed requested milestones now batch the changelog, bump project versions, commit, push and verify deployment under the user-authorized workflow; in-progress work remains unreleased. Shared-worktree instructions prohibit repository-wide stash and cleanup operations.
 
 ### Fixed
 
 - Web UI: keep the setup/sign-in version badge below the form in normal flow so long forms and narrow screens cannot overlap it.
 - REST API: concurrent GET /api/v1/servers/{id}/files reads queue behind instance operations, allowing folder refresh and editor loading together without spurious server.busy errors. The web editor also warns before in-app navigation discards unsaved text.
+- Web UI: editing a CRLF text file in the file editor keeps its line endings instead of converting them to LF.
+- Properties controls keep absent keys explicitly unset instead of claiming defaults that vary by Minecraft version. Enter/navigation/start flush queued edits, applied metadata refreshes after lifecycle changes, and live console streams reconnect after a container restart.
 
 ### Security
 

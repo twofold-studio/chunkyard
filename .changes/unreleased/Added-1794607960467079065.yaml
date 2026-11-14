@@ -1,3 +1,0 @@
-kind: Added
-body: 'REST API: GET/PATCH /api/v1/servers/{id}/network expose current/effective game-port binding and stopped-instance port/address overrides; null publishIp restores the manager default. Saving preserves server data and refreshes only the owned stopped container.'
-time: 2026-11-14T00:12:40.467079065+02:00

@@ -93,6 +93,17 @@ const KNOWN: Record<string, Omit<ErrorMessage, 'detail'> & { detail?: string }> 
 		hint: 'Reload the file to see the latest version before saving again.'
 	},
 	'files.not_empty': { title: 'Folder is not empty' },
+	'properties.conflict': {
+		title: 'Properties changed elsewhere',
+		hint: 'Reload the latest version, or keep yours to save it on top.'
+	},
+	'properties.not_found': { title: 'Properties version not found' },
+	'properties.invalid': { title: 'Properties rejected' },
+	'properties.too_large': {
+		title: 'Properties too large',
+		hint: 'server.properties is limited to 1 MiB.'
+	},
+	'properties.storage': { title: 'Could not store properties' },
 	'files.server_running': {
 		title: 'Server is running',
 		hint: 'Stop the server to change its files. Changes take effect on the next start.'

@@ -1,3 +1,0 @@
-kind: Added
-body: 'Frontend: list host Java runtimes, run system discovery, and install Temurin versions with job status; the page states that Docker servers use their image JVM.'
-time: 2026-11-13T18:18:40.177159488+02:00

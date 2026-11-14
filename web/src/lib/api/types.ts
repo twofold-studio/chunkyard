@@ -341,3 +341,42 @@ export interface UpdateNetworkRequest {
 	/** `null` restores the manager default bind address. */
 	publishIp: string | null;
 }
+
+// Properties -------------------------------------------------------------------
+
+/**
+ * `GET|PUT /api/v1/servers/{id}/properties`: the latest saved (desired)
+ * server.properties. Saved versions apply on the next explicit start/restart.
+ */
+export interface PropertiesDocument {
+	content: string;
+	etag: string;
+	/** Latest saved version. */
+	version: number;
+	/** Version the running/last started game uses; `null` when unknown (legacy container). */
+	appliedVersion: number | null;
+	/** A newer version is saved than the running game uses. */
+	restartRequired: boolean;
+	status: RuntimeStatus;
+	updatedAt: string;
+}
+
+export type PropertiesVersionSource = 'import' | 'edit' | 'restore';
+
+export interface PropertiesVersionSummary {
+	version: number;
+	etag: string;
+	createdAt: string;
+	source: PropertiesVersionSource;
+}
+
+/** `GET /api/v1/servers/{id}/properties/versions` (newest first). */
+export interface PropertiesVersionPage {
+	items: PropertiesVersionSummary[];
+	nextBefore: number | null;
+}
+
+/** `GET /api/v1/servers/{id}/properties/versions/{version}` */
+export interface PropertiesVersion extends PropertiesVersionSummary {
+	content: string;
+}

@@ -38,6 +38,11 @@ Sessions use a 32-byte random token; only SHA-256 is stored. Cookies are HttpOnl
 | DELETE | `/api/v1/servers/{id}?deleteFiles=false` | 202 `{job}`; stopped instance only; retains files by default |
 | GET | `/api/v1/servers/{id}/network` | `{port,publishIp,effectivePublishIp,boundPublishIp,boundPort,restartRequired,status}` |
 | PATCH | `/api/v1/servers/{id}/network` | 200 `{server}`; body `{port,publishIp}`; stopped only, null bind uses manager default |
+| GET/PUT | `/api/v1/servers/{id}/properties` | Desired content, etag, saved/applied version and restart state; PUT `{content,etag}` works while running |
+| GET | `/api/v1/servers/{id}/properties/versions?limit=50&before=...` | Immutable revision metadata, newest first; `{items,nextBefore}` |
+| GET | `/api/v1/servers/{id}/properties/versions/{version}` | One prior revision including content |
+| POST | `/api/v1/servers/{id}/properties/restore` | Body `{version,etag}` creates a new desired revision without restarting |
+| GET (WebSocket) | `/api/v1/servers/{id}/console/stream` | Authenticated same-origin console frames; matching `Origin` required |
 | GET | `/api/v1/servers/{id}/files?path=` | `{path,entries,truncated,canWrite}`; empty path lists instance root |
 | GET | `/api/v1/servers/{id}/files/content?path=...` | `{path,content,etag,size,readOnly,canWrite}`; UTF-8 text up to 1 MiB |
 | PUT | `/api/v1/servers/{id}/files/content?path=...` | `{path,etag,size}`; body `{content,etag}`; null etag creates only |
@@ -58,7 +63,7 @@ When authentication is enabled, setup, token verification, login, health, setup 
 
 ## Instance files
 
-File mutations require a stopped instance and use the same lock as installation, lifecycle, network changes and instance deletion. Reads/downloads work while running; `canWrite` becomes false. If Docker is unavailable, listing and reading still work with writes disabled. Operations run in blocking workers, retaining the lock until filesystem work actually finishes even if the browser disconnects.
+Generic file mutations require a stopped instance and use the same lock as installation, lifecycle, network changes and instance deletion. Reads/downloads work while running; listing `canWrite` becomes false. If Docker is unavailable, listing and reading still work with generic writes disabled. Versioned `server.properties` has its own editing rules below. Filesystem workers retain the lock until work actually finishes even if the browser disconnects.
 
 Paths are relative POSIX names inside one instance. Root listing uses an empty path; no operation may replace or delete root. Dot segments, absolute paths, backslashes, control characters and Windows device/alternate-stream names are rejected. Paths are limited to 1024 bytes, 32 components and 255 bytes per component. Directory capabilities and no-follow opens prevent symbolic-link traversal, including linked instance roots. `.chunkyard-*` components are hidden/protected. Root `eula.txt` is readable but changes use the separate EULA action.
 
@@ -68,7 +73,23 @@ Listings stop after 5000 inspected entries and report `truncated`; non-UTF-8 nam
 
 File errors use `files.path_invalid` (422), `files.symlink`/`files.protected` (403), `files.not_found` (404), `files.exists`/`files.conflict`/`files.not_empty`/`files.server_running` (409), `files.too_large` (413), `files.binary` (415), and `files.io` (500). Reads queue behind existing instance operations; conflicting mutations return `server.busy` (409).
 
-Edit `server.properties` through the same text API. Changes take effect on the next start; saving never starts a server or accepts the EULA. The launcher forces the internal game port to 25565: change the published host port through `/network`. Authentication settings such as `online-mode` are left to the owner; Chunkyard does not change them automatically.
+## Versioned server properties
+
+The dedicated `/properties` API stores desired configuration and immutable history in SQLite. Saving works while running, stopped or Docker is unavailable. It does not rewrite the active file or restart Minecraft. The latest desired revision is written atomically before the next explicit start/restart, then recorded against that specific container start. Root `server.properties` reads/writes/downloads through `/files` remain compatible and use the desired revision; generic upload, move, copy and deletion of that managed path now return `files.protected`. Clients should use `/properties` and its history routes.
+
+`GET /properties` returns `{content,etag,version,appliedVersion,restartRequired,status,updatedAt}`. PUT requires `{content,etag}`; text is UTF-8 without NUL, up to 1 MiB in an 8 MiB JSON envelope. A stale etag returns 409 `properties.conflict`; unchanged text creates no revision. Version metadata is `{version,etag,createdAt,source}` with source `import`, `edit` or `restore`. History pages default to 50, maximum 100; pass `nextBefore` back as `before`. Restoring requires the current desired etag and always creates a new revision; it never rewrites past entries or restarts the game.
+
+`appliedVersion` identifies a manager-tracked start, or is null when unknown. A legacy running instance or an external container restart has an unknown applied revision until the next managed restart. Minecraft may fill in defaults or persist console settings; observed runtime file changes are imported without discarding an independently saved pending revision. The desired revision is authoritative for the next start, so use this API rather than changing the active file with an external tool. Deleting the instance removes its history; when files are retained, the latest desired properties are first exported into that directory.
+
+The launcher forces internal game port 25565: edit the published port through `/network`. `online-mode`, whitelist and other game settings change only when the owner edits them. Autosave does not accept the EULA or start a server. Other errors include `properties.not_found` (404), `properties.invalid` (422), `properties.too_large` (413), `properties.storage` (500), existing `files.*` failures, and `server.busy` for an overlapping mutation.
+
+## Live console
+
+Connect a browser WebSocket to `/api/v1/servers/{id}/console/stream` (`wss:` for HTTPS). It uses the normal owner cookie and requires an exact matching `Origin` in both auth modes. This read-only GET does not need a CSRF header. Server commands still use the existing CSRF-protected POST route.
+
+The first JSON text frame is `{type:"snapshot",lines:[]}`, resetting the client buffer. A single ordered Docker follow request then sends the last 200 log records and subsequent output as `{type:"line",line:{stream,text}}`. Reconnecting starts a fresh snapshot; append only line frames afterward. End-of-container output produces `{type:"end"}`; failures use `{type:"error",code,detail}`. A stopped instance rejects the handshake with 409.
+
+There are at most 16 concurrent console sockets. Lines are limited to 8192 UTF-8 bytes and 256 lines per Docker frame. Slow sends time out, heartbeats detect disconnected peers, and authenticated sessions are revalidated every five seconds. Revoked sessions receive `auth.required` and close. Unexpected client data closes the read-only socket. The frontend reconnects with backoff and falls back to snapshots when streaming is unavailable; it closes sockets on hidden/inactive tabs and navigation. The page CSP permits only the configured same-origin WebSocket endpoint.
 
 `JavaRuntime` is the current core model: `{id, vendor, major, fullVersion, os, arch, path, managed, sha256}`. OS can be `linux`, `alpine-linux`, or `windows`. Planned fields such as `usedBy` and `installedAt` are not present yet. `java.allow_system_java = false` hides system runtimes and disables discovery.
 
@@ -95,9 +116,9 @@ Server lifecycle and console routes are documented in [docker.md](docker.md). Th
 
 ## Version badge and changelog
 
-`GET /api/v1/system/version` returns `{enabled:true, version:"0.1.0", channel:"development"}` for the current development build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
+`GET /api/v1/system/version` returns `{enabled:true, version:"0.2.0", channel:"development"}` for the current build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
 
-`[http] show_version = true` is the default. Set `CHUNKYARD_HTTP__SHOW_VERSION=false`, restart/redeploy, and reload the page to hide the badge: version metadata then returns `{enabled:false, version:null, channel:null}`, and the changelog endpoint returns 404 `version.disabled`. The UI fetches changelog content only when the modal opens. The package version changes during an explicit release; development pushes update Unreleased notes without bumping versions.
+`[http] show_version = true` is the default. Set `CHUNKYARD_HTTP__SHOW_VERSION=false`, restart/redeploy, and reload the page to hide the badge: version metadata then returns `{enabled:false, version:null, channel:null}`, and the changelog endpoint returns 404 `version.disabled`. The UI fetches changelog content only when the modal opens. Completed, verified milestones batch notes and bump the project version under the authorized [changelog workflow](changelog.md); in-progress changes remain Unreleased.
 
 ## Environment name migration
 

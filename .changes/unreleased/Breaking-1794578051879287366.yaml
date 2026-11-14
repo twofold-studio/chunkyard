@@ -1,3 +1,0 @@
-kind: Breaking
-body: 'REST API: setup and login now accept email/password, and user.email replaces user.username. Update clients to send email; username request fields are no longer accepted. Authentication remains enabled by default.'
-time: 2026-11-13T15:54:11.879287366+02:00

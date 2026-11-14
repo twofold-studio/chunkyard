@@ -81,9 +81,17 @@
 		openRequest?: OpenRequest | null;
 		/** True while the editor holds unsaved changes. */
 		dirty?: boolean;
+		/** Opens the versioned Properties tab instead of editing server.properties as a file. */
+		onOpenProperties?: () => void;
 	}
 
-	let { serverId, serverState, openRequest = null, dirty = $bindable(false) }: Props = $props();
+	let {
+		serverId,
+		serverState,
+		openRequest = null,
+		dirty = $bindable(false),
+		onOpenProperties
+	}: Props = $props();
 
 	let path = $state(ROOT);
 	let listing = $state.raw<DirectoryListing | null>(null);
@@ -166,6 +174,10 @@
 	}
 
 	function openEditor(target: string) {
+		if (target === SERVER_PROPERTIES && onOpenProperties) {
+			onOpenProperties();
+			return;
+		}
 		if (editing === target) return;
 		if (editing && dirty) {
 			toast.warning('Save or discard your changes first', {
@@ -462,7 +474,9 @@
 			>
 				<SettingsIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
 				<span class="flex min-w-0 flex-1 flex-col">
-					<span class="text-sm font-medium">Edit server.properties</span>
+					<span class="text-sm font-medium"
+						>{onOpenProperties ? 'Minecraft settings' : 'Edit server.properties'}</span
+					>
 					<span class="text-xs text-muted-foreground"
 						>Game rules, MOTD, difficulty, whitelist and more.</span
 					>

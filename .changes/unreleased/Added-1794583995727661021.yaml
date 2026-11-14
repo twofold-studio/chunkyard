@@ -1,3 +1,0 @@
-kind: Added
-body: 'REST API: add POST /api/v1/servers/{id}/eula to explicitly accept or revoke EULA acceptance while stopped, replacing symlinked EULA files without following them.'
-time: 2026-11-13T17:33:15.727661021+02:00

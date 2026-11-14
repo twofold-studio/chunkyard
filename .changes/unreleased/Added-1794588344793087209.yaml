@@ -1,3 +1,0 @@
-kind: Added
-body: Docker images now build and include the production UI, served alongside the API without a Node runtime. CI checks frontend validation and tests plus real-browser setup, session, deep-link, and CSP checks through Rust hosting.
-time: 2026-11-13T18:45:44.793087209+02:00

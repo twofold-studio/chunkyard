@@ -3,6 +3,7 @@ pub mod auth;
 pub mod files;
 pub mod java;
 pub mod jobs;
+pub mod properties;
 pub mod repository;
 pub mod server;
 pub mod system;

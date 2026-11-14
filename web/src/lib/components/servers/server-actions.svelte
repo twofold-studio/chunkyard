@@ -16,9 +16,20 @@
 		onAction: (action: ServerAction) => void;
 		/** Managed software is not installed yet, so the server cannot start. */
 		startBlocked?: boolean;
+		/** Icon-only buttons below the xl breakpoint (contextual header). */
+		compact?: boolean;
 	}
 
-	let { serverState, busy, pending, onAction, startBlocked = false }: Props = $props();
+	let {
+		serverState,
+		busy,
+		pending,
+		onAction,
+		startBlocked = false,
+		compact = false
+	}: Props = $props();
+	const iconOnly = $derived(compact ? 'max-xl:w-8 max-xl:px-0!' : undefined);
+	const labelClass = $derived(compact ? 'sr-only xl:not-sr-only' : undefined);
 	let confirmKill = $state(false);
 
 	const canStart = $derived(
@@ -34,30 +45,43 @@
 		/>{/if}
 {/snippet}
 
-<div class="flex flex-wrap items-center gap-2">
+<div class={['flex items-center', compact ? 'gap-1.5' : 'flex-wrap gap-2']}>
 	<Button
 		size="sm"
+		class={iconOnly}
 		disabled={!canStart}
 		title={startBlocked ? 'Install the server software before starting' : undefined}
 		onclick={() => onAction('start')}
 	>
 		{@render icon('start', PlayIcon)}
-		Start
+		<span class={labelClass}>Start</span>
 	</Button>
-	<Button size="sm" variant="outline" disabled={!canStop} onclick={() => onAction('stop')}>
+	<Button
+		size="sm"
+		variant="outline"
+		class={iconOnly}
+		disabled={!canStop}
+		onclick={() => onAction('stop')}
+	>
 		{@render icon('stop', SquareIcon)}
-		Stop
+		<span class={labelClass}>Stop</span>
 	</Button>
-	<Button size="sm" variant="outline" disabled={!canStop} onclick={() => onAction('restart')}>
+	<Button
+		size="sm"
+		variant="outline"
+		class={iconOnly}
+		disabled={!canStop}
+		onclick={() => onAction('restart')}
+	>
 		{@render icon('restart', RotateCwIcon)}
-		Restart
+		<span class={labelClass}>Restart</span>
 	</Button>
 	<AlertDialog.Root bind:open={confirmKill}>
 		<AlertDialog.Trigger>
 			{#snippet child({ props })}
-				<Button {...props} size="sm" variant="destructive" disabled={!canKill}>
+				<Button {...props} size="sm" variant="destructive" class={iconOnly} disabled={!canKill}>
 					{@render icon('kill', ZapIcon)}
-					Kill
+					<span class={labelClass}>Kill</span>
 				</Button>
 			{/snippet}
 		</AlertDialog.Trigger>

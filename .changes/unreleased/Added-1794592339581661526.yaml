@@ -1,3 +1,0 @@
-kind: Added
-body: 'Web UI: show a discreet version badge (for example v0.1.0 · dev) on setup, sign-in and the app sidebar from public GET /api/v1/system/version. Clicking it opens a scrollable changelog dialog that loads GET /api/v1/system/changelog only when first opened, with loading, error and retry states, and renders the Markdown as plain text without injecting HTML. The badge stays hidden, and the changelog is never requested, when the feature is disabled or the version request fails.'
-time: 2026-11-13T19:52:19.581661526+02:00

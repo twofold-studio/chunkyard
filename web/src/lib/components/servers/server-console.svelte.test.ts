@@ -2,6 +2,30 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import ServerConsole from './server-console.svelte';
+import type { SocketLike } from '#lib/console/console-stream.js';
+
+class FakeSocket implements SocketLike {
+	static all: FakeSocket[] = [];
+	onopen: SocketLike['onopen'] = null;
+	onmessage: SocketLike['onmessage'] = null;
+	onclose: SocketLike['onclose'] = null;
+	onerror: SocketLike['onerror'] = null;
+	closed = false;
+	constructor(readonly url: string) {
+		FakeSocket.all.push(this);
+	}
+	close() {
+		this.closed = true;
+	}
+	open() {
+		this.onopen?.(new Event('open'));
+	}
+	send(frame: unknown) {
+		this.onmessage?.({ data: JSON.stringify(frame) } as MessageEvent);
+	}
+}
+const createSocket = (url: string) => new FakeSocket(url);
+const out = (text: string) => ({ stream: 'stdout', text });
 
 function snapshot(lines: string[]) {
 	return new Response(
@@ -12,7 +36,10 @@ function snapshot(lines: string[]) {
 	);
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+	vi.unstubAllGlobals();
+	FakeSocket.all = [];
+});
 
 describe('ServerConsole', () => {
 	it('replaces the snapshot on refresh instead of appending duplicates', async () => {
@@ -42,7 +69,11 @@ describe('ServerConsole', () => {
 			init?.method === 'POST' ? new Response(null, { status: 204 }) : snapshot(['ready'])
 		);
 		vi.stubGlobal('fetch', fetch);
-		const { unmount } = render(ServerConsole, { serverId: 's1', running: true });
+		const { unmount } = render(ServerConsole, {
+			serverId: 's1',
+			running: true,
+			createSocket: null
+		});
 		await page.getByLabelText('Console command').fill('say Hello');
 		await page.getByRole('button', { name: 'Send' }).click();
 		await vi.waitFor(() => {
@@ -58,11 +89,70 @@ describe('ServerConsole', () => {
 	it('stops polling after unmount', async () => {
 		const fetch = vi.fn().mockResolvedValue(snapshot(['x']));
 		vi.stubGlobal('fetch', fetch);
-		const { unmount } = render(ServerConsole, { serverId: 's1', running: true });
+		const { unmount } = render(ServerConsole, {
+			serverId: 's1',
+			running: true,
+			createSocket: null
+		});
 		await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
 		unmount();
 		const calls = fetch.mock.calls.length;
 		await new Promise((r) => setTimeout(r, 3500));
 		expect(fetch.mock.calls.length).toBe(calls);
+	});
+
+	it('streams live output over one WebSocket without polling', async () => {
+		const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+		vi.stubGlobal('fetch', fetch);
+		render(ServerConsole, { serverId: 's1', running: true, createSocket });
+		await vi.waitFor(() => expect(FakeSocket.all).toHaveLength(1));
+		const socket = FakeSocket.all[0];
+		expect(socket.url).toMatch(/^ws:\/\/.*\/api\/v1\/servers\/s1\/console\/stream$/);
+		socket.open();
+		socket.send({ type: 'snapshot', lines: [out('one'), out('two')] });
+		socket.send({ type: 'line', line: out('three') });
+		const log = page.getByRole('log');
+		await expect.element(log).toHaveTextContent('three');
+		await expect.element(page.getByText(/^Live/)).toBeVisible();
+		// A reconnect snapshot replaces the buffer instead of duplicating lines.
+		socket.send({ type: 'snapshot', lines: [out('one'), out('two'), out('three')] });
+		await expect.element(log).toHaveTextContent('three');
+		expect(log.element().textContent?.match(/one/g)).toHaveLength(1);
+		await new Promise((r) => setTimeout(r, 300));
+		expect(fetch).not.toHaveBeenCalled();
+		// Commands still use the POST route; the reply arrives on the stream.
+		await page.getByLabelText('Console command').fill('list');
+		await page.getByRole('button', { name: 'Send' }).click();
+		await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+		await new Promise((r) => setTimeout(r, 800));
+		expect(fetch).toHaveBeenCalledOnce();
+	});
+
+	it('falls back to snapshot polling when the stream cannot be used', async () => {
+		const fetch = vi.fn().mockResolvedValue(snapshot(['polled']));
+		vi.stubGlobal('fetch', fetch);
+		render(ServerConsole, {
+			serverId: 's1',
+			running: true,
+			createSocket: () => {
+				throw new Error('blocked');
+			}
+		});
+		await expect.element(page.getByRole('log')).toHaveTextContent('polled');
+		await expect.element(page.getByText(/Refreshes every 3s/)).toBeVisible();
+	});
+
+	it('closes the socket on unmount and does not open one while stopped', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(snapshot(['old'])));
+		const screen = render(ServerConsole, { serverId: 's1', running: true, createSocket });
+		await vi.waitFor(() => expect(FakeSocket.all).toHaveLength(1));
+		await screen.rerender({ running: false });
+		await vi.waitFor(() => expect(FakeSocket.all[0].closed).toBe(true));
+		await expect.element(page.getByRole('log')).toHaveTextContent('old');
+		expect(FakeSocket.all).toHaveLength(1);
+		await screen.rerender({ running: true });
+		await vi.waitFor(() => expect(FakeSocket.all).toHaveLength(2));
+		screen.unmount();
+		expect(FakeSocket.all[1].closed).toBe(true);
 	});
 });

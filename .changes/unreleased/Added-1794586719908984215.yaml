@@ -1,3 +1,0 @@
-kind: Added
-body: 'Frontend: add the web UI shell with owner setup, email/password sign-in and sign-out, and an authentication-disabled mode that skips login without showing a user. Expired sessions return to sign-in.'
-time: 2026-11-13T18:18:39.908984215+02:00

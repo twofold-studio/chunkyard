@@ -81,6 +81,7 @@ describe('ServerNetwork', () => {
 		const save = page.getByRole('button', { name: 'Save network' });
 		await expect.element(page.getByLabelText('Host port')).toHaveValue(25565);
 		await expect.element(save).toBeDisabled();
+		await page.getByText('Playing over NetBird or another VPN?').click();
 		await expect.element(page.getByText(/NetBird \(or other VPN\)/)).toBeVisible();
 
 		await page.getByLabelText('Host port').fill('25570');
@@ -136,5 +137,27 @@ describe('ServerNetwork', () => {
 			.element(page.getByText('Stop the server to change network settings.'))
 			.toBeVisible();
 		await expect.element(page.getByText('127.0.0.1:25565', { exact: true })).toBeVisible();
+	});
+
+	it('collapses to a one-line summary that still flags a pending restart', async () => {
+		responses[`GET ${URL}`] = [
+			network({ restartRequired: true, boundPublishIp: '127.0.0.1', boundPort: 25565 })
+		];
+		render(ServerNetwork, {
+			server: server('running'),
+			busy: false,
+			onServerUpdated: vi.fn(),
+			open: false
+		});
+		await expect.element(page.getByText('0.0.0.0:25565')).toBeVisible();
+		await expect.element(page.getByText('Restart to apply', { exact: true })).toBeVisible();
+		await expect.element(page.getByLabelText('Host port')).not.toBeInTheDocument();
+		const toggle = page.getByRole('button', { name: 'Edit' });
+		await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
+		await toggle.click();
+		await expect.element(page.getByLabelText('Host port')).toBeDisabled();
+		await expect
+			.element(page.getByRole('button', { name: 'Hide' }))
+			.toHaveAttribute('aria-expanded', 'true');
 	});
 });

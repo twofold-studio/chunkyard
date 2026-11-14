@@ -5,6 +5,13 @@
 	import { untrack } from 'svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
+	import {
+		formatMetricsInterval,
+		METRICS_INTERVALS,
+		metricsInterval,
+		type MetricsIntervalSeconds
+	} from '#lib/metrics-interval.svelte.js';
 	import {
 		describeError,
 		errorCode,
@@ -32,9 +39,6 @@
 		cpus?: number;
 	}
 
-	/** The backend samples on demand (~1 s each, globally limited), so never poll faster. */
-	const INTERVAL_MS = 5000;
-
 	let { serverId, serverState, cpus }: Props = $props();
 
 	let metrics = $state.raw<ServerMetrics | null>(null);
@@ -43,6 +47,9 @@
 	let manual: AbortController | null = null;
 
 	const live = $derived(serverState === 'running');
+	// Browser-wide preference; 0 pauses automatic refresh (manual Refresh still works).
+	const seconds = $derived(metricsInterval.seconds);
+	const paused = $derived(live && seconds === 0);
 
 	async function load(id: string, signal: AbortSignal) {
 		loading = true;
@@ -64,16 +71,19 @@
 	$effect(() => {
 		const id = serverId;
 		const running = live;
+		const every = seconds;
 		const controller = new AbortController();
 		untrack(() => {
 			manual?.abort();
 			loading = false;
 			error = null;
-			if (!running || metrics?.serverId !== id) metrics = null;
-			if (running) {
-				poll((signal) => load(id, signal), { intervalMs: INTERVAL_MS, signal: controller.signal });
-			} else {
-				// Stopped/paused: one snapshot for status, resources come back as null.
+			const current = metrics?.serverId === id;
+			if (!running || !current) metrics = null;
+			if (running && every > 0) {
+				// Sequential: the next sample waits for the previous one; hidden tabs pause.
+				poll((signal) => load(id, signal), { intervalMs: every * 1000, signal: controller.signal });
+			} else if (!(running && current)) {
+				// Stopped, or refresh off: one snapshot. Turning refresh off keeps the last sample.
 				load(id, controller.signal);
 			}
 		});
@@ -140,12 +150,35 @@
 			<span>
 				{#if !live}
 					Not running
+				{:else if paused}
+					Paused{#if sampledAt}&nbsp;· sampled {formatTime(sampledAt)}{/if}
 				{:else if sampledAt}
-					Sampled {formatTime(sampledAt)} · every {INTERVAL_MS / 1000}s
+					Sampled {formatTime(sampledAt)} · every {seconds}s
 				{:else}
 					Waiting for first sample
 				{/if}
 			</span>
+			<Select.Root
+				type="single"
+				value={String(seconds)}
+				onValueChange={(next) => metricsInterval.set(Number(next) as MetricsIntervalSeconds)}
+			>
+				<Select.Trigger
+					size="sm"
+					class="h-7! gap-1 px-2 text-xs"
+					aria-label="Metrics refresh interval"
+					title="Automatic refresh (saved in this browser)"
+				>
+					{formatMetricsInterval(seconds)}
+				</Select.Trigger>
+				<Select.Content>
+					{#each METRICS_INTERVALS as option (option)}
+						<Select.Item value={String(option)} label={formatMetricsInterval(option)}>
+							{option === 0 ? 'Off' : `Every ${option}s`}
+						</Select.Item>
+					{/each}
+				</Select.Content>
+			</Select.Root>
 			<Button
 				variant="ghost"
 				size="icon-xs"

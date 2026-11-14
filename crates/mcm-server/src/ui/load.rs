@@ -12,7 +12,7 @@ use std::{
 use walkdir::WalkDir;
 const MAX_BUNDLE: usize = 64 * 1024 * 1024;
 
-pub(super) fn load(root: &Path) -> Result<Option<UiAssets>, UiError> {
+pub(super) fn load(root: &Path, origin: Option<&str>) -> Result<Option<UiAssets>, UiError> {
     match std::fs::metadata(root) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(e) => return Err(e.into()),
@@ -99,9 +99,16 @@ pub(super) fn load(root: &Path) -> Result<Option<UiAssets>, UiError> {
             "expected SvelteKit build with 200.html fallback; run pnpm --dir web build",
         ));
     }
+    let websocket_origin = match origin {
+        Some(origin) if origin.starts_with("https://") => format!(" wss://{}", &origin[8..]),
+        Some(origin) if origin.starts_with("http://") => format!(" ws://{}", &origin[7..]),
+        Some(_) => return Err(UiError::Invalid("invalid public origin")),
+        None => String::new(),
+    };
     let policy = format!(
-        "default-src 'none'; script-src 'self' {}; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'",
-        hashes.into_iter().collect::<Vec<_>>().join(" ")
+        "default-src 'none'; script-src 'self' {}; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'{}; worker-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'",
+        hashes.into_iter().collect::<Vec<_>>().join(" "),
+        websocket_origin
     );
     if policy.len() > 16384 {
         return Err(UiError::Invalid("too many inline scripts for CSP"));

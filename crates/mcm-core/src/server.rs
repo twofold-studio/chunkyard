@@ -164,6 +164,7 @@ pub struct ConsoleLine {
     pub stream: String,
     pub text: String,
 }
+pub type ConsoleStream = futures_util::stream::BoxStream<'static, Result<ConsoleLine, ServerError>>;
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
     #[error("{0}")]
@@ -225,6 +226,19 @@ pub trait ServerRepo: Send + Sync {
 /// the single managed directory belonging to the persisted server.
 #[async_trait]
 pub trait ServerRuntime: Send + Sync {
+    async fn stream_logs(&self, server: &Server, tail: u32) -> Result<ConsoleStream, ServerError> {
+        use futures_util::StreamExt;
+        let lines = self.logs(server, tail).await?;
+        Ok(Box::pin(
+            futures_util::stream::iter(lines.into_iter().map(Ok))
+                .chain(futures_util::stream::pending()),
+        ))
+    }
+    /// Distinguishes separate starts of a reused container. Unknown means an
+    /// applied configuration revision must not be claimed as current.
+    async fn configuration_identity(&self, server: &Server) -> Result<Option<String>, ServerError> {
+        Ok(self.status(server).await?.container_id)
+    }
     async fn network(&self, server: &Server) -> Result<NetworkSettings, ServerError> {
         Ok(NetworkSettings {
             port: server.port,
@@ -253,6 +267,7 @@ pub trait ServerRuntime: Send + Sync {
 }
 #[async_trait]
 pub trait ServerService: Send + Sync {
+    async fn console_stream(&self, id: &str) -> Result<ConsoleStream, ServerError>;
     async fn network(&self, id: &str) -> Result<NetworkSettings, ServerError>;
     async fn set_network(
         &self,

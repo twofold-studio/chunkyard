@@ -217,6 +217,17 @@ describe('ServerFiles', () => {
 			.toHaveValue('pvp=true\n');
 	});
 
+	it('sends server.properties to the Properties tab when one is provided', async () => {
+		reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES)));
+		const onOpenProperties = vi.fn();
+		setup({ onOpenProperties });
+		await page.getByRole('button', { name: 'server.properties', exact: true }).first().click();
+		expect(onOpenProperties).toHaveBeenCalledOnce();
+		await page.getByRole('button', { name: /Minecraft settings/ }).click();
+		expect(onOpenProperties).toHaveBeenCalledTimes(2);
+		expect(calls.some((c) => c.url.includes('/content'))).toBe(false);
+	});
+
 	it('confirms permanent folder deletion and sends recursive only when ticked', async () => {
 		reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES)), ok(listing('', ROOT_ENTRIES)));
 		reply('POST', `${BASE}/delete`, problem(409, 'files.not_empty'), { status: 204 });

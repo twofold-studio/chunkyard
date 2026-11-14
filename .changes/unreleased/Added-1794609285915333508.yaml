@@ -1,3 +1,0 @@
-kind: Added
-body: 'Web UI: staged new-server wizard (software, version/modpack, name & port, resources, review with EULA, install) with back/next validation and same-ID install retries; server pages gain Overview, Console, Files and Settings tabs; a file browser with breadcrumbs, sorting/filter, upload (raw bytes, explicit replace), download, text editor with etag conflict protection, new file/folder, rename/move/copy and confirmed permanent delete; Settings edits host port and bind address (e.g. 0.0.0.0 or a NetBird IP) and opens server.properties; shared reduced-motion-aware transitions across the app. Uses the /files and /network routes.'
-time: 2026-11-14T00:34:45.915333508+02:00

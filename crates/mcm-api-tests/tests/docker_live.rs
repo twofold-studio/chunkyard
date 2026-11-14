@@ -1,4 +1,5 @@
 //! Opt-in test: build testdata/docker-runtime first, then run with --ignored.
+use futures_util::StreamExt;
 use mcm_core::server::{CreateServer, ServerState};
 use mcm_server::wiring::build_state;
 use serde_json::json;
@@ -132,6 +133,25 @@ async fn real_docker_start_console_restart_adoption_stop_and_kill() -> Result {
             .is_some_and(|percent| percent.is_finite() && percent >= 0.0)
     );
     assert!(metrics.pids.is_some_and(|pids| pids > 0));
+    let mut live = backend.state.servers.console_stream(&id).await?;
+    tokio::time::timeout(Duration::from_secs(5), live.next())
+        .await?
+        .ok_or("missing console history")??;
+    backend
+        .state
+        .servers
+        .command(&id, "say live-stream-fixture")
+        .await?;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while let Some(line) = live.next().await {
+            if line?.text.contains("live-stream-fixture") {
+                return Ok::<_, Box<dyn std::error::Error>>(());
+            }
+        }
+        Err("console stream ended before command output".into())
+    })
+    .await??;
+    drop(live);
     backend.state.servers.command(&id, "say hello").await?;
     for _ in 0..100 {
         if std::fs::read_to_string(created.directory.join("last-command.txt"))
@@ -145,6 +165,27 @@ async fn real_docker_start_console_restart_adoption_stop_and_kill() -> Result {
         std::fs::read_to_string(created.directory.join("last-command.txt"))?.trim(),
         "say hello"
     );
+    let active_properties = backend.state.properties.properties(&id).await?;
+    let pending_content = format!(
+        "{}motd=pending version fixture\n",
+        active_properties.content
+    );
+    let pending_properties = backend
+        .state
+        .properties
+        .save_properties(
+            &id,
+            mcm_core::properties::PropertiesWrite {
+                content: pending_content.clone(),
+                etag: active_properties.etag,
+            },
+        )
+        .await?;
+    assert!(pending_properties.restart_required);
+    assert!(
+        !std::fs::read_to_string(created.directory.join("server.properties"))?
+            .contains("pending version fixture")
+    );
     backend.shutdown().await;
     drop(backend);
     config.docker.publish_ip = [0, 0, 0, 0].into();
@@ -155,9 +196,38 @@ async fn real_docker_start_console_restart_adoption_stop_and_kill() -> Result {
     );
     let old_id = reopened.state.servers.get(&id).await?.status.container_id;
     let old_network = reopened.state.servers.network(&id).await?;
+    let persisted = reopened.state.properties.properties(&id).await?;
+    assert_eq!(persisted.version, pending_properties.version);
+    assert_ne!(persisted.applied_version, Some(persisted.version));
     assert_eq!(old_network.bound_publish_ip.as_deref(), Some("127.0.0.1"));
     assert!(old_network.restart_required);
     reopened.state.servers.restart(&id).await?;
+    let applied_properties = reopened.state.properties.properties(&id).await?;
+    assert_eq!(applied_properties.applied_version, Some(persisted.version));
+    assert!(!applied_properties.restart_required);
+    assert_eq!(
+        std::fs::read_to_string(created.directory.join("server.properties"))?,
+        pending_content
+    );
+    // A reused container can be restarted outside the manager. Its old applied
+    // marker must not be claimed for this new process start.
+    let external = Command::new("docker")
+        .args(["restart", "--time", "1", &_cleanup.0])
+        .output()?;
+    assert!(external.status.success());
+    let unknown = reopened.state.properties.properties(&id).await?;
+    assert!(unknown.applied_version.is_none());
+    assert!(unknown.restart_required);
+    reopened.state.servers.restart(&id).await?;
+    assert_eq!(
+        reopened
+            .state
+            .properties
+            .properties(&id)
+            .await?
+            .applied_version,
+        Some(persisted.version)
+    );
     let refreshed = reopened.state.servers.network(&id).await?;
     assert_eq!(refreshed.bound_publish_ip.as_deref(), Some("0.0.0.0"));
     assert!(!refreshed.restart_required);

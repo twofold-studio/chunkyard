@@ -9,10 +9,13 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import { provideTopbarSlot } from '#lib/components/app/topbar-context.svelte.js';
 	import type { LayoutProps } from './$types';
 
 	let { data, children }: LayoutProps = $props();
 	let signingOut = $state(false);
+	// Scoped to this shell instance: pages render their header content through it.
+	const topbar = provideTopbarSlot();
 
 	// A protected request reported an expired session or pending setup: leave the app shell.
 	$effect(() =>
@@ -53,7 +56,7 @@
 	<Sidebar.Provider style="--sidebar-width: 16.5rem;">
 		<AppSidebar auth={data.auth} onSignOut={signOut} {signingOut} />
 		<Sidebar.Inset class="min-w-0">
-			<AppTopbar {crumbs}>
+			<AppTopbar {crumbs} context={topbar.content}>
 				{#snippet actions()}
 					{#if !onCreatePage}
 						<Button href={resolve('servers/new')} size="sm">

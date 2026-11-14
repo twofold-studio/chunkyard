@@ -19,6 +19,7 @@ pub struct ServerManager {
     create_lock: AsyncMutex<()>,
     port_locks: Mutex<HashMap<u16, Arc<AsyncMutex<()>>>>,
     installers: Option<Arc<dyn mcm_core::software::SoftwareService>>,
+    pub(crate) properties_repo: Option<Arc<dyn mcm_core::properties::PropertiesRepo>>,
 }
 impl ServerManager {
     pub fn new(
@@ -36,6 +37,7 @@ impl ServerManager {
             create_lock: AsyncMutex::new(()),
             port_locks: Mutex::new(HashMap::new()),
             installers: None,
+            properties_repo: None,
         }
     }
     pub fn with_installers(
@@ -43,6 +45,10 @@ impl ServerManager {
         installers: Arc<dyn mcm_core::software::SoftwareService>,
     ) -> Self {
         self.installers = Some(installers);
+        self
+    }
+    pub fn with_properties(mut self, repo: Arc<dyn mcm_core::properties::PropertiesRepo>) -> Self {
+        self.properties_repo = Some(repo);
         self
     }
     pub(crate) async fn record(&self, id: &str) -> Result<Server, ServerError> {
@@ -67,7 +73,11 @@ impl ServerManager {
             status,
         })
     }
-    async fn start_inner(&self, server: &Server) -> Result<RuntimeStatus, ServerError> {
+    async fn start_inner(
+        &self,
+        server: &Server,
+        guard: crate::properties::InstanceGuard,
+    ) -> Result<RuntimeStatus, ServerError> {
         if server.software.is_some() && server.launch.is_none() {
             return Err(ServerError::NotInstalled);
         }
@@ -116,11 +126,32 @@ impl ServerManager {
                 ServerState::Stopped => (),
             }
         }
-        self.runtime.start(server, directory).await
+        if matches!(
+            self.runtime.status(server).await?.state,
+            ServerState::Running | ServerState::Paused
+        ) {
+            return Err(ServerError::AlreadyRunning);
+        }
+        let version = self
+            .prepare_configuration(server, guard.clone())
+            .await
+            .map_err(configuration_error)?;
+        let status = self.runtime.start(server, directory).await?;
+        self.mark_configuration_applied(server, version)
+            .await
+            .map_err(configuration_error)?;
+        Ok(status)
     }
 }
 #[async_trait]
 impl ServerService for ServerManager {
+    async fn console_stream(&self, id: &str) -> Result<ConsoleStream, ServerError> {
+        let server = self.record(id).await?;
+        if self.runtime.status(&server).await?.state != ServerState::Running {
+            return Err(ServerError::NotRunning);
+        }
+        self.runtime.stream_logs(&server, 200).await
+    }
     async fn network(&self, id: &str) -> Result<NetworkSettings, ServerError> {
         self.runtime.network(&self.record(id).await?).await
     }
@@ -150,7 +181,7 @@ impl ServerService for ServerManager {
     async fn delete(&self, id: &str, delete_files: bool) -> Result<DeletedServer, ServerError> {
         let server = self.record(id).await?;
         let lock = self.lock(&server.id)?;
-        let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
+        let guard = Arc::new(lock.try_lock_owned().map_err(|_| ServerError::Busy)?);
         let server = self.record(id).await?;
         let status = self.runtime.status(&server).await?;
         if status.state != ServerState::Stopped {
@@ -179,6 +210,22 @@ impl ServerService for ServerManager {
         // Runtime rechecks ownership/state and removes by immutable container ID.
         // Only after that succeeds may any world files or records be removed.
         self.runtime.remove(&server).await?;
+        if !delete_files
+            && retained.is_some()
+            && let Some(repo) = &self.properties_repo
+            && repo
+                .state(&server.id)
+                .await
+                .map_err(configuration_error)?
+                .desired
+                .is_some()
+        {
+            // Retaining files must also retain the latest pending configuration,
+            // even though its version history is removed with the instance record.
+            self.prepare_configuration(&server, guard.clone())
+                .await
+                .map_err(configuration_error)?;
+        }
         if delete_files && retained.is_some() {
             match tokio::fs::remove_dir_all(&directory).await {
                 Ok(()) => (),
@@ -382,9 +429,9 @@ impl ServerService for ServerManager {
     async fn start(&self, id: &str) -> Result<ServerView, ServerError> {
         let server = self.record(id).await?;
         let lock = self.lock(&server.id)?;
-        let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
+        let guard = Arc::new(lock.try_lock_owned().map_err(|_| ServerError::Busy)?);
         let server = self.record(id).await?;
-        let status = self.start_inner(&server).await?;
+        let status = self.start_inner(&server, guard).await?;
         Ok(ServerView {
             directory: self.root.join(&server.id),
             server,
@@ -406,10 +453,10 @@ impl ServerService for ServerManager {
     async fn restart(&self, id: &str) -> Result<ServerView, ServerError> {
         let server = self.record(id).await?;
         let lock = self.lock(&server.id)?;
-        let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
+        let guard = Arc::new(lock.try_lock_owned().map_err(|_| ServerError::Busy)?);
         let server = self.record(id).await?;
         self.runtime.stop(&server).await?;
-        let status = self.start_inner(&server).await?;
+        let status = self.start_inner(&server, guard).await?;
         Ok(ServerView {
             directory: self.root.join(&server.id),
             server,
@@ -460,5 +507,9 @@ async fn initialize(directory: &Path, accept: bool) -> Result<(), ServerError> {
 }
 fn fs_error(error: std::io::Error) -> ServerError {
     tracing::error!(%error, "server filesystem operation failed");
+    ServerError::Filesystem
+}
+fn configuration_error(error: mcm_core::properties::PropertiesError) -> ServerError {
+    tracing::error!(%error, "saved properties could not be applied or recorded");
     ServerError::Filesystem
 }

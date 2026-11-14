@@ -1,3 +1,0 @@
-kind: Changed
-body: 'Web UI: first-run setup is now two steps. The setup token is verified with POST /api/v1/setup/verify-token before the owner email and password fields appear, and the final POST /api/v1/setup re-sends the verified token, which is held only in page memory.'
-time: 2026-11-13T19:41:00.477562352+02:00

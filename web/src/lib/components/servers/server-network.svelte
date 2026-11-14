@@ -10,7 +10,9 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import { CopyText, ErrorAlert, SettingsSection } from '#lib/components/app/index.js';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import { CopyText, ErrorAlert } from '#lib/components/app/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
 	import {
 		getServerNetwork,
 		isAbortError,
@@ -25,7 +27,7 @@
 		validateNetworkForm,
 		type NetworkFormValues
 	} from '#lib/servers/network.js';
-	import { collapse } from '#lib/motion/index.js';
+	import { collapse, fadeIn } from '#lib/motion/index.js';
 	import { cn } from '#lib/utils.js';
 
 	interface Props {
@@ -33,9 +35,12 @@
 		/** Another operation is running on this server. */
 		busy: boolean;
 		onServerUpdated: (server: ServerView) => void;
+		/** Form expanded; the summary row is always shown. */
+		open?: boolean;
 	}
 
-	let { server, busy, onServerUpdated }: Props = $props();
+	let { server, busy, onServerUpdated, open = $bindable(true) }: Props = $props();
+	const formId = $props.id();
 
 	let network = $state.raw<ServerNetwork | null>(null);
 	let loadError = $state.raw<unknown>(null);
@@ -109,165 +114,189 @@
 	}
 </script>
 
-<SettingsSection
-	title="Network"
-	description="Host address and port Docker publishes for the game. Inside the container Minecraft always listens on 25565/TCP."
-	icon={NetworkIcon}
->
-	{#if !network && loadError}
-		<ErrorAlert error={loadError}>
-			<Button size="sm" variant="outline" class="mt-2" onclick={() => (nonce += 1)}>Retry</Button>
-		</ErrorAlert>
-	{:else if !network}
-		<Skeleton class="h-40 w-full" />
-	{:else}
-		<form class="flex flex-col gap-5" {onsubmit} novalidate>
+{#snippet preset(value: string, label: string, hint: string)}
+	<button
+		type="button"
+		class={cn(
+			'motion-press rounded-md border px-2 py-1 text-xs transition-colors disabled:opacity-50',
+			form.publishIp.trim() === value
+				? 'border-ring bg-accent text-foreground'
+				: 'border-border text-muted-foreground hover:bg-accent/40'
+		)}
+		onclick={() => (form.publishIp = value)}
+		disabled={locked}
+		aria-pressed={form.publishIp.trim() === value}
+		title={hint}
+	>
+		{label}{#if value}<code class="ml-1.5 font-mono">{value}</code>{/if}
+	</button>
+{/snippet}
+
+<div class="flex flex-col">
+	<div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5">
+		<NetworkIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+		<span class="text-sm font-medium">Network</span>
+		{#if network}
+			<span class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+				Publishes on
+				<span class="text-sm text-foreground">
+					<CopyText
+						value={formatEndpoint(network.effectivePublishIp, network.port)}
+						label="Copy address"
+					/>
+				</span>
+			</span>
 			{#if network.restartRequired}
-				<div transition:collapse>
-					<Alert.Root>
-						<RotateCwIcon />
-						<Alert.Title>Restart to apply the new binding</Alert.Title>
-						<Alert.Description>
-							The running container still uses {network.boundPublishIp && network.boundPort
-								? formatEndpoint(network.boundPublishIp, network.boundPort)
-								: 'an older binding'}. Restart the server to publish on {formatEndpoint(
-								network.effectivePublishIp,
-								network.port
-							)}.
-						</Alert.Description>
-					</Alert.Root>
-				</div>
+				<span in:fadeIn><Badge variant="warning">Restart to apply</Badge></span>
 			{/if}
+		{:else if !loadError}
+			<Skeleton class="h-5 w-32" />
+		{/if}
+		<Button
+			variant="ghost"
+			size="sm"
+			class="ml-auto"
+			aria-expanded={open}
+			aria-controls={formId}
+			onclick={() => (open = !open)}
+		>
+			{open ? 'Hide' : 'Edit'}
+			<ChevronRightIcon
+				data-icon="inline-end"
+				class={['transition-transform duration-(--motion-fast)', open && 'rotate-90']}
+			/>
+		</Button>
+	</div>
 
-			<div class="grid gap-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
-				<Field.Field data-invalid={errors.port ? true : undefined}>
-					<Field.Label for="net-port">Host port</Field.Label>
-					<Input
-						id="net-port"
-						type="number"
-						min={1}
-						max={65535}
-						bind:value={form.port}
-						aria-invalid={errors.port ? true : undefined}
-						disabled={locked}
-					/>
-					{#if errors.port}<Field.Error>{errors.port}</Field.Error>{/if}
-				</Field.Field>
-				<Field.Field data-invalid={errors.publishIp ? true : undefined}>
-					<Field.Label for="net-ip">Bind address</Field.Label>
-					<Input
-						id="net-ip"
-						bind:value={form.publishIp}
-						class="font-mono"
-						autocomplete="off"
-						spellcheck={false}
-						placeholder={network.publishIp === null
-							? `Manager default (${network.effectivePublishIp})`
-							: 'Manager default'}
-						aria-invalid={errors.publishIp ? true : undefined}
-						aria-describedby="net-ip-help"
-						disabled={locked}
-					/>
-					{#if errors.publishIp}<Field.Error>{errors.publishIp}</Field.Error>{/if}
-				</Field.Field>
-			</div>
+	{#if open}
+		<div id={formId} transition:collapse class="border-t border-border px-4 py-4">
+			{#if !network && loadError}
+				<ErrorAlert error={loadError}>
+					<Button size="sm" variant="outline" class="mt-2" onclick={() => (nonce += 1)}>
+						Retry
+					</Button>
+				</ErrorAlert>
+			{:else if !network}
+				<Skeleton class="h-24 w-full" />
+			{:else}
+				<form class="flex flex-col gap-4" {onsubmit} novalidate>
+					{#if network.restartRequired}
+						<div transition:collapse>
+							<Alert.Root>
+								<RotateCwIcon />
+								<Alert.Title>Restart to apply the new binding</Alert.Title>
+								<Alert.Description>
+									The running container still uses {network.boundPublishIp && network.boundPort
+										? formatEndpoint(network.boundPublishIp, network.boundPort)
+										: 'an older binding'}. Restart the server to publish on {formatEndpoint(
+										network.effectivePublishIp,
+										network.port
+									)}.
+								</Alert.Description>
+							</Alert.Root>
+						</div>
+					{/if}
 
-			<div class="flex flex-wrap gap-2" role="group" aria-label="Bind address presets">
-				{#each BIND_PRESETS as preset (preset.value)}
-					<button
-						type="button"
-						class={cn(
-							'motion-press flex flex-col rounded-md border px-3 py-1.5 text-left text-xs transition-colors disabled:opacity-50',
-							form.publishIp.trim() === preset.value
-								? 'border-ring bg-accent text-foreground'
-								: 'border-border hover:bg-accent/40'
-						)}
-						onclick={() => (form.publishIp = preset.value)}
-						disabled={locked}
-						aria-pressed={form.publishIp.trim() === preset.value}
+					<div class="grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
+						<Field.Field data-invalid={errors.port ? true : undefined}>
+							<Field.Label for="net-port">Host port</Field.Label>
+							<Input
+								id="net-port"
+								type="number"
+								min={1}
+								max={65535}
+								bind:value={form.port}
+								aria-invalid={errors.port ? true : undefined}
+								disabled={locked}
+								class="h-8"
+							/>
+							{#if errors.port}<Field.Error>{errors.port}</Field.Error>{/if}
+						</Field.Field>
+						<Field.Field data-invalid={errors.publishIp ? true : undefined}>
+							<Field.Label for="net-ip">Bind address</Field.Label>
+							<Input
+								id="net-ip"
+								bind:value={form.publishIp}
+								class="h-8 font-mono"
+								autocomplete="off"
+								spellcheck={false}
+								placeholder={network.publishIp === null
+									? `Manager default (${network.effectivePublishIp})`
+									: 'Manager default'}
+								aria-invalid={errors.publishIp ? true : undefined}
+								aria-describedby="net-ip-help"
+								disabled={locked}
+							/>
+							{#if errors.publishIp}<Field.Error>{errors.publishIp}</Field.Error>{/if}
+						</Field.Field>
+					</div>
+
+					<div
+						class="flex flex-wrap items-center gap-1.5"
+						role="group"
+						aria-label="Bind address presets"
 					>
-						<span class="font-medium">{preset.label}</span>
-						<span class="text-muted-foreground"
-							><code class="font-mono">{preset.value}</code> · {preset.hint}</span
-						>
-					</button>
-				{/each}
-				<button
-					type="button"
-					class={cn(
-						'motion-press flex flex-col rounded-md border px-3 py-1.5 text-left text-xs transition-colors disabled:opacity-50',
-						form.publishIp.trim() === ''
-							? 'border-ring bg-accent text-foreground'
-							: 'border-border hover:bg-accent/40'
-					)}
-					onclick={() => (form.publishIp = '')}
-					disabled={locked}
-					aria-pressed={form.publishIp.trim() === ''}
-				>
-					<span class="font-medium">Manager default</span>
-					<span class="text-muted-foreground">CHUNKYARD_DOCKER__PUBLISH_IP or 0.0.0.0</span>
-				</button>
-			</div>
+						{#each BIND_PRESETS as item (item.value)}
+							{@render preset(item.value, item.label, item.hint)}
+						{/each}
+						{@render preset('', 'Manager default', 'CHUNKYARD_DOCKER__PUBLISH_IP or 0.0.0.0')}
+					</div>
 
-			<div id="net-ip-help" class="flex flex-col gap-1.5 text-sm text-muted-foreground">
-				<p>
-					To play over a NetBird (or other VPN) mesh, bind to <code class="font-mono">0.0.0.0</code>
-					or the host's NetBird IP (usually <code class="font-mono">100.x.y.z</code>), then connect
-					to the host's NetBird name or IP on port {form.port ?? network.port}. Binding to all
-					interfaces also exposes the port on the LAN and, without a firewall, to the internet.
-				</p>
-				<p>
-					Other servers may share this port, but only one of them can run at a time. Files and
-					worlds are kept when the network changes.
-				</p>
-			</div>
-
-			<dl
-				class="grid gap-3 rounded-md border border-border bg-background px-4 py-3 text-sm sm:grid-cols-2"
-			>
-				<div class="flex flex-col gap-1">
-					<dt class="text-xs text-muted-foreground">Next start publishes on</dt>
-					<dd>
-						<CopyText
-							value={formatEndpoint(network.effectivePublishIp, network.port)}
-							label="Copy address"
-						/>
-					</dd>
-				</div>
-				<div class="flex flex-col gap-1">
-					<dt class="text-xs text-muted-foreground">Current container</dt>
-					<dd class="font-mono text-sm">
-						{network.boundPublishIp && network.boundPort
-							? formatEndpoint(network.boundPublishIp, network.boundPort)
-							: 'No container'}
-					</dd>
-				</div>
-			</dl>
-
-			{#if saveError}
-				<div transition:collapse><ErrorAlert error={saveError} /></div>
-			{/if}
-
-			<div class="flex flex-wrap items-center justify-end gap-2">
-				{#if !stopped}
-					<p class="mr-auto flex items-center gap-1.5 text-sm text-muted-foreground">
-						<TriangleAlertIcon class="size-3.5" aria-hidden="true" />
-						Stop the server to change network settings.
+					<p id="net-ip-help" class="text-xs text-muted-foreground">
+						Minecraft listens on 25565/TCP inside the container. Servers may share a host port, but
+						only one of them can run at a time. Files and worlds are kept when this changes.
 					</p>
-				{/if}
-				<Button
-					variant="outline"
-					size="sm"
-					disabled={!dirty || saving}
-					onclick={() => network && resetForm(network)}
-				>
-					Reset
-				</Button>
-				<Button type="submit" size="sm" disabled={locked || !dirty}>
-					{#if saving}<Spinner data-icon="inline-start" />{/if}
-					Save network
-				</Button>
-			</div>
-		</form>
+					<details class="group text-xs text-muted-foreground">
+						<summary class="cursor-pointer select-none hover:text-foreground">
+							Playing over NetBird or another VPN?
+						</summary>
+						<p class="mt-1.5">
+							To play over a NetBird (or other VPN) mesh, bind to <code class="font-mono"
+								>0.0.0.0</code
+							>
+							or the host's NetBird IP (usually <code class="font-mono">100.x.y.z</code>), then
+							connect to the host's NetBird name or IP on port {form.port ?? network.port}. Binding
+							to all interfaces also exposes the port on the LAN and, without a firewall, to the
+							internet.
+						</p>
+					</details>
+
+					{#if saveError}
+						<div transition:collapse><ErrorAlert error={saveError} /></div>
+					{/if}
+
+					<div class="flex flex-wrap items-center justify-end gap-2">
+						<p class="mr-auto text-xs text-muted-foreground">
+							Current container:
+							<span class="font-mono text-foreground"
+								>{network.boundPublishIp && network.boundPort
+									? formatEndpoint(network.boundPublishIp, network.boundPort)
+									: 'No container'}</span
+							>
+						</p>
+						{#if !stopped}
+							<p
+								class="flex w-full items-center gap-1.5 text-xs text-muted-foreground sm:order-first"
+							>
+								<TriangleAlertIcon class="size-3.5" aria-hidden="true" />
+								Stop the server to change network settings.
+							</p>
+						{/if}
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={!dirty || saving}
+							onclick={() => network && resetForm(network)}
+						>
+							Reset
+						</Button>
+						<Button type="submit" size="sm" disabled={locked || !dirty}>
+							{#if saving}<Spinner data-icon="inline-start" />{/if}
+							Save network
+						</Button>
+					</div>
+				</form>
+			{/if}
+		</div>
 	{/if}
-</SettingsSection>
+</div>

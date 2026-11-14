@@ -16,7 +16,7 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 - A small version badge opens a changelog modal, including on setup/login. `CHUNKYARD_HTTP__SHOW_VERSION=false` hides it and disables changelog delivery.
 - Every mutation sends `X-MCM-CSRF: 1`; requests are same-origin with relative paths. The UI must be served from the origin in `CHUNKYARD_HTTP__PUBLIC_URL`.
 - Lifecycle actions and Java installs are jobs. The UI polls `/api/v1/jobs/{id}` every second and shows queued/running/finished only; the backend reports no percentage.
-- The console is a snapshot of the last 200 lines. It is replaced, never appended, every 3 s while the server is running, the Console tab is open and the browser tab is visible. Auto-refresh can be turned off. Stopped servers show one snapshot.
+- The console streams over a same-origin WebSocket while running, visible and open. It keeps at most 1000 lines, resets on reconnect, and falls back to sequential 3-second snapshots if streaming is unavailable. Stopped servers show one snapshot. Commands still use the protected POST route.
 - Server status is re-read every 5 s on the detail page. "Container running" means the process runs; Minecraft may still be starting.
 - Creating a managed server submits creation followed by an install job automatically; it downloads the selected software, without starting Minecraft or accepting the EULA. Failed installs retain the server ID for retry. Only Custom JAR creation asks you to supply a file.
 - Docker servers use the JVM from their image. The Java page states that host runtimes are not used by Docker servers.
@@ -55,6 +55,8 @@ For a reverse proxy, preserve the original `Host` and set `CHUNKYARD_HTTP__PUBLI
 
 ## Hosting verification
 
+`node scripts/smoke-properties-console.mjs` additionally checks the contextual header, Properties Enter/debounce autosave, running/saved revision separation, restart application, history restoration, real WebSocket console output and the metrics preference. Build the Rust binary/UI and the disposable `mcm-manager-test-runtime:local` image (`docker build -t mcm-manager-test-runtime:local testdata/docker-runtime`) first. It uses temporary data and a shell console fixture, not Minecraft; it removes its container afterward. Use `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` for an installed Chrome as needed.
+
 After building the UI and `cargo build -p mcm-server --locked`, run `node scripts/smoke-ui.mjs`. It uses Playwright Chromium to check the real Rust service in both auth modes, owner setup, session persistence, navigation, refreshes and CSP violations. Install Chromium with `pnpm --dir web exec playwright install chromium`, or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an installed Chrome executable. The test uses temporary data and disables Docker operations. CI runs it after frontend validation, component/unit tests and the production build.
 
 ## Vanilla/Paper creation
@@ -63,9 +65,15 @@ The creation wizard guides software, version/build, name/port, resources, review
 
 ## Instance management and motion
 
-Instance pages provide Overview, Console, Files and Settings tabs. Settings edits the published host port/address and opens `server.properties` in the shared file editor. Gameplay settings can be edited there as raw text; a structured gameplay form is not implemented. Files supports breadcrumbs, sorting/filtering, new files/folders, uploads, downloads, rename/move/copy and confirmed permanent deletion. Upload conflicts require explicit replacement. Text saves include the last-read etag and stop on conflicts. Changes require a stopped instance and apply on the next start. Limits and protected paths are described in [instance files](http-api.md#instance-files).
+The selected instance's name, status, concise software/port/memory summary and lifecycle controls occupy the main top bar. They update on server changes and clear when leaving the instance. Overview keeps secondary container details. Management tabs are Overview, Console, Properties, Files and Settings; compact Settings rows expand networking and EULA controls.
 
-The editor remains mounted across management tabs, with an unsaved marker. Closing it asks before discarding edits; leaving the page or browser also warns. Uploads run sequentially and cancel when leaving the instance page. Downloads are single files; folder ZIP, resumable uploads and syntax highlighting are not implemented.
+Properties provides a searchable grouped form and a raw-text view. Booleans, choices, numbers and unknown keys can be edited without rewriting unrelated comments/formatting. Changes autosave after about 900 ms of inactivity, immediately on Enter in a single-line input, or after changing a switch/select. There is no Save button or ordinary save confirmation. Navigation and start/restart flush queued edits first; conflicts and failures remain visible instead of overwriting another saved version. Editing works while Minecraft runs: the tab distinguishes the saved and running versions and marks restart-required changes. History can preview and restore earlier content as a new version without restarting.
+
+Files supports breadcrumbs, sorting/filtering, new files/folders, uploads, downloads, rename/move/copy and confirmed permanent deletion. Generic file mutations require a stopped instance; `server.properties` opens the dedicated versioned Properties tab. Upload conflicts require explicit replacement. Text saves use the last-read etag and stop on conflicts. Limits and protected paths are described in [instance files](http-api.md#instance-files).
+
+Editors remain mounted across management tabs. The generic file editor asks before discarding unsaved edits; Properties autosaves without that prompt. Uploads run sequentially and cancel when leaving the instance page. Downloads are single files; folder ZIP, resumable uploads and syntax highlighting are not implemented.
+
+Resources has a refresh preference for Off, 1, 2, 5, 10, 30 or 60 seconds. It is saved in this browser and reused across instances. Polls never overlap and pause when hidden. Off retains the last snapshot and supports manual Refresh.
 
 `web/src/lib/motion/index.ts` supplies shared durations, easings and fade/rise/pop/step/collapse transitions. `Reveal` and `Swap` compose these presets; `layout.css` provides matching hover/press/highlight utilities. Motion is brief and runs on entry. System reduced-motion preferences disable movement and dialog animations.
 

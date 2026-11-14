@@ -10,5 +10,7 @@ pub use jobs::SqliteJobRepo;
 pub(crate) fn storage(error: impl std::fmt::Display) -> mcm_core::repository::RepositoryError {
     mcm_core::repository::RepositoryError(error.to_string())
 }
+mod properties;
 mod servers;
+pub use properties::SqlitePropertiesRepo;
 pub use servers::SqliteServerRepo;

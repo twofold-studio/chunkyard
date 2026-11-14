@@ -69,11 +69,13 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
                 crate::storage::instance_id(&config.data_dir)?,
             )),
         )
-        .with_installers(software.clone()),
+        .with_installers(software.clone())
+        .with_properties(Arc::new(mcm_db::SqlitePropertiesRepo::new(&database))),
     );
     let state = AppState {
         software,
         files: servers.clone(),
+        properties: servers.clone(),
         servers,
         health: Arc::new(database.clone()),
         auth_enabled: config.auth.enabled,

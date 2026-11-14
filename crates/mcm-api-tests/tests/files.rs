@@ -207,6 +207,7 @@ async fn running_instances_allow_reads_and_refuse_all_file_mutations() -> Result
     let (id, directory) = create(&app).await?;
     std::fs::write(directory.join("server.jar"), "fixture")?;
     std::fs::write(directory.join("server.properties"), "online-mode=true\n")?;
+    std::fs::write(directory.join("notes.txt"), "ordinary file\n")?;
     let server = format!("/api/v1/servers/{id}");
     let pending: Value = app
         .post(&format!("{server}/start"))
@@ -238,10 +239,7 @@ async fn running_instances_allow_reads_and_refuse_all_file_mutations() -> Result
     assert_eq!(list["canWrite"], false);
     let read: Value = app
         .client
-        .get(format!(
-            "{}{server}/files/content?path=server.properties",
-            app.base
-        ))
+        .get(format!("{}{server}/files/content?path=notes.txt", app.base))
         .send()
         .await?
         .error_for_status()?
@@ -250,12 +248,9 @@ async fn running_instances_allow_reads_and_refuse_all_file_mutations() -> Result
     assert_eq!(read["canWrite"], false);
     for (action, body) in [
         ("mkdir", json!({"path":"no"})),
-        ("move", json!({"from":"server.properties","to":"moved"})),
-        ("copy", json!({"from":"server.properties","to":"copy"})),
-        (
-            "delete",
-            json!({"path":"server.properties","recursive":false}),
-        ),
+        ("move", json!({"from":"notes.txt","to":"moved"})),
+        ("copy", json!({"from":"notes.txt","to":"copy"})),
+        ("delete", json!({"path":"notes.txt","recursive":false})),
     ] {
         let response = app
             .post(&format!("{server}/files/{action}"))
@@ -267,14 +262,11 @@ async fn running_instances_allow_reads_and_refuse_all_file_mutations() -> Result
         assert_eq!(problem["code"], "files.server_running");
     }
     assert_eq!(
-        put(
-            &app,
-            &format!("{server}/files/content?path=server.properties")
-        )
-        .json(&json!({"content":"changed","etag":read["etag"]}))
-        .send()
-        .await?
-        .status(),
+        put(&app, &format!("{server}/files/content?path=notes.txt"))
+            .json(&json!({"content":"changed","etag":read["etag"]}))
+            .send()
+            .await?
+            .status(),
         409
     );
     assert_eq!(

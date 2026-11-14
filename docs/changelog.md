@@ -22,13 +22,15 @@ Choose Added, Changed, Deprecated, Removed, Fixed, Security, or Breaking. Keep n
 
 CI regenerates the changelog and checks for differences so fragments and the readable history stay synchronized. Future agents follow the rule in the root `AGENTS.md`.
 
-When preparing a release, choose an explicit version and run:
+The user authorizes a versioned milestone once the entire current set of requested changes is complete and verified. Choose the next semantic version, batch its notes, update Cargo/frontend/OpenAPI versions and lockfiles, then commit, push and verify deployment. Requests arriving during work join that set unless explicitly separate. Tags and forge release publication still require a separate request.
+
+For the versioned changelog, run:
 
 ```sh
-changie batch 0.1.0
+changie batch 0.2.0
 changie merge --include-unreleased '## Unreleased'
 ```
 
-The version above is an example for the first release, not an already published release. Batching combines the pending fragments into a version file under `.changes/` and consumes those fragments; the version file retains their notes. Review the result, update the Cargo workspace version and lockfile separately, and run the relevant checks. Changie is configured only to manage release notes: it does not change crate versions, commit, tag, or publish anything.
+Use the actual next project version in place of the example. Batching combines pending fragments into a version file under `.changes/` and consumes those fragments; that file retains their notes. Changie only manages release notes: package versions, lockfiles, commits, pushes and deployment checks are separate steps.
 
-Use `changie batch 0.1.0 --dry-run` to preview notes without consuming fragments. Ongoing work remains under Unreleased until a release is requested.
+Use `changie batch 0.2.0 --dry-run` to preview notes without consuming fragments. Keep work under Unreleased while any requested implementation or verification remains unfinished.

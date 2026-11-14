@@ -2,8 +2,8 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Chunkyard API",
-    "version": "0.1.0",
-    "description": "Single-owner Minecraft manager. Cookie authentication is required unless CHUNKYARD_AUTH__ENABLED=false. Authentication-disabled mode grants full access, with user:null. Host/origin and X-MCM-CSRF protections apply in both modes. JSON request bodies are limited to 1 MiB, except the text editor's 8 MiB envelope for escaped UTF-8 text up to 1 MiB. Raw uploads are streamed up to 128 MiB. API responses use no-store. Jobs are durable; console and resource metrics are snapshots."
+    "version": "0.2.0",
+    "description": "Single-owner Minecraft manager. Cookie authentication is required unless CHUNKYARD_AUTH__ENABLED=false. Host/origin and X-MCM-CSRF protections apply in both modes. JSON bodies are limited to 1 MiB, except file/properties editors' 8 MiB envelopes for escaped text up to 1 MiB. Raw uploads stream up to 128 MiB. Properties revisions can be saved while running and apply on the next explicit start/restart. Console supports snapshots and same-origin WebSocket streaming; metrics are snapshots."
   },
   "servers": [
     {
@@ -12,6 +12,10 @@
     }
   ],
   "tags": [
+    {
+      "name": "Properties",
+      "description": "Versioned desired and applied server.properties."
+    },
     {
       "name": "Files",
       "description": "Instance-relative browsing and stopped-instance file operations."
@@ -51,6 +55,206 @@
     }
   ],
   "paths": {
+    "/api/v1/servers/{id}/properties": {
+      "parameters": [{ "$ref": "#/components/parameters/FileServerId" }],
+      "get": {
+        "operationId": "get_server_properties",
+        "tags": ["Properties"],
+        "summary": "Read saved properties and applied revision",
+        "description": "Imports an existing file on first read. Returns desired content, not necessarily the running JVM's file. Legacy/external starts have appliedVersion=null until a managed start. Minecraft-generated defaults are recorded when observed without discarding pending owner edits.",
+        "responses": {
+          "200": {
+            "description": "Saved versus applied state",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PropertiesDocument" }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/PropertiesProblem" }
+        }
+      },
+      "put": {
+        "operationId": "save_server_properties",
+        "tags": ["Properties"],
+        "summary": "Save a revision while running or stopped",
+        "description": "Requires same-origin Origin/Referer. Persists desired configuration/history separately; does not restart or modify the active instance file. Start/restart applies it atomically before Docker starts. Identical text creates no revision. Stale etag returns409 properties.conflict.",
+        "parameters": [{ "$ref": "#/components/parameters/FileCsrf" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["content", "etag"],
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "description": "UTF-8 without NUL, at most1MiB."
+                  },
+                  "etag": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved state",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PropertiesDocument" }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/PropertiesProblem" }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/properties/versions": {
+      "parameters": [{ "$ref": "#/components/parameters/FileServerId" }],
+      "get": {
+        "operationId": "list_properties_versions",
+        "tags": ["Properties"],
+        "summary": "Page revision metadata newest first",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "History page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["items", "nextBefore"],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PropertiesVersion"
+                      }
+                    },
+                    "nextBefore": { "type": ["integer", "null"] }
+                  }
+                }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/PropertiesProblem" }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/properties/versions/{version}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/FileServerId" },
+        {
+          "name": "version",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "integer", "minimum": 1 }
+        }
+      ],
+      "get": {
+        "operationId": "get_properties_version",
+        "tags": ["Properties"],
+        "summary": "Read an immutable revision",
+        "responses": {
+          "200": {
+            "description": "Revision content",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PropertiesRevision" }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/PropertiesProblem" }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/properties/restore": {
+      "parameters": [
+        { "$ref": "#/components/parameters/FileServerId" },
+        { "$ref": "#/components/parameters/FileCsrf" }
+      ],
+      "post": {
+        "operationId": "restore_properties_version",
+        "tags": ["Properties"],
+        "summary": "Restore a revision as a new desired version",
+        "description": "Requires same-origin Origin/Referer. Does not restart or rewrite history. Etag must match the current desired revision.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["version", "etag"],
+                "properties": {
+                  "version": { "type": "integer", "minimum": 1 },
+                  "etag": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New desired state",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PropertiesDocument" }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/PropertiesProblem" }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/console/stream": {
+      "parameters": [{ "$ref": "#/components/parameters/FileServerId" }],
+      "get": {
+        "operationId": "stream_console",
+        "tags": ["Console"],
+        "summary": "WebSocket: stream running-instance console",
+        "description": "Same-origin browser WebSocket with normal cookie authentication. Matching Origin required even with auth disabled; no CSRF header for this read-only GET. Snapshot frame resets the client, followed by ordered line frames from one Docker follow request including its last200 records. Lines cap at8192 UTF-8 bytes; up to256 lines per Docker frame are retained. Stopped instances return409. Maximum16 connections with bounded buffers, heartbeat/disconnect handling and session revalidation every5s. Commands remain on the commands POST route.",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uri" }
+          }
+        ],
+        "x-websocket": true,
+        "responses": {
+          "101": {
+            "description": "JSON text frames use ConsoleEvent.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ConsoleEvent" }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/FileProblem" }
+        }
+      }
+    },
     "/api/v1/servers/{id}/files": {
       "parameters": [
         { "$ref": "#/components/parameters/FileServerId" },
@@ -1998,6 +2202,14 @@
       }
     },
     "responses": {
+      "PropertiesProblem": {
+        "description": "properties.conflict409; properties.not_found404; properties.invalid422; properties.too_large413; properties.storage500. Existing server.busy and files.* errors may also appear.",
+        "content": {
+          "application/problem+json": {
+            "schema": { "$ref": "#/components/schemas/Problem" }
+          }
+        }
+      },
       "FileProblem": {
         "description": "Problem response: path_invalid 422; symlink/protected 403; not_found 404; exists/conflict/not_empty/server_running 409; too_large 413; binary 415; busy 429; io 500. File codes use files. prefix. Lifecycle conflicts use server.busy 409. Authentication/origin protections also apply.",
         "content": {
@@ -2016,6 +2228,87 @@
       }
     },
     "schemas": {
+      "PropertiesVersion": {
+        "type": "object",
+        "required": ["version", "etag", "createdAt", "source"],
+        "properties": {
+          "version": { "type": "integer", "minimum": 1 },
+          "etag": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "source": { "enum": ["import", "edit", "restore"] }
+        }
+      },
+      "PropertiesRevision": {
+        "allOf": [
+          { "$ref": "#/components/schemas/PropertiesVersion" },
+          {
+            "type": "object",
+            "required": ["content"],
+            "properties": { "content": { "type": "string" } }
+          }
+        ]
+      },
+      "PropertiesDocument": {
+        "type": "object",
+        "required": [
+          "version",
+          "etag",
+          "content",
+          "updatedAt",
+          "appliedVersion",
+          "restartRequired",
+          "status"
+        ],
+        "properties": {
+          "version": { "type": "integer", "minimum": 1 },
+          "etag": { "type": "string" },
+          "content": { "type": "string" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "appliedVersion": {
+            "type": ["integer", "null"],
+            "description": "Manager-tracked applied revision, or null when unknown."
+          },
+          "restartRequired": { "type": "boolean" },
+          "status": { "$ref": "#/components/schemas/RuntimeStatus" }
+        }
+      },
+      "ConsoleEvent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["type", "lines"],
+            "properties": {
+              "type": { "const": "snapshot" },
+              "lines": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/ConsoleLine" }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["type", "line"],
+            "properties": {
+              "type": { "const": "line" },
+              "line": { "$ref": "#/components/schemas/ConsoleLine" }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["type", "code", "detail"],
+            "properties": {
+              "type": { "const": "error" },
+              "code": { "type": "string" },
+              "detail": { "type": "string" }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["type"],
+            "properties": { "type": { "const": "end" } }
+          }
+        ]
+      },
       "FileEntry": {
         "type": "object",
         "required": ["name", "path", "kind", "size", "modifiedAt", "readOnly"],

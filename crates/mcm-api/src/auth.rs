@@ -129,7 +129,7 @@ pub(crate) async fn health(State(state): State<AppState>) -> (StatusCode, Json<V
         )
     }
 }
-fn session_cookie(headers: &HeaderMap) -> Option<&str> {
+pub(crate) fn session_cookie(headers: &HeaderMap) -> Option<&str> {
     let mut found = None;
     for value in headers.get_all("cookie") {
         for part in value.to_str().ok()?.split(';') {

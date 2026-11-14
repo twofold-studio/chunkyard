@@ -11,6 +11,7 @@ pub struct AppState {
     pub software: Arc<dyn mcm_core::software::SoftwareService>,
     pub servers: Arc<dyn mcm_core::server::ServerService>,
     pub files: Arc<dyn mcm_core::files::FileService>,
+    pub properties: Arc<dyn mcm_core::properties::PropertiesService>,
     pub java: Arc<dyn JavaRuntimeService>,
     pub jobs: Arc<dyn JobService>,
     pub origin: String,

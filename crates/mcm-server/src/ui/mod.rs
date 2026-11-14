@@ -38,7 +38,7 @@ impl UiAssets {
     /// None means the build directory doesn't exist. An existing malformed bundle
     /// fails startup instead of publishing a broken page or a source directory.
     pub fn load(root: &Path) -> Result<Option<Self>, UiError> {
-        load::load(root)
+        load::load(root, None)
     }
     async fn serve(&self, request: Request) -> axum::response::Response {
         let path = request.uri().path();
@@ -66,10 +66,11 @@ impl UiAssets {
 /// Compose the SPA fallback with API routes before applying shared security.
 pub async fn router(state: AppState, directory: Option<&Path>) -> Result<Router, UiError> {
     let directory = directory.map(Path::to_path_buf);
+    let origin = state.origin.clone();
     let assets = tokio::task::spawn_blocking(move || {
         directory
             .as_deref()
-            .map(UiAssets::load)
+            .map(|root| load::load(root, Some(&origin)))
             .transpose()
             .map(Option::flatten)
     })

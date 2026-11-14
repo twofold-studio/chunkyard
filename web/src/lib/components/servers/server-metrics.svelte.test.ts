@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import ServerMetrics from './server-metrics.svelte';
+import { METRICS_INTERVAL_KEY, metricsInterval } from '#lib/metrics-interval.svelte.js';
 
 const GiB = 1024 ** 3;
 
@@ -47,7 +48,11 @@ function json(body: unknown, status = 200) {
 	});
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+	vi.unstubAllGlobals();
+	localStorage.removeItem(METRICS_INTERVAL_KEY);
+	metricsInterval.reload();
+});
 
 describe('ServerMetrics', () => {
 	it('shows a single snapshot with em dashes, never zeros, while stopped', async () => {
@@ -153,5 +158,39 @@ describe('ServerMetrics', () => {
 		await expect.element(page.getByText('Metrics sampler busy; retrying shortly.')).toBeVisible();
 		await expect.element(page.getByTestId('metric-cpu')).toHaveTextContent('33.0%');
 		unmount();
+	});
+
+	it('polls at the saved interval and shares the browser preference', async () => {
+		metricsInterval.set(1);
+		expect(localStorage.getItem(METRICS_INTERVAL_KEY)).toBe('1');
+		const fetch = vi.fn().mockImplementation(async () => json(sample()));
+		vi.stubGlobal('fetch', fetch);
+		const screen = render(ServerMetrics, { serverId: 's1', serverState: 'running' });
+		await expect.element(page.getByText(/every 1s/)).toBeVisible();
+		await vi.waitFor(() => expect(fetch.mock.calls.length).toBeGreaterThanOrEqual(2), {
+			timeout: 2500
+		});
+		await expect
+			.element(page.getByRole('combobox', { name: 'Metrics refresh interval' }))
+			.toHaveTextContent('1s');
+		// Unmount before fetch is unstubbed so no tick reaches the network.
+		screen.unmount();
+	});
+
+	it('stops automatic refresh when Off, keeps the snapshot and allows manual refresh', async () => {
+		const fetch = vi.fn().mockImplementation(async () => json(sample()));
+		vi.stubGlobal('fetch', fetch);
+		const screen = render(ServerMetrics, { serverId: 's1', serverState: 'running' });
+		await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+		await page.getByRole('combobox', { name: 'Metrics refresh interval' }).click();
+		await page.getByRole('option', { name: 'Off' }).click();
+		await expect.element(page.getByText(/^Paused/)).toBeVisible();
+		expect(localStorage.getItem(METRICS_INTERVAL_KEY)).toBe('0');
+		await expect.element(page.getByTestId('metric-cpu')).toHaveTextContent('12.5%');
+		await new Promise((r) => setTimeout(r, 300));
+		expect(fetch).toHaveBeenCalledTimes(1);
+		await page.getByRole('button', { name: 'Refresh metrics' }).click();
+		await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+		screen.unmount();
 	});
 });

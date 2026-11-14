@@ -9,6 +9,7 @@ workspace = true
 
 [dependencies]
 async-trait.workspace = true
+futures-util.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 uuid.workspace = true

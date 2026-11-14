@@ -20,7 +20,7 @@ Create a server with `POST /api/v1/servers`:
 }
 ```
 
-Set `acceptEula` to true only if you accept the Minecraft EULA. Creation returns 201 `{server}` with an ID, managed directory, configuration, and stopped status. For a manual server, copy your server JAR into the returned directory before starting. The REST API can also create and install a selected Vanilla or Paper release, as described below. The web creation form now offers Vanilla/Paper version selection and runs the install automatically; no JAR needs to be supplied for these managed types. File uploads are not available yet. The service writes initial `eula.txt` and `server.properties` files.
+Set `acceptEula` to true only if you accept the Minecraft EULA. Creation returns 201 `{server}` with an ID, managed directory, configuration, and stopped status. For a custom server, upload its JAR through Files while stopped. Managed Vanilla/Paper installation downloads it automatically. The service writes initial `eula.txt` and `server.properties` files.
 
 | Method | Endpoint | Response |
 |---|---|---|
@@ -36,7 +36,7 @@ Set `acceptEula` to true only if you accept the Minecraft EULA. Creation returns
 | POST | `/api/v1/servers/{id}/console/commands` | 204; body `{line: "say Hello"}` |
 | GET | `/api/v1/system/isolation` | `{docker: {available, version, reason}}` |
 
-These routes share the existing owner-session or explicitly disabled-auth mode. Mutations require the same origin and `X-MCM-CSRF: 1`. Poll `/api/v1/jobs/{id}` for actions; their `serverId` identifies the target and successful results contain `{server}`. Only one lifecycle operation per server may run at a time. Commands cannot contain CR, LF or NUL. Logs are a bounded snapshot, not a live WebSocket stream; tail is 1–1000 lines and output is capped at 4 MiB.
+These routes share the existing authentication rules. Mutations require the same origin and `X-MCM-CSRF: 1`. Poll `/api/v1/jobs/{id}` for actions; their `serverId` identifies the target and successful results contain `{server}`. Only one lifecycle operation per server may run at a time. Commands cannot contain CR, LF or NUL. The logs endpoint returns bounded snapshots (1–1000 lines, at most 4 MiB). A separate authenticated [WebSocket console stream](http-api.md#live-console) follows live output.
 
 The default manual image supplies Java 21. Managed Vanilla installs use the Java major in Mojang metadata; Paper uses its published recommended Java table. Unless you explicitly pass `dockerImage`, installation chooses `eclipse-temurin:<major>-jre` and stores that choice with the server. An explicit image remains your compatibility responsibility. Docker uses the image JVM, not a host-managed JRE. Forge, Fabric and modpack installers are deferred.
 
@@ -79,7 +79,7 @@ Files remain on the manager host by default. A successful job returns `result.de
 
 ## Instance file management
 
-The file API can browse/download files while an instance runs. Stop it before editing `server.properties`, uploading, moving, copying or deleting files. Changes apply on the next start. The launcher keeps Minecraft's internal port at 25565; published host port/address settings live in `/api/v1/servers/{id}/network`. File saves never change EULA acceptance or start the game. See [file routes and limits](http-api.md#instance-files).
+Generic file changes require a stopped instance. Versioned `server.properties` can be edited and autosaved while running: desired revisions remain in the manager database until the next explicit start/restart, separately from the active file. The Properties tab shows saved/applied versions and history. The launcher keeps Minecraft's internal port at 25565; published host settings live in `/api/v1/servers/{id}/network`. Saves never accept the EULA or start the game. See [file limits](http-api.md#instance-files) and [properties versioning](http-api.md#versioned-server-properties).
 
 # Run the manager in Docker
 

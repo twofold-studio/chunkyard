@@ -17,6 +17,7 @@
 	import { fileDownloadUrl } from '#lib/api/index.js';
 	import { TextFileEditor, type EditorApi } from '#lib/files/text-editor.svelte.js';
 	import { baseName, formatBytes, SERVER_PROPERTIES } from '#lib/files/paths.js';
+	import { detectEol } from '#lib/files/properties.js';
 	import { collapse, fadeIn } from '#lib/motion/index.js';
 	import { formatTime } from '#lib/format.js';
 
@@ -56,6 +57,16 @@
 		dirty = editor.dirty;
 	});
 
+	// Becoming writable (server stopped) re-reads a clean file: write permission comes from
+	// the read, and Minecraft rewrites server.properties while it runs.
+	let lastWritable = untrack(() => writable);
+	$effect(() => {
+		const next = writable;
+		if (next === lastWritable) return;
+		lastWritable = next;
+		if (next && untrack(() => !editor.dirty && !editor.loading)) void editor.reload();
+	});
+
 	const canEdit = $derived(editor.editable && writable);
 	const isProperties = $derived(path === SERVER_PROPERTIES);
 	const lineCount = $derived(editor.content ? editor.content.split('\n').length : 1);
@@ -84,6 +95,11 @@
 	/** Set by Escape so the next Tab leaves the editor (keyboard trap escape hatch). */
 	let tabEscapes = false;
 
+	// Textareas report every line break as LF. Map them back to the file's own line ending
+	// so editing a CRLF file as raw text does not silently convert it.
+	const fileEol = $derived(detectEol(editor.original));
+	const withFileEol = (text: string) => (fileEol === '\n' ? text : text.replace(/\n/g, fileEol));
+
 	function onkeydown(event: KeyboardEvent) {
 		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
 			event.preventDefault();
@@ -101,7 +117,8 @@
 			const area = event.currentTarget as HTMLTextAreaElement;
 			event.preventDefault();
 			const { selectionStart: start, selectionEnd: end } = area;
-			editor.content = `${editor.content.slice(0, start)}\t${editor.content.slice(end)}`;
+			const text = area.value;
+			editor.content = withFileEol(`${text.slice(0, start)}\t${text.slice(end)}`);
 			queueMicrotask(() => area.setSelectionRange(start + 1, start + 1));
 		}
 	}
@@ -131,7 +148,7 @@
 			{/if}
 			{#if readOnlyReason}<Badge variant="outline">Read-only</Badge>{/if}
 		</div>
-		<div class="flex items-center gap-2">
+		<div class="flex flex-wrap items-center gap-2">
 			<Button
 				variant="outline"
 				size="sm"
@@ -139,7 +156,7 @@
 				download={baseName(path)}
 			>
 				<DownloadIcon data-icon="inline-start" />
-				Download
+				<span class="max-sm:sr-only">Download</span>
 			</Button>
 			<Button
 				variant="outline"
@@ -149,7 +166,7 @@
 				title="Discard changes and read the file again"
 			>
 				<RotateCcwIcon data-icon="inline-start" />
-				Reload
+				<span class="max-sm:sr-only">Reload</span>
 			</Button>
 			<Button
 				size="sm"
@@ -196,14 +213,15 @@
 		{#if readOnlyReason}
 			<p class="text-sm text-muted-foreground">{readOnlyReason}</p>
 		{:else if isProperties}
-			<p class="text-sm text-muted-foreground">
-				Changes apply on the next start. The game port inside the container stays 25565; change the
-				host port in Settings → Network instead of <code class="font-mono">server-port</code>.
+			<p class="text-xs text-muted-foreground">
+				Edits here change the file on disk. Use the Properties tab for versioned settings that apply
+				on the next start.
 			</p>
 		{/if}
 		<div class="overflow-hidden rounded-lg border border-border bg-background">
 			<textarea
-				bind:value={editor.content}
+				value={editor.content.replace(/\r\n?/g, '\n')}
+				oninput={(event) => (editor.content = withFileEol(event.currentTarget.value))}
 				{onkeydown}
 				readonly={!canEdit}
 				spellcheck={false}

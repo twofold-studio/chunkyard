@@ -1,3 +1,0 @@
-kind: Added
-body: 'Frontend: show servers as compact cards (status, software type, Minecraft version, memory, CPUs, host port) with a create tile always in the first slot. The game port now defaults to Automatic and is omitted from POST /api/v1/servers when blank. An explicit port may be shared with other servers, and the UI explains that only one of them can run at a time. Stopped servers can be deleted from their page via DELETE /api/v1/servers/{id} after confirmation. By default files are kept on the manager host, and an opt-in checkbox deletes world and server files. Only the delete job is polled, and the page returns to the server list when deletion succeeds.'
-time: 2026-11-13T23:16:14.530314260+02:00

@@ -1,6 +1,6 @@
 # Lightweight monitoring
 
-The server detail page includes a **Resources** panel backed by `GET /api/v1/servers/{id}/metrics` returns an on-demand Docker snapshot under the normal owner-session or explicitly disabled-auth rules. There is no background collector, time-series database or Grafana dependency. Poll sequentially no faster than every five seconds, and stop when the view is hidden.
+The server detail page includes a **Resources** panel backed by `GET /api/v1/servers/{id}/metrics`, an on-demand Docker snapshot under the normal authentication rules. There is no background collector, time-series database or Grafana dependency. The browser refresh preference defaults to five seconds and offers Off, 1, 2, 5, 10, 30 or 60 seconds. It persists across instances in this browser. Requests remain sequential and stop while hidden; Off keeps the last sample and allows manual Refresh. Faster intervals create more sampling traffic.
 
 The response includes `serverId`, `status`, `sampledAt`, `startedAt`, `uptimeSeconds`, `cpuPercent`, `memoryUsageBytes`, `memoryWorkingSetBytes`, `memoryLimitBytes`, `networkRxBytes`, `networkTxBytes`, `blockReadBytes`, `blockWriteBytes`, and `pids`.
 

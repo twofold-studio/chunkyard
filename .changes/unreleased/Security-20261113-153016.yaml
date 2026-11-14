@@ -1,3 +1,0 @@
-kind: Security
-body: Protect API mutations with same-origin and CSRF checks; use salted Argon2id passwords, hashed session tokens, login throttling, private credential files, verified downloads, and bounded archive extraction.
-time: 2026-11-13T15:30:16.553010548+02:00

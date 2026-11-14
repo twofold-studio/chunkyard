@@ -8,6 +8,15 @@ use mcm_core::server::*;
 use std::{path::PathBuf, time::Duration};
 #[async_trait]
 impl ServerRuntime for DockerRuntime {
+    async fn stream_logs(&self, server: &Server, tail: u32) -> Result<ConsoleStream, ServerError> {
+        self.follow_logs(server, tail).await
+    }
+    async fn configuration_identity(&self, server: &Server) -> Result<Option<String>, ServerError> {
+        Ok(self.inspect(server).await?.and_then(|container| {
+            let started = container.state?.started_at?;
+            Some(format!("{}:{started}", container.id?))
+        }))
+    }
     async fn network(&self, server: &Server) -> Result<NetworkSettings, ServerError> {
         Ok(self.network_of(server, self.inspect(server).await?))
     }

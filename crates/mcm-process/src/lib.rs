@@ -2,6 +2,7 @@
 mod config;
 mod docker;
 mod files;
+mod properties;
 mod service;
 mod validation;
 pub use config::DockerConfig;

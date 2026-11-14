@@ -63,9 +63,13 @@ impl TestApp {
                 Arc::new(mcm_db::SqliteServerRepo::new(&backend.database)),
                 Arc::new(runtime::FakeRuntime::default()),
             )
-            .with_installers(backend.state.software.clone()),
+            .with_installers(backend.state.software.clone())
+            .with_properties(Arc::new(mcm_db::SqlitePropertiesRepo::new(
+                &backend.database,
+            ))),
         );
         backend.state.files = servers.clone();
+        backend.state.properties = servers.clone();
         backend.state.servers = servers;
         let base = format!("http://{address}");
         let router = if ui {

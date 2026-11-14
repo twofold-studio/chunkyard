@@ -1,14 +1,18 @@
 <script lang="ts">
-	import ServerIcon from '@lucide/svelte/icons/server';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import XIcon from '@lucide/svelte/icons/x';
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import { CopyText, ErrorAlert, StatusBadge } from '#lib/components/app/index.js';
+	import {
+		CopyText,
+		ErrorAlert,
+		StatusBadge,
+		useTopbarContent
+	} from '#lib/components/app/index.js';
 	import ServerActions from '#lib/components/servers/server-actions.svelte';
 	import ServerConsole from '#lib/components/servers/server-console.svelte';
 	import ServerMetrics from '#lib/components/servers/server-metrics.svelte';
@@ -16,11 +20,12 @@
 	import ServerSettings from '#lib/components/servers/server-settings.svelte';
 	import ServerFiles from '#lib/components/files/server-files.svelte';
 	import { Reveal } from '#lib/components/motion/index.js';
-	import { SERVER_PROPERTIES } from '#lib/files/paths.js';
 	import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
 	import FolderTreeIcon from '@lucide/svelte/icons/folder-tree';
 	import SlidersIcon from '@lucide/svelte/icons/sliders-horizontal';
+	import FileCogIcon from '@lucide/svelte/icons/file-cog';
+	import ServerProperties from '#lib/components/properties/server-properties.svelte';
 	import EulaDialog from '#lib/components/servers/eula-dialog.svelte';
 	import DeleteServerDialog from '#lib/components/servers/delete-server-dialog.svelte';
 	import ServerInstallPanel from '#lib/components/servers/server-install-panel.svelte';
@@ -59,6 +64,7 @@
 	const TABS = [
 		{ value: 'overview', label: 'Overview', icon: LayoutDashboardIcon },
 		{ value: 'console', label: 'Console', icon: TerminalIcon },
+		{ value: 'properties', label: 'Properties', icon: FileCogIcon },
 		{ value: 'files', label: 'Files', icon: FolderTreeIcon },
 		{ value: 'settings', label: 'Settings', icon: SlidersIcon }
 	] as const;
@@ -70,14 +76,48 @@
 	/** Files stays mounted after the first visit so editor changes survive tab switches. */
 	let filesVisited = $state(initialTab === 'files');
 	let filesDirty = $state(false);
-	let openRequest = $state<{ path: string; nonce: number } | null>(null);
+	/** Properties stays mounted after its first visit so its view and history survive tab switches. */
+	let propertiesVisited = $state(initialTab === 'properties');
+	/** Properties autosave is queued or in flight (flushed on unmount, never prompted). */
+	let propertiesPending = $state(false);
+	let propertiesEditor = $state<{
+		flushPending(): Promise<boolean>;
+		refreshMetadata(): Promise<void>;
+	} | null>(null);
+	let leavingAfterAutosave = false;
+	/** Bumped to expand and scroll to Settings → Network. */
+	let networkFocus = $state(0);
 	let tabDirection = $state<1 | -1>(1);
 
 	beforeNavigate((navigation) => {
-		if (removed || !filesDirty || navigation.willUnload) return;
+		if (removed || navigation.willUnload) return;
 		if (navigation.to?.url.pathname === page.url.pathname) return;
 		// Tab switches keep the editor mounted; leaving the instance discards it.
-		if (!window.confirm('Leave this server and discard unsaved file changes?')) navigation.cancel();
+		if (filesDirty && !window.confirm('Leave this server and discard unsaved file changes?')) {
+			navigation.cancel();
+			return;
+		}
+		if (propertiesPending && propertiesEditor && navigation.to) {
+			navigation.cancel();
+			if (leavingAfterAutosave) return;
+			leavingAfterAutosave = true;
+			const destination = navigation.to.url.href;
+			void propertiesEditor
+				.flushPending()
+				.then(async (saved) => {
+					if (!saved) {
+						selectTab('properties');
+						toast.error('Properties could not be saved. Resolve the error before leaving.');
+						return;
+					}
+					await tick();
+					// eslint-disable-next-line svelte/no-navigation-without-resolve -- SvelteKit supplied this resolved destination.
+					await goto(destination);
+				})
+				.finally(() => {
+					leavingAfterAutosave = false;
+				});
+		}
 	});
 
 	function selectTab(next: string) {
@@ -87,11 +127,12 @@
 		tabDirection = to >= from ? 1 : -1;
 		tab = next;
 		if (next === 'files') filesVisited = true;
+		if (next === 'properties') propertiesVisited = true;
 	}
 
-	function editProperties() {
-		openRequest = { path: SERVER_PROPERTIES, nonce: (openRequest?.nonce ?? 0) + 1 };
-		selectTab('files');
+	function editNetwork() {
+		networkFocus += 1;
+		selectTab('settings');
 	}
 
 	let eulaOpen = $state(false);
@@ -116,7 +157,10 @@
 			poll(
 				async () => {
 					if (removed || deleting) return;
-					if (!controller.busy && controller.server.id === id) await controller.refresh();
+					if (!controller.busy && controller.server.id === id) {
+						await controller.refresh();
+						if (tab === 'properties') await propertiesEditor?.refreshMetadata();
+					}
 				},
 				{ intervalMs: 5000, immediate: false, signal: abort.signal }
 			)
@@ -125,7 +169,18 @@
 	});
 
 	async function onAction(action: ServerAction) {
+		const target = server.id;
+		if ((action === 'start' || action === 'restart') && propertiesPending && propertiesEditor) {
+			if (!(await propertiesEditor.flushPending())) {
+				selectTab('properties');
+				toast.error('Save the pending properties before starting or restarting.');
+				return;
+			}
+		}
+		if (server.id !== target) return;
 		const job = await controller.run(action);
+		if (job?.state === 'succeeded' && server.id === target)
+			await propertiesEditor?.refreshMetadata();
 		consoleKey += 1;
 		if (job?.state === 'succeeded') toast.success(`${actionDone[action]} ${server.name}`);
 	}
@@ -167,33 +222,40 @@
 		goto(resolve(`servers/${server.id}`), { replaceState: true });
 	}
 
+	// The selected server owns the app top bar while this page is mounted.
+	useTopbarContent(header);
+
 	const errorKind = $derived(errorCode(controller.error));
 	const jarPath = $derived(`${server.directory.replace(/[\\/]+$/, '')}/${server.jar}`);
 </script>
 
-<header class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-	<div class="flex min-w-0 flex-col gap-1.5">
-		<div class="flex flex-wrap items-center gap-3">
-			<h1 class="flex min-w-0 items-center gap-2.5 text-lg font-semibold tracking-tight">
-				<ServerIcon class="size-[18px] shrink-0 text-muted-foreground" aria-hidden="true" />
-				<span class="truncate">{server.name}</span>
+{#snippet header()}
+	<div class="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+		<div class="flex min-w-0 items-center gap-2">
+			<h1 class="truncate text-base font-semibold tracking-tight" title={server.name}>
+				{server.name}
 			</h1>
-			<StatusBadge state={server.status.state} />
+			<StatusBadge state={server.status.state} compact />
 		</div>
-		<p class="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
-			{#if softwareSummary}
-				<span class="text-foreground">
-					{softwareSummary.kind}{#if softwareSummary.detail}&nbsp;{softwareSummary.detail}{/if}
+		<p
+			class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground max-md:hidden"
+			role="status"
+		>
+			{#if controller.busy && controller.job && controller.action}
+				<Spinner class="size-3" />
+				<span class="truncate">{labels[controller.action]}… job {controller.job.state}</span>
+			{:else}
+				<span class="truncate">
+					{#if softwareSummary}{softwareSummary.kind}{#if softwareSummary.detail}
+							{softwareSummary.detail}{/if} ·
+					{/if}Port {server.port} · {formatMemoryRange(server.memoryMinMb, server.memoryMaxMb)}
 				</span>
 			{/if}
-			<span>Docker</span>
-			<span class="font-mono">{server.dockerImage}</span>
-			<span>Port {server.port}</span>
-			<span>{formatMemoryRange(server.memoryMinMb, server.memoryMaxMb)}</span>
 		</p>
 	</div>
-	<div class="flex flex-wrap items-center gap-2">
+	<div class="flex shrink-0 items-center gap-1.5">
 		<ServerActions
+			compact
 			serverState={server.status.state}
 			busy={controller.busy || deleting || removed}
 			pending={controller.action}
@@ -201,13 +263,14 @@
 			{onAction}
 		/>
 		<DeleteServerDialog
+			compact
 			{server}
-			disabled={controller.busy || removed}
+			disabled={controller.busy || removed || propertiesPending}
 			bind:deleting
 			ondeleted={onDeleted}
 		/>
 	</div>
-</header>
+{/snippet}
 
 {#if created && software}
 	<Alert.Root>
@@ -276,18 +339,6 @@
 	/>
 {/if}
 
-{#if controller.busy && controller.job && controller.action}
-	<div class="flex items-center gap-2 text-sm text-muted-foreground" role="status">
-		<Spinner />
-		{labels[controller.action]}… job {controller.job.state}
-	</div>
-{:else if running && !controller.error}
-	<p class="text-sm text-muted-foreground">
-		The container is running. Minecraft may still be starting; watch the console for its “Done”
-		message before connecting.
-	</p>
-{/if}
-
 {#if controller.error}
 	{#if errorKind === 'server.jar_missing'}
 		<ErrorAlert
@@ -316,7 +367,7 @@
 			<Tabs.Trigger value={item.value} class="flex-none px-1">
 				<item.icon data-icon="inline-start" aria-hidden="true" />
 				{item.label}
-				{#if item.value === 'files' && filesDirty}
+				{#if (item.value === 'files' && filesDirty) || (item.value === 'properties' && propertiesPending)}
 					<span class="size-1.5 rounded-full bg-warning" aria-label="Unsaved changes"></span>
 				{/if}
 			</Tabs.Trigger>
@@ -326,7 +377,7 @@
 		{#if tab === 'overview'}
 			<Reveal preset="step" direction={tabDirection} class="flex flex-col gap-6">
 				<ServerMetrics serverId={server.id} serverState={server.status.state} cpus={server.cpus} />
-				<ServerOverview {server} onEditNetwork={() => selectTab('settings')} />
+				<ServerOverview {server} onEditNetwork={editNetwork} />
 			</Reveal>
 		{/if}
 	</Tabs.Content>
@@ -337,14 +388,27 @@
 			</Reveal>
 		{/if}
 	</Tabs.Content>
+	<Tabs.Content value="properties">
+		{#if propertiesVisited}
+			{#key server.id}
+				<ServerProperties
+					bind:this={propertiesEditor}
+					serverId={server.id}
+					serverState={server.status.state}
+					bind:pending={propertiesPending}
+					onEditNetwork={editNetwork}
+				/>
+			{/key}
+		{/if}
+	</Tabs.Content>
 	<Tabs.Content value="files">
 		{#if filesVisited}
 			{#key server.id}
 				<ServerFiles
 					serverId={server.id}
 					serverState={server.status.state}
-					{openRequest}
 					bind:dirty={filesDirty}
+					onOpenProperties={() => selectTab('properties')}
 				/>
 			{/key}
 		{/if}
@@ -357,8 +421,10 @@
 					busy={controller.busy || deleting || removed}
 					onRequestEula={() => (eulaOpen = true)}
 					onRevokeEula={() => setEula(false)}
-					onEditProperties={editProperties}
 					onServerUpdated={(updated) => controller.apply(updated)}
+					onOpenProperties={() => selectTab('properties')}
+					{networkFocus}
+					onNetworkFocused={() => (networkFocus = 0)}
 				/>
 			</Reveal>
 		{/if}

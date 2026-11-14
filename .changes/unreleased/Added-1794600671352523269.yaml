@@ -1,3 +1,0 @@
-kind: Added
-body: 'Web UI: new-server flow picks software from the live GET /api/v1/software catalog (Vanilla and Paper with Minecraft version and optional stable build selection), then creates the server and runs POST /api/v1/servers/{id}/install with indeterminate job status. A failed install keeps the record and retries on the same ID. Server pages show software and launch metadata, offer install for uninstalled servers and disable Start until installed. Custom JAR remains an advanced option; installs never start the server or accept the EULA.'
-time: 2026-11-13T22:11:11.352523269+02:00

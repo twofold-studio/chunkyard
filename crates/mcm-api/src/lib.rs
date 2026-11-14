@@ -1,10 +1,12 @@
 //! HTTP transport. Services and configuration arrive through the composition root.
 mod auth;
+mod console_stream;
 mod error;
 mod files;
 mod java;
 mod json;
 mod openapi;
+mod properties;
 mod security;
 mod servers;
 mod software;
@@ -29,6 +31,11 @@ pub fn secure_router(router: Router, state: AppState) -> Router {
 pub fn routes(state: AppState) -> Router {
     let protected = Router::new()
         .merge(files::routes())
+        .merge(properties::routes())
+        .route(
+            "/api/v1/servers/{id}/console/stream",
+            get(console_stream::upgrade),
+        )
         .route(
             "/api/v1/servers/{id}/network",
             get(servers::network).patch(servers::set_network),

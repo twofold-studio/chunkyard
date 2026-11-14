@@ -1,3 +1,0 @@
-kind: Added
-body: 'REST API: public GET /api/v1/system/version and /api/v1/system/changelog provide package metadata and bundled project notes for the version UI. CHUNKYARD_HTTP__SHOW_VERSION=false hides version values and returns 404 for the changelog; enabled by default, including before owner setup.'
-time: 2026-11-13T19:47:58.001079959+02:00

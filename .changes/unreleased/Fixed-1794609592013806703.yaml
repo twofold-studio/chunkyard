@@ -1,3 +1,0 @@
-kind: Fixed
-body: 'REST API: concurrent GET /api/v1/servers/{id}/files reads queue behind instance operations, allowing folder refresh and editor loading together without spurious server.busy errors. The web editor also warns before in-app navigation discards unsaved text.'
-time: 2026-11-14T00:39:52.013806703+02:00
