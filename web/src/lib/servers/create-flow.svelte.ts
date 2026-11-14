@@ -3,6 +3,7 @@ import {
 	getServer,
 	isAbortError,
 	type CreateServerRequest,
+	type InstallOptions,
 	type Job,
 	type ServerView
 } from '#lib/api/index.js';
@@ -70,13 +71,16 @@ export class CreateServerFlow {
 		return this.#install();
 	}
 
-	/** Retries the install for the record created earlier; never creates a new record. */
-	async retryInstall(): Promise<ServerView | null> {
+	/**
+	 * Retries the install for the record created earlier; never creates a new record.
+	 * `options` are advanced overrides for unusual server packs.
+	 */
+	async retryInstall(options: InstallOptions | null = null): Promise<ServerView | null> {
 		if (this.busy || !this.server || this.phase === 'done') return null;
-		return this.#install();
+		return this.#install(options);
 	}
 
-	async #install(): Promise<ServerView | null> {
+	async #install(installOptions: InstallOptions | null = null): Promise<ServerView | null> {
 		const server = this.server;
 		if (!server) return null;
 		this.error = null;
@@ -88,6 +92,7 @@ export class CreateServerFlow {
 				signal,
 				intervalMs: this.#jobIntervalMs,
 				api: this.#api,
+				installOptions,
 				onUpdate: (job) => (this.job = job)
 			});
 			this.job = outcome.job;

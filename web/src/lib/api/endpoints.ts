@@ -17,9 +17,12 @@ import type {
 	PropertiesDocument,
 	PropertiesVersion,
 	PropertiesVersionPage,
+	InstallOptions,
 	Isolation,
+	LaunchSettings,
 	SavedFile,
 	ServerNetwork,
+	UpdateLaunchRequest,
 	UpdateNetworkRequest,
 	UpdateResourcesRequest,
 	Items,
@@ -76,9 +79,19 @@ export const getServer = (id: string, o: Opts = {}) =>
 export const createServer = (body: CreateServerRequest, o: Opts = {}) =>
 	request<{ server: ServerView }>('/api/v1/servers', { ...o, method: 'POST', body });
 
-/** Installs the persisted software selection (202). No request body; never starts the server. */
-export const installServer = (id: string, o: Opts = {}) =>
-	request<{ job: Job }>(`/api/v1/servers/${enc(id)}/install`, { ...o, method: 'POST' });
+/**
+ * Installs the persisted software selection (202); never starts the server. Without
+ * `options` (or with an empty object) no request body is sent and everything is detected.
+ */
+export const installServer = (
+	id: string,
+	{ options, ...o }: Opts & { options?: InstallOptions | null } = {}
+) =>
+	request<{ job: Job }>(`/api/v1/servers/${enc(id)}/install`, {
+		...o,
+		method: 'POST',
+		...(options && Object.keys(options).length > 0 ? { body: options } : {})
+	});
 
 /**
  * `DELETE /api/v1/servers/{id}?deleteFiles=…` (202, job kind `server.delete`). Only stopped
@@ -244,6 +257,21 @@ export const updateServerNetwork = (id: string, body: UpdateNetworkRequest, o: O
  */
 export const updateServerResources = (id: string, body: UpdateResourcesRequest, o: Opts = {}) =>
 	request<{ server: ServerView }>(`/api/v1/servers/${enc(id)}/resources`, {
+		...o,
+		method: 'PATCH',
+		body
+	});
+
+/** Detected and effective launch profile plus the image policy. */
+export const getServerLaunch = (id: string, o: Opts = {}) =>
+	request<LaunchSettings>(`/api/v1/servers/${enc(id)}/launch`, o);
+
+/**
+ * Stopped servers only. Removes the owned stopped container (files are kept); the new
+ * launch applies on the next start, which also validates the target.
+ */
+export const updateServerLaunch = (id: string, body: UpdateLaunchRequest, o: Opts = {}) =>
+	request<{ server: ServerView }>(`/api/v1/servers/${enc(id)}/launch`, {
 		...o,
 		method: 'PATCH',
 		body

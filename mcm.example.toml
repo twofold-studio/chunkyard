@@ -25,3 +25,6 @@ stop_timeout_s = 60
 # user = "1000:1000"
 # When mcm runs in Docker, set this to the host path mounted as its data_dir.
 # host_data_dir = "/srv/mcm"
+[curseforge]
+# Supply privately through CHUNKYARD_CURSEFORGE__API_KEY in production.
+# api_key = ""

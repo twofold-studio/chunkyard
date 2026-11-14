@@ -3,6 +3,8 @@ mod config;
 mod docker;
 mod exports;
 mod files;
+mod install;
+mod launch;
 mod properties;
 mod service;
 mod validation;

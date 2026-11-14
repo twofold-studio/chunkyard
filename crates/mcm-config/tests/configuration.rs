@@ -1,5 +1,20 @@
 use mcm_config::Config;
 #[test]
+fn curseforge_key_is_loaded_but_never_appears_in_config_inspection_or_debug()
+-> Result<(), Box<dyn std::error::Error>> {
+    let c = Config::load_with_env(
+        None,
+        [(
+            "CHUNKYARD_CURSEFORGE__API_KEY".into(),
+            "sensitive-test-key".into(),
+        )],
+    )?;
+    assert_eq!(c.curseforge.api_key.as_deref(), Some("sensitive-test-key"));
+    assert!(!serde_json::to_string(&c)?.contains("sensitive-test-key"));
+    assert!(!format!("{c:?}").contains("sensitive-test-key"));
+    Ok(())
+}
+#[test]
 fn file_environment_and_cli_sources_have_explicit_precedence()
 -> Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;

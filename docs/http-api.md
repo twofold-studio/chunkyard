@@ -33,10 +33,13 @@ Sessions use a 32-byte random token; only SHA-256 is stored. Cookies are HttpOnl
 | POST | `/api/v1/auth/login` | `{kind: "session", me}` and session cookie; body `{email, password}` |
 | GET | `/api/v1/auth/me` | Current owner/session metadata |
 | POST | `/api/v1/auth/logout` | 204 and cleared cookie |
-| GET | `/api/v1/software` | `{items: [{id, name, available, reason}]}`; Vanilla, Paper, custom |
+| GET | `/api/v1/software` | `{items: [{id, name, available, reason}]}`; Vanilla, Paper, CurseForge (requires key), custom |
 | GET | `/api/v1/software/{kind}/versions` | `{items: [{id, stable}]}`; kind `vanilla` or `paper`; releases newest first |
 | GET | `/api/v1/software/paper/versions/{version}/builds` | `{items: [{id, stable}]}`; stable build IDs are strings, newest first |
-| POST | `/api/v1/servers/{id}/install` | 202 `{job}`; no body; installs the persisted software selection |
+| POST | `/api/v1/servers/{id}/install` | 202 `{job}`; empty body or optional installer overrides; installs the persisted software selection |
+| GET | `/api/v1/modpacks/curseforge?query=&index=0` | Minecraft modpack search/popular results with pagination |
+| GET | `/api/v1/modpacks/curseforge/{id}/files` | Recent client releases with linked server packs |
+| GET / PATCH | `/api/v1/servers/{id}/launch` | Detected/current launch profile and stopped-instance overrides |
 | DELETE | `/api/v1/servers/{id}?deleteFiles=false` | 202 `{job}`; stopped instance only; retains files by default |
 | GET | `/api/v1/servers/{id}/network` | `{port,publishIp,effectivePublishIp,boundPublishIp,boundPort,restartRequired,status}` |
 | PATCH | `/api/v1/servers/{id}/network` | 200 `{server}`; body `{port,publishIp}`; stopped only, null bind uses manager default |
@@ -97,7 +100,7 @@ There are at most 16 concurrent console sockets. Lines are limited to 8192 UTF-8
 
 `Job` follows the phase 0 shape: `{id, kind, serverId, state, progress, message, error, result, createdBy, createdAt, startedAt, finishedAt}`. Java install success has `result: {runtime}`. Progress is indeterminate during work and becomes 1 on success. Poll a job while its state is `queued` or `running`. Jobs survive restarts; interrupted work becomes failed with `job.interrupted`. There are at most four active jobs; excess submissions return 429 `job.busy`. A panicking task becomes failed with `job.panicked`. SIGINT/SIGTERM interrupts active jobs and flushes their final states before closing the database. Only one daemon may own a data directory.
 
-This is a single-owner service. Email/password login and the optional authentication switch are the current auth scope; multi-user permissions, 2FA, and API tokens are deferred. WebSockets, job cancellation/progress, and native process management remain pending. Initial Docker server lifecycle and console snapshots are implemented; see [Docker usage](docker.md). Older phase 0 specs describe a broader product than the current scope.
+This is a single-owner service. Email/password login and the optional authentication switch are the current auth scope; multi-user permissions, 2FA, and API tokens are deferred. WebSocket console streaming is implemented; user-requested job cancellation, percentage progress and native process management remain pending. See [Docker usage](docker.md) and [CurseForge installation and launch profiles](curseforge.md). Older phase 0 specs describe a broader product than the current scope.
 
 For an opt-in test with a real daemon and live Java 21 download:
 
@@ -118,7 +121,7 @@ Server lifecycle and console routes are documented in [docker.md](docker.md). Th
 
 ## Version badge and changelog
 
-`GET /api/v1/system/version` returns `{enabled:true, version:"0.3.0", channel:"development"}` for the current build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
+`GET /api/v1/system/version` returns `{enabled:true, version:"0.4.0", channel:"development"}` for the current build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
 
 `[http] show_version = true` is the default. Set `CHUNKYARD_HTTP__SHOW_VERSION=false`, restart/redeploy, and reload the page to hide the badge: version metadata then returns `{enabled:false, version:null, channel:null}`, and the changelog endpoint returns 404 `version.disabled`. The UI fetches changelog content only when the modal opens. Completed, verified milestones batch notes and bump the project version under the authorized [changelog workflow](changelog.md); in-progress changes remain Unreleased.
 

@@ -9,6 +9,7 @@
 	import { prefersReducedMotion } from '#lib/motion/index.js';
 	import ServerNetwork from './server-network.svelte';
 	import ServerResources from './server-resources.svelte';
+	import ServerLaunch from './server-launch.svelte';
 	import type { ServerView } from '#lib/api/index.js';
 
 	interface Props {
@@ -23,6 +24,9 @@
 		networkFocus?: number;
 		/** Called once a focus request was handled, so it is not replayed on the next visit. */
 		onNetworkFocused?: () => void;
+		/** Bump to expand Launch and scroll it into view (e.g. after `server.launch_missing`). */
+		launchFocus?: number;
+		onLaunchFocused?: () => void;
 	}
 
 	let {
@@ -33,15 +37,18 @@
 		onServerUpdated,
 		onOpenProperties,
 		networkFocus = 0,
-		onNetworkFocused
+		onNetworkFocused,
+		launchFocus = 0,
+		onLaunchFocused
 	}: Props = $props();
 
 	const stopped = $derived(server.status.state === 'stopped');
 	let networkOpen = $state(false);
 	let networkEl = $state<HTMLElement | null>(null);
+	let launchOpen = $state(false);
 
-	async function revealNetwork() {
-		networkOpen = true;
+	async function reveal(openSection: () => void) {
+		openSection();
 		await tick();
 		networkEl?.scrollIntoView({
 			block: 'start',
@@ -52,8 +59,16 @@
 	$effect(() => {
 		if (networkFocus <= 0) return;
 		untrack(() => {
-			void revealNetwork();
+			void reveal(() => (networkOpen = true));
 			onNetworkFocused?.();
+		});
+	});
+
+	$effect(() => {
+		if (launchFocus <= 0) return;
+		untrack(() => {
+			void reveal(() => (launchOpen = true));
+			onLaunchFocused?.();
 		});
 	});
 </script>
@@ -96,6 +111,7 @@
 	>
 		<ServerNetwork {server} {busy} {onServerUpdated} bind:open={networkOpen} />
 		<ServerResources {server} {busy} {onServerUpdated} />
+		<ServerLaunch {server} {busy} {onServerUpdated} bind:open={launchOpen} />
 		<div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5">
 			<ScaleIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
 			<span class="text-sm font-medium">Minecraft EULA</span>

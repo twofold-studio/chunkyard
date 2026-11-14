@@ -1,4 +1,6 @@
 //! Official Vanilla and Paper metadata with bounded, checksum-verified downloads.
+mod curseforge;
+mod pack;
 mod providers;
 use mcm_core::software::SoftwareError;
 use mcm_download::SafeHttp;
@@ -8,12 +10,20 @@ use url::Url;
 
 pub struct Installers {
     http: SafeHttp,
+    curseforge_http: SafeHttp,
+    curseforge_key: Option<String>,
 }
 impl Installers {
     pub fn new() -> Result<Self, mcm_download::DownloadError> {
         Ok(Self {
             http: SafeHttp::minecraft()?,
+            curseforge_http: SafeHttp::modpacks()?,
+            curseforge_key: None,
         })
+    }
+    pub fn with_curseforge(mut self, key: Option<String>) -> Self {
+        self.curseforge_key = key;
+        self
     }
     async fn json(&self, url: &str) -> Result<Value, SoftwareError> {
         tokio::time::timeout(

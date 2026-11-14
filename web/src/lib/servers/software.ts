@@ -1,5 +1,7 @@
+import { LAUNCH_MODE_LABELS, loaderLabel } from './launch.js';
 import type {
 	BuildSoftwareKind,
+	ServerLaunch,
 	LoaderSoftwareKind,
 	ServerSoftware,
 	ServerView,
@@ -87,18 +89,24 @@ export function buildSoftware(selection: {
 	}
 }
 
-/** Human-readable summary of a server's managed software, e.g. "Paper · 1.21.1 build 130". */
-export function describeSoftware(software: ServerSoftware): { kind: string; detail: string } {
+/**
+ * Human-readable summary of a server's managed software, e.g. "Paper · 1.21.1 build 130".
+ * With the installed `launch`, a "latest" Paper selection shows the build actually installed.
+ */
+export function describeSoftware(
+	software: ServerSoftware,
+	launch: ServerLaunch | null = null
+): { kind: string; detail: string } {
 	switch (software.type) {
 		case 'vanilla':
 			return { kind: SOFTWARE_LABELS.vanilla, detail: String(software.version) };
-		case 'paper':
+		case 'paper': {
+			const build = software.build || launch?.build;
 			return {
 				kind: SOFTWARE_LABELS.paper,
-				detail: software.build
-					? `${software.version} build ${software.build}`
-					: `${software.version} latest build`
+				detail: build ? `${software.version} build ${build}` : `${software.version} latest build`
 			};
+		}
 		case 'fabric':
 		case 'forge':
 			return {
@@ -108,7 +116,7 @@ export function describeSoftware(software: ServerSoftware): { kind: string; deta
 		case 'curseforge':
 			return {
 				kind: SOFTWARE_LABELS.curseforge,
-				detail: `project ${software.projectId}, file ${software.fileId}`
+				detail: `project ${software.projectId} · release ${software.fileId}`
 			};
 		default: {
 			// A newer backend may report a kind this UI does not know yet.
@@ -154,6 +162,72 @@ export function monogram(name: string): string {
 	return letters.toUpperCase() || '?';
 }
 
+export interface DetailRow {
+	label: string;
+	value: string;
+	mono?: boolean;
+}
+
+/**
+ * Installed details for a managed server: Minecraft, loader, Paper build, Java and launch
+ * mode. Build numbers are only labelled as Paper builds for Paper servers.
+ */
+export function installedDetails(
+	server: Pick<ServerView, 'software' | 'launch' | 'launchOverride'>
+): DetailRow[] {
+	const launch = server.launch ?? null;
+	if (!launch) return [];
+	const software = server.software ?? null;
+	const rows: DetailRow[] = [];
+	if (launch.version) rows.push({ label: 'Minecraft', value: launch.version });
+	const loader = installedLoader(server);
+	if (loader) rows.push({ label: 'Loader', value: loader });
+	if (software?.type === 'paper' && launch.build) {
+		rows.push({ label: 'Paper build', value: launch.build });
+	}
+	const override = server.launchOverride ?? null;
+	rows.push({ label: 'Java', value: `Java ${override?.javaMajor ?? launch.javaMajor}` });
+	const mode = override?.mode ?? launch.profile?.mode;
+	if (mode) {
+		rows.push({
+			label: 'Launch',
+			value: `${LAUNCH_MODE_LABELS[mode] ?? mode}${override ? ' (custom)' : ''}`
+		});
+	}
+	return rows;
+}
+
+/** "NeoForge 21.1.77" from the installed loader, or the requested Fabric/Forge loader. */
+export function installedLoader(server: Pick<ServerView, 'software' | 'launch'>): string | null {
+	const loader = server.launch?.loader;
+	if (loader?.type) return `${loaderLabel(loader.type)} ${loader.version}`.trim();
+	const software = server.software;
+	if (software?.type === 'fabric' || software?.type === 'forge') {
+		return `${SOFTWARE_LABELS[software.type]} ${software.loaderVersion}`;
+	}
+	return null;
+}
+
+/**
+ * One-line software summary for headers. Installed CurseForge packs show their detected
+ * Minecraft version and loader instead of raw IDs.
+ */
+export function softwareHeadline(server: Pick<ServerView, 'software' | 'launch'>): string | null {
+	const software = server.software ?? null;
+	if (!software) return null;
+	const launch = server.launch ?? null;
+	const summary = describeSoftware(software, launch);
+	if (software.type === 'curseforge' && launch) {
+		const loader = launch.loader?.type
+			? `${loaderLabel(launch.loader.type)} ${launch.loader.version}`.trim()
+			: null;
+		return [summary.kind, launch.version && `Minecraft ${launch.version}`, loader]
+			.filter(Boolean)
+			.join(' · ');
+	}
+	return summary.detail ? `${summary.kind} ${summary.detail}` : summary.kind;
+}
+
 /**
  * Short labels for a server card: software type ("Paper", "Vanilla", "Custom", …) and the
  * Minecraft version, preferring the installed launch version over the requested selection.
@@ -164,7 +238,9 @@ export function cardSummary(server: Pick<ServerView, 'software' | 'launch'>): {
 } {
 	const software = server.software ?? null;
 	const type = software ? describeSoftware(software).kind : 'Custom';
-	const label = software?.type === 'curseforge' ? 'CurseForge' : type;
+	const loader = server.launch?.loader?.type ? loaderLabel(server.launch.loader.type) : null;
+	const label =
+		software?.type === 'curseforge' ? (loader ? `CurseForge · ${loader}` : 'CurseForge') : type;
 	const requested =
 		software && 'version' in software && typeof software.version === 'string'
 			? software.version

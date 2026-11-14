@@ -8,6 +8,21 @@ use axum::{
 use mcm_core::{auth::Actor, jobs::JobFailure, server::CreateServer};
 use serde::Deserialize;
 use serde_json::{Value, json};
+pub(crate) async fn launch_settings(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(json!(s.servers.launch_settings(&id).await?)))
+}
+pub(crate) async fn set_launch(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+    ApiJson(body): ApiJson<mcm_core::server::LaunchUpdate>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(
+        json!({"server":s.servers.set_launch(&id,body).await?}),
+    ))
+}
 
 pub(crate) async fn set_resources(
     State(state): State<AppState>,
@@ -116,10 +131,10 @@ pub(crate) async fn eula(
         json!({"server":state.servers.set_eula(&id,body.accepted).await?}),
     ))
 }
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum Action {
     Delete { delete_files: bool },
-    Install,
+    Install(mcm_core::software::InstallOptions),
     Start,
     Stop,
     Restart,
@@ -135,7 +150,7 @@ async fn action(
     state.servers.get(&id).await?;
     let kind = match action {
         Action::Delete { .. } => "server.delete",
-        Action::Install => "server.install",
+        Action::Install(_) => "server.install",
         Action::Start => "server.start",
         Action::Stop => "server.stop",
         Action::Restart => "server.restart",
@@ -158,7 +173,7 @@ async fn action(
                             .map(|deleted| json!({"deleted":deleted}))
                             .map_err(job_failure);
                     }
-                    Action::Install => servers.install(&id).await,
+                    Action::Install(options) => servers.install_with_options(&id, options).await,
                     Action::Start => servers.start(&id).await,
                     Action::Stop => servers.stop(&id).await,
                     Action::Restart => servers.restart(&id).await,
@@ -208,8 +223,20 @@ pub(crate) async fn install(
     State(state): State<AppState>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
+    body: axum::body::Bytes,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
-    action(state, actor, id, Action::Install).await
+    let options = if body.is_empty() {
+        Default::default()
+    } else {
+        serde_json::from_slice(&body).map_err(|_| {
+            ApiError::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "validation",
+                "Invalid installer options.",
+            )
+        })?
+    };
+    action(state, actor, id, Action::Install(options)).await
 }
 
 fn job_failure(error: mcm_core::server::ServerError) -> JobFailure {

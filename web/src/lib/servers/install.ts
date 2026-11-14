@@ -1,6 +1,7 @@
 import {
 	installServer,
 	waitForJob,
+	type InstallOptions,
 	type Job,
 	type JobFailure,
 	type ServerView
@@ -32,7 +33,8 @@ export function serverFromResult(result: unknown): ServerView | null {
 /**
  * `POST /api/v1/servers/{id}/install` (202), then polls the job until it finishes.
  * Request rejections and aborts throw; a failed job resolves with `error` set.
- * Never starts the server or touches EULA acceptance.
+ * Never starts the server or touches EULA acceptance. `installOptions` are advanced
+ * overrides; without them no request body is sent.
  */
 export async function installAndWait(
 	id: string,
@@ -41,10 +43,16 @@ export async function installAndWait(
 		intervalMs?: number;
 		onUpdate?: (job: Job) => void;
 		api?: Partial<InstallApi>;
+		installOptions?: InstallOptions | null;
 	} = {}
 ): Promise<InstallOutcome> {
 	const api = { ...defaultInstallApi, ...options.api };
-	const { job } = await api.installServer(id, { signal: options.signal });
+	const { job } = await api.installServer(
+		id,
+		options.installOptions
+			? { signal: options.signal, options: options.installOptions }
+			: { signal: options.signal }
+	);
 	const final = await api.waitForJob(job, {
 		signal: options.signal,
 		intervalMs: options.intervalMs ?? 1000,

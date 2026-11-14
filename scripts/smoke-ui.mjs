@@ -41,6 +41,7 @@ async function test(enabled, showVersion = true) {
         CHUNKYARD_HTTP__PUBLIC_URL: base,
         CHUNKYARD_HTTP__UI_DIR: resolve("web/build"),
         CHUNKYARD_DOCKER__ENABLED: String(liveInstall),
+        CHUNKYARD_CURSEFORGE__API_KEY: process.env.CHUNKYARD_TEST_CURSEFORGE_KEY ?? "",
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -438,6 +439,43 @@ async function test(enabled, showVersion = true) {
         .waitFor();
       assert.equal(await page.getByTestId("server-card").count(), 0);
     }
+    if (!enabled && showVersion && process.env.CHUNKYARD_TEST_CURSEFORGE_KEY) {
+      await page.goto(`${base}/servers/new`);
+      await page.getByText("CurseForge modpack", { exact: true }).click();
+      await page.getByRole("button", { name: "Next", exact: true }).click();
+      await page.getByLabel("Search modpacks", { exact: true }).fill("RLCraft");
+      const packFiles = page.waitForResponse(r => r.url().endsWith('/modpacks/curseforge/285109/files'));
+      await page.getByRole("button", { name: "Select RLCraft", exact: true }).click();
+      const available = await packFiles;
+      assert.equal(available.status(), 200);
+      assert((await available.json()).items.length > 0);
+      await page.locator('#modpack-release').waitFor();
+      await page.getByRole("button", { name: "Next", exact: true }).click();
+      await page.getByLabel("Server name", { exact: true }).fill("CurseForge metadata UI fixture");
+      await page.getByRole("button", { name: "Next", exact: true }).click();
+      await page.getByRole("button", { name: "Next", exact: true }).click();
+      const creation = page.waitForResponse(r => r.url().endsWith("/api/v1/servers") && r.request().method() === "POST");
+      await page.getByRole("button", { name: "Create and install", exact: true }).click();
+      const record = (await (await creation).json()).server;
+      assert.equal(record.software.type, "curseforge");
+      assert.equal(record.software.projectId, 285109);
+      assert.equal(record.acceptEula, false);
+      await page.getByRole("button", { name: "Retry install", exact: true }).waitFor();
+      await page.getByRole("button", { name: /Advanced options/ }).click();
+      const overrides = page.getByRole("group", { name: "Advanced install options", exact: true });
+      await overrides.getByLabel("Minecraft version", { exact: true }).fill("1.12.2");
+      await overrides.getByLabel("Java version", { exact: true }).fill("8");
+      const retry = page.waitForResponse(r => r.url().endsWith(`/servers/${record.id}/install`) && r.request().method() === "POST");
+      await page.getByRole("button", { name: "Retry install", exact: true }).click();
+      const response = await retry;
+      assert.equal(response.status(), 202);
+      const body = response.request().postDataJSON();
+      assert.equal(body.minecraftVersion, "1.12.2");
+      assert.equal(body.javaMajor, 8);
+      const saved = await page.evaluate(async id => (await fetch(`/api/v1/servers/${id}`)).json(), record.id);
+      assert.equal(saved.acceptEula, false);
+      console.log("PASS: real CurseForge search/releases, creation, same-ID installer override request and unchanged EULA (Docker intentionally disabled)");
+    }
     await sleep(150);
     assert.deepEqual(violations, [], "page violated its CSP");
     assert.deepEqual(errors, [], "page script errors");
@@ -449,6 +487,7 @@ async function test(enabled, showVersion = true) {
       "UI alerts:",
       await page?.getByRole("alert").allTextContents(),
     );
+    console.error("UI state:", (await page?.locator('body').innerText())?.slice(-3500));
     throw error;
   } finally {
     await context?.close();

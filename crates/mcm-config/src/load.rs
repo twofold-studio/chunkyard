@@ -37,6 +37,9 @@ impl Config {
             };
             let invalid = || ConfigError::Invalid(format!("invalid value for {key}"));
             match suffix {
+                "CURSEFORGE__API_KEY" => {
+                    config.curseforge.api_key = if value.is_empty() { None } else { Some(value) }
+                }
                 "AUTH__ENABLED" => config.auth.enabled = value.parse().map_err(|_| invalid())?,
                 "DOCKER__ENABLED" => {
                     config.docker.enabled = value.parse().map_err(|_| invalid())?

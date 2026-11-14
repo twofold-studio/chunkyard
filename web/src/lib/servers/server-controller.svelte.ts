@@ -6,6 +6,7 @@ import {
 	serverAction,
 	setEula,
 	waitForJob,
+	type InstallOptions,
 	type Job,
 	type JobFailure,
 	type ServerAction,
@@ -129,8 +130,9 @@ export class ServerController {
 	/**
 	 * Installs managed software for a server that is not installed yet. Retries reuse
 	 * this record; the server is never started and EULA acceptance is untouched.
+	 * `options` are advanced overrides; `null` detects everything (empty request body).
 	 */
-	async install(): Promise<Job | null> {
+	async install(options: InstallOptions | null = null): Promise<Job | null> {
 		if (this.busy || !needsInstall(this.server)) return null;
 		const id = this.server.id;
 		this.installError = null;
@@ -141,6 +143,7 @@ export class ServerController {
 				signal: this.signal,
 				intervalMs: this.#jobIntervalMs,
 				api: this.#api,
+				installOptions: options,
 				onUpdate: (job) => {
 					this.#installRequested = false;
 					this.installJob = job;

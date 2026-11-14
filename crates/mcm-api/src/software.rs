@@ -1,9 +1,27 @@
 use crate::{AppState, error::ApiError};
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
 };
 use serde_json::Value;
+#[derive(serde::Deserialize, Default)]
+#[serde(default, deny_unknown_fields)]
+pub(crate) struct Search {
+    query: String,
+    index: u32,
+}
+pub(crate) async fn modpacks(
+    State(s): State<AppState>,
+    Query(q): Query<Search>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(s.software.search_modpacks(&q.query, q.index).await?))
+}
+pub(crate) async fn modpack_files(
+    State(s): State<AppState>,
+    Path(id): Path<u64>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(s.software.modpack_files(id).await?))
+}
 pub(crate) async fn catalog(State(state): State<AppState>) -> Json<Value> {
     Json(state.software.catalog())
 }

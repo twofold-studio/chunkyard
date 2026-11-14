@@ -15,6 +15,85 @@ pub struct SafeHttp {
 }
 
 impl SafeHttp {
+    pub fn modpacks() -> Result<Self, DownloadError> {
+        Self::with_hosts(&[
+            "api.curseforge.com",
+            "edge.forgecdn.net",
+            "mediafilez.forgecdn.net",
+            "mediafiles.forgecdn.net",
+            "maven.minecraftforge.net",
+            "maven.neoforged.net",
+            "maven.fabricmc.net",
+            "meta.fabricmc.net",
+        ])
+    }
+    /// Credentialed metadata requests never follow redirects or send the key to a CDN.
+    pub async fn curseforge_json<T: DeserializeOwned>(
+        &self,
+        url: Url,
+        key: &str,
+    ) -> Result<T, DownloadError> {
+        self.validate(&url)?;
+        if url.host_str() != Some("api.curseforge.com") {
+            return Err(DownloadError::ForbiddenUrl);
+        }
+        let mut key =
+            reqwest::header::HeaderValue::from_str(key).map_err(|_| DownloadError::ForbiddenUrl)?;
+        key.set_sensitive(true);
+        let mut response = self
+            .client
+            .get(url)
+            .header("x-api-key", key)
+            .send()
+            .await?
+            .error_for_status()?;
+        if response.status().is_redirection() {
+            return Err(DownloadError::Redirect);
+        }
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await? {
+            if bytes.len() + chunk.len() > 4 * 1024 * 1024 {
+                return Err(DownloadError::Size);
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        serde_json_decode(&bytes)
+    }
+    pub async fn text(&self, url: Url) -> Result<String, DownloadError> {
+        let mut response = self.get(url).await?;
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await? {
+            if bytes.len() + chunk.len() > 128 * 1024 {
+                return Err(DownloadError::Size);
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        String::from_utf8(bytes).map_err(|_| DownloadError::Checksum)
+    }
+    /// Published server ZIPs may exceed the smaller single-JAR download limit.
+    pub async fn pack_artifact(
+        &self,
+        url: Url,
+        path: &Path,
+        size: u64,
+        checksum: &str,
+    ) -> Result<(), DownloadError> {
+        if size == 0 || size > 2 * 1024 * 1024 * 1024 {
+            return Err(DownloadError::Size);
+        }
+        let response = self.get(url).await?;
+        write_artifact(response, path, size, checksum, 2 * 1024 * 1024 * 1024).await
+    }
+    pub async fn installer_artifact(
+        &self,
+        url: Url,
+        path: &Path,
+        checksum: &str,
+    ) -> Result<(), DownloadError> {
+        let response = self.get(url).await?;
+        let size = response.content_length().ok_or(DownloadError::Size)?;
+        write_artifact(response, path, size, checksum, 512 * 1024 * 1024).await
+    }
     pub fn adoptium() -> Result<Self, DownloadError> {
         let hosts = [
             "api.adoptium.net",
@@ -109,7 +188,7 @@ impl SafeHttp {
             return Err(DownloadError::Size);
         }
         let response = self.get(url).await?;
-        write_artifact(response, destination, size, checksum).await
+        write_artifact(response, destination, size, checksum, 512 * 1024 * 1024).await
     }
 
     /// Writes only to a caller-owned staging directory; no partially verified final file.
@@ -137,17 +216,18 @@ async fn write_verified(
     if sha256.len() != 64 {
         return Err(DownloadError::Checksum);
     }
-    write_artifact(response, destination, size, sha256).await
+    write_artifact(response, destination, size, sha256, 512 * 1024 * 1024).await
 }
 async fn write_artifact(
     response: reqwest::Response,
     destination: &Path,
     size: u64,
     checksum: &str,
+    max_size: u64,
 ) -> Result<(), DownloadError> {
     let limit = size;
     if size == 0
-        || size > 512 * 1024 * 1024
+        || size > max_size
         || !matches!(checksum.len(), 40 | 64)
         || !checksum.bytes().all(|b| b.is_ascii_hexdigit())
     {
@@ -305,14 +385,22 @@ mod streaming_tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let dir = tempfile::tempdir()?;
         let checksum = format!("{:x}", sha1::Sha1::digest(b"abc"));
-        write_artifact(response().await?, &dir.path().join("valid"), 3, &checksum).await?;
+        write_artifact(
+            response().await?,
+            &dir.path().join("valid"),
+            3,
+            &checksum,
+            512 * 1024 * 1024,
+        )
+        .await?;
         assert_eq!(tokio::fs::read(dir.path().join("valid")).await?, b"abc");
         assert!(matches!(
             write_artifact(
                 response().await?,
                 &dir.path().join("corrupt"),
                 3,
-                &"0".repeat(40)
+                &"0".repeat(40),
+                512 * 1024 * 1024
             )
             .await,
             Err(DownloadError::Checksum)

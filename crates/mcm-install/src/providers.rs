@@ -7,7 +7,39 @@ const PAPER: &str = "https://fill.papermc.io/v3/projects/paper";
 #[async_trait]
 impl SoftwareService for Installers {
     fn catalog(&self) -> Value {
-        json!({"items":[{"id":"vanilla","name":"Vanilla","available":true,"reason":null},{"id":"paper","name":"Paper","available":true,"reason":null},{"id":"custom","name":"Custom JAR","available":true,"reason":null}]})
+        let enabled = self.curseforge_key.is_some();
+        json!({"items":[{"id":"vanilla","name":"Vanilla","available":true,"reason":null},{"id":"paper","name":"Paper","available":true,"reason":null},{"id":"curseforge","name":"CurseForge modpack","available":enabled,"reason":if enabled{None}else{Some("Configure CHUNKYARD_CURSEFORGE__API_KEY on the manager.")}},{"id":"custom","name":"Custom JAR","available":true,"reason":null}]})
+    }
+    async fn search_modpacks(&self, query: &str, index: u32) -> Result<Value, SoftwareError> {
+        self.cf_search(query, index).await
+    }
+    async fn modpack_files(&self, id: u64) -> Result<Value, SoftwareError> {
+        self.cf_files(id).await
+    }
+    async fn prepare_plan(
+        &self,
+        software: &Software,
+        directory: &Path,
+        options: &mcm_core::software::InstallOptions,
+        lease: std::sync::Arc<dyn Send + Sync>,
+    ) -> Result<mcm_core::software::PreparedSoftware, SoftwareError> {
+        if let Some(profile) = &options.launch {
+            profile.validate()?;
+        }
+        if let Software::CurseForge {
+            project_id,
+            file_id,
+        } = software
+        {
+            self.cf_prepare(*project_id, *file_id, directory, options, lease)
+                .await
+        } else {
+            Ok(mcm_core::software::PreparedSoftware {
+                launch: self.prepare(software, directory).await?,
+                installer: None,
+                instance_files: false,
+            })
+        }
     }
     async fn versions(&self, kind: &str) -> Result<Value, SoftwareError> {
         let mut ids: Vec<String> = match kind {
@@ -78,6 +110,7 @@ impl SoftwareService for Installers {
             return Err(SoftwareError::Upstream);
         }
         let (url, size, checksum, build) = match software {
+            Software::CurseForge { .. } => return Err(SoftwareError::Invalid),
             Software::Vanilla { .. } => {
                 let file = &vanilla["downloads"]["server"];
                 (
@@ -110,6 +143,8 @@ impl SoftwareService for Installers {
         self.artifact(&url, &directory.join("server.jar"), size, &checksum)
             .await?;
         Ok(Launch {
+            profile: None,
+            loader: None,
             path: "server.jar".into(),
             version: version.into(),
             build,

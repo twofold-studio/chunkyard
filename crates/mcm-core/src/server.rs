@@ -25,6 +25,35 @@ pub struct Server {
     pub auto_java: bool,
     #[serde(default)]
     pub publish_ip: Option<IpAddr>,
+    #[serde(default)]
+    pub launch_override: Option<crate::software::LaunchProfile>,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LaunchSettings {
+    pub detected: crate::software::LaunchProfile,
+    pub current: crate::software::LaunchProfile,
+    pub overridden: bool,
+    pub docker_image: String,
+    pub auto_java: bool,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LaunchUpdate {
+    #[serde(deserialize_with = "deserialize_profile")]
+    pub profile: Option<crate::software::LaunchProfile>,
+    #[serde(default, deserialize_with = "deserialize_image")]
+    pub docker_image: Option<Option<String>>,
+}
+fn deserialize_profile<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<Option<crate::software::LaunchProfile>, D::Error> {
+    Option::<crate::software::LaunchProfile>::deserialize(d)
+}
+fn deserialize_image<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<Option<Option<String>>, D::Error> {
+    Ok(Some(Option::<String>::deserialize(d)?))
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -174,6 +203,8 @@ pub struct ConsoleLine {
 pub type ConsoleStream = futures_util::stream::BoxStream<'static, Result<ConsoleLine, ServerError>>;
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
+    #[error("The configured launch file is missing. Check the launch settings and Files.")]
+    MissingLaunch,
     #[error("{0}")]
     Invalid(&'static str),
     #[error("server not found")]
@@ -211,6 +242,13 @@ pub enum ServerError {
 }
 #[async_trait]
 pub trait ServerRepo: Send + Sync {
+    async fn set_launch(
+        &self,
+        id: &str,
+        profile: Option<&crate::software::LaunchProfile>,
+        image: &str,
+        auto_java: bool,
+    ) -> Result<(), RepositoryError>;
     async fn set_resources(
         &self,
         id: &str,
@@ -238,6 +276,18 @@ pub trait ServerRepo: Send + Sync {
 /// the single managed directory belonging to the persisted server.
 #[async_trait]
 pub trait ServerRuntime: Send + Sync {
+    async fn run_installer(
+        &self,
+        _server: &Server,
+        _directory: PathBuf,
+        _command: crate::software::InstallerCommand,
+        _lease: std::sync::Arc<dyn Send + Sync>,
+    ) -> Result<(), ServerError> {
+        Err(ServerError::Software(
+            crate::software::SoftwareError::InstallFailed,
+        ))
+    }
+    async fn shutdown(&self) {}
     async fn stream_logs(&self, server: &Server, tail: u32) -> Result<ConsoleStream, ServerError> {
         use futures_util::StreamExt;
         let lines = self.logs(server, tail).await?;
@@ -279,6 +329,16 @@ pub trait ServerRuntime: Send + Sync {
 }
 #[async_trait]
 pub trait ServerService: Send + Sync {
+    async fn launch_settings(&self, id: &str) -> Result<LaunchSettings, ServerError>;
+    async fn set_launch(&self, id: &str, request: LaunchUpdate) -> Result<ServerView, ServerError>;
+    async fn install_with_options(
+        &self,
+        id: &str,
+        _options: crate::software::InstallOptions,
+    ) -> Result<ServerView, ServerError> {
+        self.install(id).await
+    }
+    async fn shutdown(&self) {}
     async fn set_resources(
         &self,
         id: &str,
@@ -310,6 +370,7 @@ pub trait ServerService: Send + Sync {
 impl ServerError {
     pub fn code(&self) -> &'static str {
         match self {
+            Self::MissingLaunch => "server.launch_missing",
             Self::Invalid(_) => "validation",
             Self::NotFound => "server.not_found",
             Self::Busy => "server.busy",

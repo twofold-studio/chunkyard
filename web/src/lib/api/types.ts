@@ -73,6 +73,8 @@ export interface ServerView {
 	launch?: ServerLaunch | null;
 	/** The Docker image was chosen automatically to match the required Java. */
 	autoJava?: boolean;
+	/** Owner-saved launch profile replacing detection; `null`/absent uses the detected launch. */
+	launchOverride?: LaunchProfile | null;
 }
 
 export interface ServerLaunch {
@@ -80,7 +82,57 @@ export interface ServerLaunch {
 	version: string;
 	build: string | null;
 	javaMajor: number;
+	/** SHA-256 of the downloaded artifact (the server-pack ZIP for CurseForge). */
 	checksum: string;
+	/** How the installed target is launched; absent on older records. */
+	profile?: { mode: LaunchMode; jvmArgs: string[]; args: string[] } | null;
+	/** Mod loader detected or installed for this server; absent when none. */
+	loader?: { type: string; version: string } | null;
+}
+
+/**
+ * - `jar`: Java `-jar <path>`.
+ * - `args`: Java `@<path>` argument file (modern Forge/NeoForge `unix_args.txt`).
+ * - `script`: `/bin/bash <path>` inside the game container.
+ */
+export type LaunchMode = 'jar' | 'args' | 'script';
+
+/** Launch target. `path` is relative to the instance directory; arguments are separate values. */
+export interface LaunchProfile {
+	mode: LaunchMode;
+	path: string;
+	javaMajor: number;
+	jvmArgs: string[];
+	args: string[];
+}
+
+/** `GET /api/v1/servers/{id}/launch`. */
+export interface LaunchSettings {
+	detected: LaunchProfile;
+	current: LaunchProfile;
+	overridden: boolean;
+	dockerImage: string;
+	autoJava: boolean;
+}
+
+/**
+ * `PATCH /api/v1/servers/{id}/launch`. A `null` profile resets detection; a `null` image
+ * restores automatic Temurin selection; an omitted image preserves the current policy.
+ */
+export interface UpdateLaunchRequest {
+	profile: LaunchProfile | null;
+	dockerImage?: string | null;
+}
+
+export type ModLoader = 'forge' | 'neoforge' | 'fabric';
+
+/** Optional body of `POST /api/v1/servers/{id}/install`; every field is an override. */
+export interface InstallOptions {
+	minecraftVersion?: string;
+	loader?: ModLoader;
+	loaderVersion?: string;
+	javaMajor?: number;
+	launch?: LaunchProfile;
 }
 
 /** Software kinds listed by `GET /api/v1/software`. */

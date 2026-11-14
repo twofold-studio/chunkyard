@@ -8,6 +8,19 @@ use mcm_core::server::*;
 use std::{path::PathBuf, time::Duration};
 #[async_trait]
 impl ServerRuntime for DockerRuntime {
+    async fn run_installer(
+        &self,
+        server: &Server,
+        directory: PathBuf,
+        command: mcm_core::software::InstallerCommand,
+        lease: std::sync::Arc<dyn Send + Sync>,
+    ) -> Result<(), ServerError> {
+        self.install_loader(server, directory, command, lease).await
+    }
+    async fn shutdown(&self) {
+        self.installer_tasks.close();
+        self.installer_tasks.wait().await;
+    }
     async fn stream_logs(&self, server: &Server, tail: u32) -> Result<ConsoleStream, ServerError> {
         self.follow_logs(server, tail).await
     }
@@ -21,6 +34,13 @@ impl ServerRuntime for DockerRuntime {
         Ok(self.network_of(server, self.inspect(server).await?))
     }
     async fn remove(&self, server: &Server) -> Result<(), ServerError> {
+        super::installer::remove_owned(
+            self.client()?,
+            &format!("{}-installer", self.name(server)),
+            &self.instance,
+            &server.id,
+        )
+        .await?;
         let Some(container) = self.inspect(server).await? else {
             return Ok(());
         };

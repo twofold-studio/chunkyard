@@ -34,6 +34,7 @@ pub struct Backend {
 impl Backend {
     pub async fn shutdown(&self) {
         self.jobs.shutdown().await;
+        self.state.servers.shutdown().await;
         self.database.close().await;
     }
 }
@@ -58,16 +59,25 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
         Arc::new(Adoptium::new(http.clone())),
         http,
     ));
-    let software = Arc::new(mcm_install::Installers::new()?);
+    let software = Arc::new(
+        mcm_install::Installers::new()?.with_curseforge(config.curseforge.api_key.clone()),
+    );
+    let runtime = Arc::new(mcm_process::DockerRuntime::new(
+        config.docker.clone(),
+        crate::storage::instance_id(&config.data_dir)?,
+    ));
+    if config.data_dir.join("servers").is_dir()
+        && let Err(error) = runtime.recover_installers().await
+        && !matches!(error, mcm_core::server::ServerError::DockerUnavailable)
+    {
+        tracing::warn!(%error,"could not recover interrupted loader installers");
+    }
     let servers = Arc::new(
         mcm_process::ServerManager::new(
             config.data_dir.join("servers"),
             config.docker.runtime_image.clone(),
             Arc::new(SqliteServerRepo::new(&database)),
-            Arc::new(mcm_process::DockerRuntime::new(
-                config.docker.clone(),
-                crate::storage::instance_id(&config.data_dir)?,
-            )),
+            runtime,
         )
         .with_installers(software.clone())
         .with_properties(Arc::new(mcm_db::SqlitePropertiesRepo::new(&database))),

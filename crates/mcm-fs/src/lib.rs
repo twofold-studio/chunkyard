@@ -1,7 +1,7 @@
 //! Bounded archive extraction into new, private staging directories.
 mod archive;
 pub mod sandbox;
-pub use archive::{ArchiveFormat, extract};
+pub use archive::{ArchiveFormat, extract, extract_server_pack};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ArchiveError {

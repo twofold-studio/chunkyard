@@ -63,7 +63,8 @@
 	$effect(() => {
 		const q = trimmed;
 		moreAbort?.abort();
-		if (q.length < MIN_QUERY) {
+		// An empty query lists popular packs; a single character is too broad to search.
+		if (q.length > 0 && q.length < MIN_QUERY) {
 			searching = false;
 			searchError = null;
 			results = [];
@@ -76,7 +77,7 @@
 		searchError = null;
 		(async () => {
 			try {
-				await sleep(debounceMs, controller.signal);
+				if (q) await sleep(debounceMs, controller.signal);
 				const page = await searchCurseForgeModpacks(q, 0, { signal: controller.signal });
 				results = page.items;
 				total = page.pagination.totalCount;
@@ -247,8 +248,10 @@
 					</Select.Content>
 				</Select.Root>
 				<Field.Description>
-					Only releases with a server pack are listed.
+					Only releases with a linked server pack are listed; that server pack is what gets
+					installed.
 					{#if selectedFile?.gameVersions.length}Minecraft {gameVersions(selectedFile)}.{/if}
+					Some packs need extra settings; a failed install can be retried with advanced options.
 				</Field.Description>
 			{/if}
 		</Field.Field>
@@ -280,18 +283,24 @@
 			{#if searchError}
 				<ErrorAlert error={searchError} />
 			{/if}
-			{#if trimmed.length < MIN_QUERY}
+			{#if trimmed.length > 0 && trimmed.length < MIN_QUERY}
 				<p class="text-sm text-muted-foreground">Type at least {MIN_QUERY} characters to search.</p>
 			{:else if searching}
 				<div class="flex flex-col gap-2" aria-busy="true">
 					{#each { length: 3 }, i (i)}<Skeleton class="h-16 w-full rounded-lg" />{/each}
 				</div>
 			{:else if !searchError && results.length === 0}
-				<p class="text-sm text-muted-foreground">No modpacks match “{searched}”.</p>
+				<p class="text-sm text-muted-foreground">
+					{searched ? `No modpacks match “${searched}”.` : 'No modpacks found.'}
+				</p>
 			{:else if results.length > 0}
 				<p class="text-xs text-muted-foreground">
-					{total.toLocaleString('en')}
-					{total === 1 ? 'result' : 'results'}
+					{#if searched}
+						{total.toLocaleString('en')}
+						{total === 1 ? 'result' : 'results'}
+					{:else}
+						Popular modpacks
+					{/if}
 				</p>
 				<ul class="flex flex-col gap-1.5" aria-label="Modpack results">
 					{#each results as item (item.id)}

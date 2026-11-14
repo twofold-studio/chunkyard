@@ -28,6 +28,7 @@
 		isAbortError,
 		listSoftware,
 		type CurseForgeModpack,
+		type InstallOptions,
 		type ServerSoftware,
 		type ServerView,
 		type SoftwareCatalogItem,
@@ -189,8 +190,8 @@
 		else next();
 	}
 
-	async function retry() {
-		const server = await flow.retryInstall();
+	async function retry(options: InstallOptions | null) {
+		const server = await flow.retryInstall(options);
 		if (server) oncreated(server);
 	}
 
@@ -491,7 +492,7 @@
 										{@render reviewRow(
 											kind === 'curseforge' ? 'Modpack' : 'Version',
 											kind === 'curseforge' && pack
-												? `${pack.name} (file ${fileId})`
+												? `${pack.name} (release ${fileId})`
 												: (summary?.detail ?? '—'),
 											'version'
 										)}

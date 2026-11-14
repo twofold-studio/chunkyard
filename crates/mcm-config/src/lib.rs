@@ -12,6 +12,20 @@ pub struct Config {
     pub java: JavaConfig,
     pub auth: AuthConfig,
     pub docker: mcm_process::DockerConfig,
+    pub curseforge: CurseForgeConfig,
+}
+#[derive(Clone, Default, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct CurseForgeConfig {
+    #[serde(skip_serializing)]
+    pub api_key: Option<String>,
+}
+impl std::fmt::Debug for CurseForgeConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CurseForgeConfig")
+            .field("configured", &self.api_key.is_some())
+            .finish()
+    }
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -66,6 +80,7 @@ impl Default for Config {
             java: JavaConfig::default(),
             auth: AuthConfig::default(),
             docker: mcm_process::DockerConfig::default(),
+            curseforge: CurseForgeConfig::default(),
         }
     }
 }

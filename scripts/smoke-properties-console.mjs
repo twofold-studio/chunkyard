@@ -263,6 +263,15 @@ try {
   const changedResources = await api(`/api/v1/servers/${second.id}`);
   assert.equal(changedResources.memoryMaxMb, 384);
   assert.equal(changedResources.cpus, 0.5);
+  await page.getByRole("button", { name: "Edit launch settings", exact: true }).click();
+  await page.getByRole("switch", { name: "Custom launch", exact: true }).click();
+  await page.getByLabel("Extra JVM arguments (one per line)", { exact: true }).fill("-Dsmoke.launch=true");
+  const savedLaunch = page.waitForResponse(r => r.url().endsWith("/launch") && r.request().method() === "PATCH");
+  await page.getByRole("button", { name: "Save launch", exact: true }).click();
+  assert.equal((await savedLaunch).status(), 200);
+  const launch = await api(`/api/v1/servers/${second.id}/launch`);
+  assert.equal(launch.overridden, true);
+  assert.deepEqual(launch.current.jvmArgs, ["-Dsmoke.launch=true"]);
   await page.getByRole("tab", { name: "Exports", exact: true }).click();
   await page.getByRole("radio", { name: "Full instance", exact: true }).click();
   await page.getByRole("button", { name: "Export", exact: true }).click();

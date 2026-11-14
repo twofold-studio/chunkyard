@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Chunkyard API",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": "Single-owner Minecraft manager. Cookie authentication is required unless CHUNKYARD_AUTH__ENABLED=false. Host/origin and X-MCM-CSRF protections apply in both modes. JSON bodies are limited to 1 MiB, except file/properties editors' 8 MiB envelopes for escaped text up to 1 MiB. Raw uploads stream up to 128 MiB. Properties revisions can be saved while running and apply on the next explicit start/restart. Console supports snapshots and same-origin WebSocket streaming; metrics are snapshots."
   },
   "servers": [
@@ -2482,7 +2482,7 @@
         "tags": [
           "Servers"
         ],
-        "summary": "Install selected Vanilla or Paper software",
+        "summary": "Install managed software or a CurseForge server pack",
         "responses": {
           "202": {
             "description": "Installation queued",
@@ -2505,7 +2505,7 @@
             }
           }
         },
-        "description": "Returns a server.install job. Requires a stopped managed server without an existing game container or successful installation. Downloads and verifies an official JAR, records the resolved version/build/checksum, and selects a matching JVM image unless explicitly overridden. Never starts a server or changes EULA acceptance. Retry failed jobs against this same server ID. Reinstallation of an installed server is rejected.",
+        "description": "Durable job; no body required. Optional overrides help unusual CurseForge layouts. Published archives are checksum verified, loader installers run in isolated Docker, and existing instance files are not overwritten. Never starts Minecraft or accepts the EULA. Retry failed jobs on the same ID; successful installations cannot be installed again.",
         "parameters": [
           {
             "name": "id",
@@ -2538,7 +2538,17 @@
             },
             "description": "Must match the configured public origin; a same-origin Referer may substitute."
           }
-        ]
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallOptions"
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/storage": {
@@ -2880,6 +2890,240 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ServerResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/launch": {
+      "get": {
+        "operationId": "get_launch",
+        "tags": [
+          "Software"
+        ],
+        "summary": "Read detected and overridden launch settings",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read detected and overridden launch settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LaunchSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patch_launch",
+        "tags": [
+          "Software"
+        ],
+        "summary": "Edit stopped-instance launch settings without changing files",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/FileCsrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LaunchUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Edit stopped-instance launch settings without changing files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modpacks/curseforge": {
+      "get": {
+        "operationId": "search_modpacks",
+        "tags": [
+          "Software"
+        ],
+        "summary": "Search Minecraft modpacks; empty query returns popular packs",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 120,
+              "default": ""
+            }
+          },
+          {
+            "name": "index",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9900,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search Minecraft modpacks; empty query returns popular packs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CurseForgePack"
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "index": {
+                          "type": "integer"
+                        },
+                        "pageSize": {
+                          "type": "integer"
+                        },
+                        "totalCount": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "index",
+                        "pageSize",
+                        "totalCount"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "pagination"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modpacks/curseforge/{id}/files": {
+      "get": {
+        "operationId": "modpack_files",
+        "tags": [
+          "Software"
+        ],
+        "summary": "List recent releases with linked server packs",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List recent releases with linked server packs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CurseForgeFile"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -3646,6 +3890,16 @@
               "null"
             ],
             "description": "Optional instance bind-address override; null uses the manager default."
+          },
+          "launchOverride": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LaunchProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -4393,9 +4647,32 @@
               "version"
             ],
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "curseforge"
+              },
+              "projectId": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "fileId": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Client release with a linked serverPackFileId."
+              }
+            },
+            "required": [
+              "type",
+              "projectId",
+              "fileId"
+            ],
+            "additionalProperties": false
           }
         ],
-        "description": "Managed software selection. Release versions only; Forge, Fabric and CurseForge are deferred."
+        "description": "Managed Vanilla/Paper releases or a CurseForge modpack client release. Standalone Forge/Fabric selections are not offered yet."
       },
       "InstalledLaunch": {
         "type": "object",
@@ -4423,7 +4700,13 @@
           },
           "checksum": {
             "type": "string",
-            "description": "Published SHA-1 (Vanilla) or SHA-256 (Paper) of the installed JAR."
+            "description": "Verified artifact checksum: published SHA-1 for Vanilla, SHA-256 for Paper, or calculated SHA-256 of the published/checksum-verified CurseForge server ZIP."
+          },
+          "profile": {
+            "$ref": "#/components/schemas/LaunchOptions"
+          },
+          "loader": {
+            "$ref": "#/components/schemas/InstalledLoader"
           }
         },
         "required": [
@@ -4696,6 +4979,300 @@
           "memoryMinMb",
           "memoryMaxMb",
           "cpus"
+        ],
+        "additionalProperties": false
+      },
+      "LaunchProfile": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "jar",
+              "args",
+              "script"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "Instance-relative launch file; no absolute or dot paths."
+          },
+          "javaMajor": {
+            "type": "integer",
+            "minimum": 8,
+            "maximum": 99
+          },
+          "jvmArgs": {
+            "type": "array",
+            "maxItems": 128,
+            "items": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          },
+          "args": {
+            "type": "array",
+            "maxItems": 128,
+            "items": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          }
+        },
+        "required": [
+          "mode",
+          "path",
+          "javaMajor"
+        ],
+        "additionalProperties": false
+      },
+      "LaunchSettings": {
+        "type": "object",
+        "properties": {
+          "detected": {
+            "$ref": "#/components/schemas/LaunchProfile"
+          },
+          "current": {
+            "$ref": "#/components/schemas/LaunchProfile"
+          },
+          "overridden": {
+            "type": "boolean"
+          },
+          "dockerImage": {
+            "type": "string"
+          },
+          "autoJava": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "detected",
+          "current",
+          "overridden",
+          "dockerImage",
+          "autoJava"
+        ],
+        "additionalProperties": false
+      },
+      "LaunchUpdate": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LaunchProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dockerImage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "profile"
+        ],
+        "additionalProperties": false
+      },
+      "InstallOptions": {
+        "type": "object",
+        "properties": {
+          "minecraftVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "loader": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "forge",
+                  "neoforge",
+                  "fabric"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "loaderVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "javaMajor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 8,
+                "maximum": 99
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "launch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LaunchProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "LaunchOptions": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "jar",
+              "args",
+              "script"
+            ]
+          },
+          "jvmArgs": {
+            "type": "array",
+            "maxItems": 128,
+            "items": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          },
+          "args": {
+            "type": "array",
+            "maxItems": 128,
+            "items": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "InstalledLoader": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "forge",
+              "neoforge",
+              "fabric"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "CurseForgePack": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "websiteUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "logoUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "downloads": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "summary",
+          "websiteUrl",
+          "logoUrl",
+          "downloads"
+        ],
+        "additionalProperties": false
+      },
+      "CurseForgeFile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "gameVersions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "serverPackFileId": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "gameVersions",
+          "serverPackFileId"
         ],
         "additionalProperties": false
       }

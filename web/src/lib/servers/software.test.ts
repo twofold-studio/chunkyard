@@ -3,9 +3,12 @@ import {
 	buildSoftware,
 	cardSummary,
 	describeSoftware,
+	installedDetails,
+	installedLoader,
 	monogram,
 	needsInstall,
-	safeCurseForgeUrl
+	safeCurseForgeUrl,
+	softwareHeadline
 } from './software';
 
 const base = { kind: null, version: '', build: '', projectId: null, fileId: null } as const;
@@ -120,5 +123,84 @@ describe('cardSummary', () => {
 			software: 'Custom',
 			version: null
 		});
+	});
+});
+
+describe('installed software labels', () => {
+	const launch = {
+		path: 'server.jar',
+		version: '1.21.1',
+		build: null,
+		javaMajor: 21,
+		checksum: 'ab'
+	};
+	const pack = { type: 'curseforge' as const, projectId: 101, fileId: 555 };
+
+	it('shows the installed Paper build for a latest-build selection', () => {
+		expect(
+			describeSoftware({ type: 'paper', version: '1.21.1' }, { ...launch, build: '130' }).detail
+		).toBe('1.21.1 build 130');
+		expect(describeSoftware({ type: 'paper', version: '1.21.1' }).detail).toBe(
+			'1.21.1 latest build'
+		);
+	});
+
+	it('describes a CurseForge selection without Paper wording', () => {
+		const summary = describeSoftware(pack);
+		expect(summary).toEqual({ kind: 'CurseForge modpack', detail: 'project 101 · release 555' });
+	});
+
+	it('lists Minecraft, loader, Java and launch for an installed pack', () => {
+		const server = {
+			software: pack,
+			launch: {
+				...launch,
+				version: '1.20.1',
+				build: '5555',
+				javaMajor: 17,
+				loader: { type: 'forge', version: '47.3.0' },
+				profile: { mode: 'args' as const, jvmArgs: [], args: [] }
+			}
+		};
+		const rows = installedDetails(server);
+		expect(rows).toEqual([
+			{ label: 'Minecraft', value: '1.20.1' },
+			{ label: 'Loader', value: 'Forge 47.3.0' },
+			{ label: 'Java', value: 'Java 17' },
+			{ label: 'Launch', value: 'Java argument file' }
+		]);
+		// A build number is only ever labelled as a Paper build for Paper servers.
+		expect(rows.some((row) => /build/i.test(row.label))).toBe(false);
+		expect(softwareHeadline(server)).toBe('CurseForge modpack · Minecraft 1.20.1 · Forge 47.3.0');
+		expect(cardSummary(server)).toEqual({ software: 'CurseForge · Forge', version: '1.20.1' });
+	});
+
+	it('marks a custom launch override and uses its Java', () => {
+		const rows = installedDetails({
+			software: pack,
+			launch: { ...launch, loader: { type: 'neoforge', version: '21.1.77' } },
+			launchOverride: { mode: 'script', path: 'run.sh', javaMajor: 21, jvmArgs: [], args: [] }
+		});
+		expect(rows).toContainEqual({ label: 'Loader', value: 'NeoForge 21.1.77' });
+		expect(rows).toContainEqual({ label: 'Launch', value: 'Bash script (custom)' });
+	});
+
+	it('labels Paper builds and Fabric loaders for their own kinds', () => {
+		expect(
+			installedDetails({
+				software: { type: 'paper', version: '1.21.1' },
+				launch: { ...launch, build: '130' }
+			})
+		).toContainEqual({ label: 'Paper build', value: '130' });
+		expect(
+			installedLoader({
+				software: { type: 'fabric', version: '1.21.1', loaderVersion: '0.16.5' },
+				launch
+			})
+		).toBe('Fabric 0.16.5');
+		expect(softwareHeadline({ software: pack, launch: null })).toBe(
+			'CurseForge modpack project 101 · release 555'
+		);
+		expect(installedDetails({ software: pack, launch: null })).toEqual([]);
 	});
 });

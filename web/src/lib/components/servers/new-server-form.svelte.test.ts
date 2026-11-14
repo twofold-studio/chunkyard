@@ -422,7 +422,27 @@ describe('NewServerForm', () => {
 		);
 		setup();
 		await page.getByText('CurseForge modpack', { exact: true }).click();
+		// An empty query lists popular packs.
+		reply(
+			'GET',
+			'/api/v1/modpacks/curseforge?query=&index=0',
+			ok({
+				items: [
+					{
+						id: 7,
+						name: 'Popular Pack',
+						summary: 'Most downloaded.',
+						websiteUrl: null,
+						logoUrl: null,
+						downloads: 9_000_000
+					}
+				],
+				pagination: { index: 0, pageSize: 20, totalCount: 1 }
+			})
+		);
 		await next();
+		await expect.element(page.getByText('Popular modpacks')).toBeVisible();
+		await expect.element(page.getByText('Popular Pack')).toBeVisible();
 
 		reply(
 			'GET',
@@ -477,11 +497,86 @@ describe('NewServerForm', () => {
 			body: { code: 'server.busy', detail: 'Busy.' }
 		});
 		await toReview();
-		await expect.element(page.getByText('All the Mods 10 (file 555)')).toBeVisible();
+		await expect.element(page.getByText('All the Mods 10 (release 555)')).toBeVisible();
 		await page.getByRole('button', { name: 'Create and install' }).click();
 		await expect.element(page.getByText('Operation in progress')).toBeVisible();
 		expect(posts('/api/v1/servers')[0].body).toMatchObject({
 			software: { type: 'curseforge', projectId: 101, fileId: 555 }
 		});
+	});
+
+	it('retries a failed modpack install on the same ID with advanced overrides', async () => {
+		reply(
+			'GET',
+			'/api/v1/software',
+			ok({ items: [{ id: 'curseforge', name: 'CurseForge', available: true, reason: null }] })
+		);
+		const { oncreated } = setup();
+		await page.getByText('CurseForge modpack', { exact: true }).click();
+		const packItem = {
+			id: 101,
+			name: 'All the Mods 10',
+			summary: 'Kitchen sink.',
+			websiteUrl: null,
+			logoUrl: null,
+			downloads: 10
+		};
+		reply(
+			'GET',
+			'/api/v1/modpacks/curseforge?query=&index=0',
+			ok({ items: [packItem], pagination: { index: 0, pageSize: 20, totalCount: 1 } })
+		);
+		reply(
+			'GET',
+			'/api/v1/modpacks/curseforge/101/files',
+			ok({
+				items: [{ id: 555, name: 'ATM10 2.0', gameVersions: ['1.21.1'], serverPackFileId: 556 }]
+			})
+		);
+		await next();
+		await page.getByRole('button', { name: 'Select All the Mods 10' }).click();
+		await expect
+			.element(page.getByRole('combobox', { name: 'Release' }))
+			.toHaveTextContent('ATM10 2.0');
+		await next();
+		await page.getByLabelText('Server name').fill('ATM');
+
+		const pack = { software: { type: 'curseforge', projectId: 101, fileId: 555 } };
+		reply('POST', '/api/v1/servers', ok({ server: managedServer(pack) }, 201));
+		reply(
+			'POST',
+			'/api/v1/servers/srv-1/install',
+			ok({ job: job('queued') }, 202),
+			ok({ job: job('queued') }, 202)
+		);
+		reply(
+			'GET',
+			'/api/v1/jobs/job-1',
+			ok(
+				job('failed', {
+					error: { code: 'software.pack_unsupported', detail: 'No server loader was found.' }
+				})
+			),
+			ok(job('succeeded', { result: { server: managedServer({ ...pack, launch: {} }) } }))
+		);
+		await toReview();
+		await page.getByRole('button', { name: 'Create and install' }).click();
+		await expect.element(page.getByText('Server pack not supported')).toBeVisible();
+		// The first install sends no body: everything is detected.
+		expect(posts('/api/v1/servers/srv-1/install')[0].body).toBeUndefined();
+
+		await page.getByRole('button', { name: /Advanced options/ }).click();
+		await page.getByLabelText('Loader version').fill('21.1.77');
+		await page.getByRole('combobox', { name: 'Loader' }).click();
+		await page.getByRole('option', { name: 'NeoForge' }).click();
+		await page.getByRole('button', { name: 'Retry install' }).click();
+
+		await vi.waitFor(() => expect(oncreated).toHaveBeenCalledOnce());
+		expect(posts('/api/v1/servers')).toHaveLength(1);
+		const installs = posts('/api/v1/servers/srv-1/install');
+		expect(installs).toHaveLength(2);
+		expect(installs[1].body).toEqual({ loader: 'neoforge', loaderVersion: '21.1.77' });
+		// Installing never accepts the EULA for the owner.
+		expect(posts('/api/v1/servers/srv-1/eula')).toHaveLength(0);
 	});
 });

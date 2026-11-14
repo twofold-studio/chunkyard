@@ -12,7 +12,7 @@
 		StatusBadge
 	} from '#lib/components/app/index.js';
 	import { formatCpus, formatMemory } from '#lib/format.js';
-	import { describeSoftware, needsInstall } from '#lib/servers/software.js';
+	import { describeSoftware, installedDetails, needsInstall } from '#lib/servers/software.js';
 	import type { ServerView } from '#lib/api/index.js';
 
 	interface Props {
@@ -22,8 +22,9 @@
 	}
 
 	let { server, onEditNetwork }: Props = $props();
-	const software = $derived(server.software ? describeSoftware(server.software) : null);
 	const launch = $derived(server.launch ?? null);
+	const software = $derived(server.software ? describeSoftware(server.software, launch) : null);
+	const details = $derived(installedDetails(server));
 </script>
 
 {#snippet value(label: string, text: string, mono = false)}
@@ -66,12 +67,14 @@
 			</div>
 			{#if launch}
 				<div class="grid gap-4 sm:grid-cols-3">
-					{@render value('Minecraft', launch.version)}
-					{#if launch.build}{@render value('Build', launch.build)}{/if}
-					{@render value('Java', `Java ${launch.javaMajor}`)}
+					{#each details as row (row.label)}{@render value(row.label, row.value)}{/each}
 				</div>
-				{@render value('Launch file', launch.path, true)}
-				{@render value('SHA-256', launch.checksum, true)}
+				{@render value('Launch file', server.launchOverride?.path ?? launch.path, true)}
+				{@render value(
+					server.software?.type === 'curseforge' ? 'Server pack SHA-256' : 'SHA-256',
+					launch.checksum,
+					true
+				)}
 			{/if}
 		</SettingsSection>
 	{/if}

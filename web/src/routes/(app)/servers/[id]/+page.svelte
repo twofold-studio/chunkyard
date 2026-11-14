@@ -31,10 +31,11 @@
 	import EulaDialog from '#lib/components/servers/eula-dialog.svelte';
 	import DeleteServerDialog from '#lib/components/servers/delete-server-dialog.svelte';
 	import ServerInstallPanel from '#lib/components/servers/server-install-panel.svelte';
-	import { describeSoftware, needsInstall } from '#lib/servers/software.js';
+	import { needsInstall, softwareHeadline } from '#lib/servers/software.js';
 	import {
 		errorCode,
 		type DeletedServer,
+		type InstallOptions,
 		type ServerAction,
 		type ServerView
 	} from '#lib/api/index.js';
@@ -61,7 +62,7 @@
 	const created = $derived(page.url.searchParams.has('created'));
 	const software = $derived(server.software ?? null);
 	const notInstalled = $derived(needsInstall(server));
-	const softwareSummary = $derived(software ? describeSoftware(software) : null);
+	const softwareSummary = $derived(softwareHeadline(server));
 
 	const TABS = [
 		{ value: 'overview', label: 'Overview', icon: LayoutDashboardIcon },
@@ -94,6 +95,8 @@
 	let leavingAfterAutosave = false;
 	/** Bumped to expand and scroll to Settings → Network. */
 	let networkFocus = $state(0);
+	/** Bumped to expand and scroll to Settings → Launch. */
+	let launchFocus = $state(0);
 	let tabDirection = $state<1 | -1>(1);
 
 	beforeNavigate((navigation) => {
@@ -140,6 +143,11 @@
 
 	function editNetwork() {
 		networkFocus += 1;
+		selectTab('settings');
+	}
+
+	function editLaunch() {
+		launchFocus += 1;
 		selectTab('settings');
 	}
 
@@ -206,8 +214,8 @@
 		}
 	}
 
-	async function onInstall() {
-		const job = await controller.install();
+	async function onInstall(options: InstallOptions | null) {
+		const job = await controller.install(options);
 		if (job?.state === 'succeeded') toast.success(`Installed ${server.name}`);
 	}
 
@@ -254,8 +262,7 @@
 				<span class="truncate">{labels[controller.action]}… job {controller.job.state}</span>
 			{:else}
 				<span class="truncate">
-					{#if softwareSummary}{softwareSummary.kind}{#if softwareSummary.detail}
-							{softwareSummary.detail}{/if} ·
+					{#if softwareSummary}{softwareSummary} ·
 					{/if}Port {server.port} · {formatMemoryRange(server.memoryMinMb, server.memoryMaxMb)}
 				</span>
 			{/if}
@@ -355,6 +362,13 @@
 		>
 			<div class="mt-2"><CopyText value={jarPath} label="Copy JAR path" /></div>
 		</ErrorAlert>
+	{:else if errorKind === 'server.launch_missing'}
+		<ErrorAlert error={controller.error}>
+			<div class="mt-2 flex flex-wrap gap-2">
+				<Button size="sm" variant="outline" onclick={() => selectTab('files')}>Open Files</Button>
+				<Button size="sm" variant="outline" onclick={editLaunch}>Launch settings</Button>
+			</div>
+		</ErrorAlert>
 	{:else if errorKind === 'server.eula_required'}
 		<ErrorAlert error={controller.error} hint="Accept the Minecraft EULA, then start again.">
 			<Button size="sm" variant="outline" class="mt-2" onclick={() => (eulaOpen = true)}>
@@ -450,6 +464,8 @@
 					onOpenProperties={() => selectTab('properties')}
 					{networkFocus}
 					onNetworkFocused={() => (networkFocus = 0)}
+					{launchFocus}
+					onLaunchFocused={() => (launchFocus = 0)}
 				/>
 			</Reveal>
 		{/if}

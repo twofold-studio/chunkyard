@@ -18,6 +18,18 @@ impl SqliteServerRepo {
 }
 #[async_trait]
 impl ServerRepo for SqliteServerRepo {
+    async fn set_launch(
+        &self,
+        id: &str,
+        profile: Option<&mcm_core::software::LaunchProfile>,
+        image: &str,
+        auto_java: bool,
+    ) -> Result<(), RepositoryError> {
+        let profile = serde_json::to_string(&profile).map_err(storage)?;
+        sqlx::query("UPDATE servers SET document=json_set(document,'$.launchOverride',json(?),'$.dockerImage',?,'$.autoJava',json(?)) WHERE id=?")
+            .bind(profile).bind(image).bind(if auto_java{"true"}else{"false"}).bind(id).execute(&self.pool).await.map_err(storage)?;
+        Ok(())
+    }
     async fn set_resources(
         &self,
         id: &str,

@@ -28,24 +28,13 @@ impl DockerRuntime {
             + i64::from(server.memory_max_mb / 4).max(256))
             * 1024
             * 1024;
+        let (entrypoint, cmd) = crate::launch::command(server);
         Ok(ContainerCreateBody {
             image: Some(image),
             working_dir: Some("/data".into()),
             user: Some(user),
-            entrypoint: Some(vec!["java".into()]),
-            cmd: Some(vec![
-                format!("-Xms{}M", server.memory_min_mb),
-                format!("-Xmx{}M", server.memory_max_mb),
-                "-jar".into(),
-                server
-                    .launch
-                    .as_ref()
-                    .map(|l| l.path.clone())
-                    .unwrap_or_else(|| server.jar.clone()),
-                "nogui".into(),
-                "--port".into(),
-                "25565".into(),
-            ]),
+            entrypoint: Some(vec![entrypoint]),
+            cmd: Some(cmd),
             open_stdin: Some(true),
             stdin_once: Some(false),
             attach_stdin: Some(true),
@@ -108,8 +97,34 @@ impl DockerRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn modern_loader_and_script_profiles_build_argument_vectors_without_host_shells() {
+        use mcm_core::software::*;
+        let mut s = server();
+        s.launch_override = Some(LaunchProfile {
+            mode: LaunchMode::Args,
+            path: "libraries/forge/unix_args.txt".into(),
+            java_major: 17,
+            jvm_args: vec!["-Dexample=true".into()],
+            args: vec!["--world".into(), "a world with spaces".into()],
+        });
+        let (entry, args) = crate::launch::command(&s);
+        assert_eq!(entry, "java");
+        assert!(args.contains(&"@libraries/forge/unix_args.txt".into()));
+        assert!(args.contains(&"a world with spaces".into()));
+        assert_eq!(args.last().map(String::as_str), Some("25565"));
+        if let Some(p) = s.launch_override.as_mut() {
+            p.mode = LaunchMode::Script;
+            p.path = "start.sh".into();
+            p.args = vec!["$(never-expanded-by-manager)".into()];
+        }
+        let (entry, args) = crate::launch::command(&s);
+        assert_eq!(entry, "/bin/bash");
+        assert_eq!(args, vec!["start.sh", "$(never-expanded-by-manager)"]);
+    }
     fn server() -> Server {
         Server {
+            launch_override: None,
             id: "test-server".into(),
             name: "Test".into(),
             runtime: "docker".into(),
@@ -173,6 +188,8 @@ mod tests {
         );
         let mut server = server();
         server.launch = Some(mcm_core::software::Launch {
+            profile: None,
+            loader: None,
             path: ".chunkyard-software-test/server.jar".into(),
             version: "1.21.4".into(),
             build: Some("232".into()),

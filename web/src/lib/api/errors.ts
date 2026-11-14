@@ -49,6 +49,26 @@ const KNOWN: Record<string, Omit<ErrorMessage, 'detail'> & { detail?: string }> 
 	'server.already_installed': { title: 'Already installed' },
 	'software.upstream': { title: 'Software provider unavailable' },
 	'software.download_failed': { title: 'Software download failed' },
+	'software.download_unavailable': {
+		title: 'Download not allowed',
+		hint: 'The pack author disabled third-party downloads for this file. Choose another release or upload the server files yourself.'
+	},
+	'software.pack_unsupported': {
+		title: 'Server pack not supported',
+		hint: 'Retry with Advanced options (Minecraft version, loader, Java or a launch target), or create a Custom JAR server and upload the files.'
+	},
+	'software.files_conflict': {
+		title: 'Files already exist',
+		hint: 'The install never overwrites unrelated files. Move or delete the conflicting files in Files, then retry.'
+	},
+	'software.install_failed': {
+		title: 'Install failed',
+		hint: 'Check the details, adjust Advanced options if the pack needs it, and retry. The server record is kept.'
+	},
+	'server.launch_missing': {
+		title: 'Launch target missing',
+		hint: 'The configured launch file does not exist. Fix it in Files or in Settings → Launch, then start again.'
+	},
 	'server.running': { title: 'Server is running' },
 	'server.not_running': { title: 'Server is not running' },
 	'server.port_in_use': {

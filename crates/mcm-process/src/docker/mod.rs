@@ -1,5 +1,6 @@
 mod definition;
 mod image;
+mod installer;
 mod io;
 mod lifecycle;
 mod metrics;
@@ -16,6 +17,7 @@ pub struct DockerRuntime {
     instance: String,
     negotiated: tokio::sync::OnceCell<()>,
     stats_slots: tokio::sync::Semaphore,
+    installer_tasks: tokio_util::task::TaskTracker,
 }
 impl DockerRuntime {
     fn network_of(
@@ -63,6 +65,7 @@ impl DockerRuntime {
             instance,
             negotiated: tokio::sync::OnceCell::new(),
             stats_slots: tokio::sync::Semaphore::new(4),
+            installer_tasks: tokio_util::task::TaskTracker::new(),
         }
     }
     fn client(&self) -> Result<&Docker, ServerError> {

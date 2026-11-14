@@ -25,7 +25,7 @@ pub fn extract(
     fs::create_dir(destination)?;
     match format {
         ArchiveFormat::TarGz => extract_tar(source, destination),
-        ArchiveFormat::Zip => extract_zip(source, destination),
+        ArchiveFormat::Zip => extract_zip(source, destination, MAX_BYTES),
     }
 }
 
@@ -140,7 +140,12 @@ fn validate_link(path: &Path, target: &Path) -> Result<(), ArchiveError> {
     Ok(())
 }
 
-fn extract_zip(source: &Path, root: &Path) -> Result<(), ArchiveError> {
+/// Server packs use a separate bound; the Java runtime extraction limit stays unchanged.
+pub fn extract_server_pack(source: &Path, destination: &Path) -> Result<(), ArchiveError> {
+    fs::create_dir(destination)?;
+    extract_zip(source, destination, 8 * 1024 * 1024 * 1024)
+}
+fn extract_zip(source: &Path, root: &Path, max_bytes: u64) -> Result<(), ArchiveError> {
     let mut archive = zip::ZipArchive::new(File::open(source)?)?;
     if archive.len() > MAX_ENTRIES {
         return Err(ArchiveError::Limit);
@@ -159,10 +164,19 @@ fn extract_zip(source: &Path, root: &Path) -> Result<(), ArchiveError> {
         } else {
             let size = entry.size();
             total = total.checked_add(size).ok_or(ArchiveError::Limit)?;
-            if total > MAX_BYTES {
+            if total > max_bytes {
                 return Err(ArchiveError::Limit);
             }
             copy_file(&mut entry, &destination, size)?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                // Keep executable helpers usable while stripping special permission bits.
+                fs::set_permissions(
+                    &destination,
+                    fs::Permissions::from_mode(0o644 | (entry.unix_mode().unwrap_or(0) & 0o111)),
+                )?;
+            }
         }
     }
     Ok(())

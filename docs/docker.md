@@ -2,7 +2,7 @@
 
 Existing instance CPU and heap limits can be edited in **Settings → Resources** while stopped (`PATCH /api/v1/servers/{id}/resources`). The next start recreates the container with those limits. Minecraft heap is separate from the container's additional memory overhead.
 
-Use **Exports** to compress a stopped instance's worlds, selected paths or all files. Configure an existing private S3 bucket under **Storage & exports**; RustFS works through its S3 API (for this deployment, `http://vd.netbird.cloud:9000` over NetBird, path-style, region `us-east-1`). Credentials stay in a mode-0600 file under `/data/exports/`, so the manager's persistent data volume must be retained. S3 archives are uploaded, read back and SHA-256 verified before the temporary local archive is removed. Export catalog entries survive instance deletion. Download or verify the export before explicitly deleting the instance **and its files** to reclaim disk. See [the export contract](exports-contract.md) for limits and manual restoration. There is no automatic deletion, retention policy, scheduled backup or one-click restoration yet.
+Use **Exports** to compress a stopped instance's worlds, selected paths or all files. Configure an existing private S3 bucket under **Storage & exports**; RustFS works through its S3 API (for this deployment, `http://100.91.0.2:9000` over NetBird, path-style, region `us-east-1`). The Oracle container does not resolve the private `vd.netbird.cloud` hostname, so its saved connection uses VD's NetBird IP. Credentials stay in a mode-0600 file under `/data/exports/`, so the manager's persistent data volume must be retained. S3 archives are uploaded, read back and SHA-256 verified before the temporary local archive is removed. Export catalog entries survive instance deletion. Download or verify the export before explicitly deleting the instance **and its files** to reclaim disk. See [the export contract](exports-contract.md) for limits and manual restoration. There is no automatic deletion, retention policy, scheduled backup or one-click restoration yet.
 
 The backend can now create server records and control one Docker container per server: start, stop, restart, force kill, recent logs, and console commands. The frontend now exposes these operations; see [frontend usage](frontend.md). A Linux Docker engine is required; native and shim runtimes are not implemented yet.
 
@@ -24,7 +24,7 @@ Create a server with `POST /api/v1/servers`:
 }
 ```
 
-Set `acceptEula` to true only if you accept the Minecraft EULA. Creation returns 201 `{server}` with an ID, managed directory, configuration, and stopped status. For a custom server, upload its JAR through Files while stopped. Managed Vanilla/Paper installation downloads it automatically. The service writes initial `eula.txt` and `server.properties` files.
+Set `acceptEula` to true only if you accept the Minecraft EULA. Creation returns 201 `{server}` with an ID, managed directory, configuration, and stopped status. For a custom server, upload its JAR through Files while stopped. Managed Vanilla/Paper and CurseForge installations fetch their software automatically. The service writes initial `eula.txt` and `server.properties` files.
 
 | Method | Endpoint | Response |
 |---|---|---|
@@ -42,7 +42,7 @@ Set `acceptEula` to true only if you accept the Minecraft EULA. Creation returns
 
 These routes share the existing authentication rules. Mutations require the same origin and `X-MCM-CSRF: 1`. Poll `/api/v1/jobs/{id}` for actions; their `serverId` identifies the target and successful results contain `{server}`. Only one lifecycle operation per server may run at a time. Commands cannot contain CR, LF or NUL. The logs endpoint returns bounded snapshots (1–1000 lines, at most 4 MiB). A separate authenticated [WebSocket console stream](http-api.md#live-console) follows live output.
 
-The default manual image supplies Java 21. Managed Vanilla installs use the Java major in Mojang metadata; Paper uses its published recommended Java table. Unless you explicitly pass `dockerImage`, installation chooses `eclipse-temurin:<major>-jre` and stores that choice with the server. An explicit image remains your compatibility responsibility. Docker uses the image JVM, not a host-managed JRE. Forge, Fabric and modpack installers are deferred.
+The default manual image supplies Java 21. Managed Vanilla installs use the Java major in Mojang metadata; Paper uses its published recommended Java table. CurseForge installs detect the loader/Java requirements from the pack and manifests. Unless you explicitly pass `dockerImage`, installation chooses `eclipse-temurin:<major>-jre` and stores that choice with the server. An explicit image remains your compatibility responsibility. Docker uses the image JVM, not a host-managed JRE. Standalone Forge/Fabric selections are deferred; those loaders and NeoForge are supported through CurseForge server packs. See [CurseForge details](curseforge.md).
 
 ### Managed Vanilla and Paper installation (REST API)
 

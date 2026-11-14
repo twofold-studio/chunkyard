@@ -164,7 +164,9 @@ impl From<mcm_core::server::ServerError> for ApiError {
             E::Busy | E::PortInUse | E::AlreadyRunning | E::NotRunning | E::ContainerConflict => {
                 StatusCode::CONFLICT
             }
-            E::DockerUnavailable | E::MissingJar | E::NotInstalled => StatusCode::FAILED_DEPENDENCY,
+            E::DockerUnavailable | E::MissingJar | E::MissingLaunch | E::NotInstalled => {
+                StatusCode::FAILED_DEPENDENCY
+            }
             E::MetricsBusy => StatusCode::TOO_MANY_REQUESTS,
             E::Docker => StatusCode::BAD_GATEWAY,
             E::AlreadyInstalled => StatusCode::CONFLICT,
@@ -184,6 +186,9 @@ impl From<mcm_core::server::ServerError> for ApiError {
             E::ContainerConflict => "Container ownership labels do not match this instance.",
             E::DockerUnavailable => "A reachable Linux Docker engine is required.",
             E::MissingJar => "Place the configured JAR in the server directory before starting.",
+            E::MissingLaunch => {
+                "The configured launch file is missing. Check Launch settings and Files."
+            }
             E::EulaRequired => "Accept the Minecraft EULA before starting.",
             _ => "The Docker operation failed.",
         };
@@ -196,11 +201,27 @@ impl From<mcm_core::software::SoftwareError> for ApiError {
         use mcm_core::software::SoftwareError as E;
         let status = match error {
             E::Invalid => StatusCode::UNPROCESSABLE_ENTITY,
+            E::PackUnsupported => StatusCode::UNPROCESSABLE_ENTITY,
+            E::FilesConflict => StatusCode::CONFLICT,
+            E::DownloadUnavailable => StatusCode::FAILED_DEPENDENCY,
+            E::InstallFailed => StatusCode::BAD_GATEWAY,
             E::Upstream | E::Download => StatusCode::BAD_GATEWAY,
             E::Filesystem => StatusCode::INTERNAL_SERVER_ERROR,
         };
         let detail = match error {
             E::Invalid => "Select a valid software type, Minecraft release and Paper build.",
+            E::DownloadUnavailable => {
+                "The pack or file is unavailable for third-party download, or CurseForge is not configured."
+            }
+            E::PackUnsupported => {
+                "Could not detect a supported server loader. Supply advanced install settings or select another release."
+            }
+            E::FilesConflict => {
+                "Existing instance files conflict with this pack. Move them before retrying."
+            }
+            E::InstallFailed => {
+                "The isolated loader installer failed. Check its logs and the instance resource limits."
+            }
             E::Upstream => {
                 "The software provider could not be reached or returned invalid metadata. Retry shortly."
             }

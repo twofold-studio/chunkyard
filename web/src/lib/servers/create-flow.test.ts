@@ -70,6 +70,29 @@ describe('CreateServerFlow', () => {
 		expect(flow.phase).toBe('done');
 	});
 
+	it('passes advanced install options to a same-ID retry only', async () => {
+		const installServer = vi.fn().mockResolvedValue({ job: job('queued') });
+		const waitForJob = vi
+			.fn()
+			.mockResolvedValueOnce(
+				job('failed', { error: { code: 'software.pack_unsupported', detail: 'No loader.' } })
+			)
+			.mockResolvedValueOnce(job('succeeded', { result: { server: server() } }));
+		const flow = new CreateServerFlow({
+			api: {
+				createServer: vi.fn().mockResolvedValue({ server: server() }),
+				installServer,
+				waitForJob
+			}
+		});
+		await flow.submit(request);
+		expect(installServer).toHaveBeenNthCalledWith(1, 's1', { signal: expect.anything() });
+		const options = { loader: 'forge' as const, loaderVersion: '47.3.0' };
+		await flow.retryInstall(options);
+		expect(installServer).toHaveBeenNthCalledWith(2, 's1', { signal: expect.anything(), options });
+		expect(flow.phase).toBe('done');
+	});
+
 	it('keeps the record when the install request itself is rejected', async () => {
 		const flow = new CreateServerFlow({
 			api: {

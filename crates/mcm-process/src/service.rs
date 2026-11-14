@@ -13,12 +13,13 @@ use uuid::Uuid;
 pub struct ServerManager {
     pub(crate) root: PathBuf,
     default_image: String,
-    repo: Arc<dyn ServerRepo>,
+    pub(crate) repo: Arc<dyn ServerRepo>,
     pub(crate) runtime: Arc<dyn ServerRuntime>,
     locks: Mutex<HashMap<String, Arc<AsyncMutex<()>>>>,
     create_lock: AsyncMutex<()>,
     port_locks: Mutex<HashMap<u16, Arc<AsyncMutex<()>>>>,
-    installers: Option<Arc<dyn mcm_core::software::SoftwareService>>,
+    pub(crate) installers: Option<Arc<dyn mcm_core::software::SoftwareService>>,
+    pub(crate) install_tasks: tokio_util::task::TaskTracker,
     pub(crate) properties_repo: Option<Arc<dyn mcm_core::properties::PropertiesRepo>>,
 }
 impl ServerManager {
@@ -37,6 +38,7 @@ impl ServerManager {
             create_lock: AsyncMutex::new(()),
             port_locks: Mutex::new(HashMap::new()),
             installers: None,
+            install_tasks: tokio_util::task::TaskTracker::new(),
             properties_repo: None,
         }
     }
@@ -61,7 +63,7 @@ impl ServerManager {
         let mut locks = self.locks.lock().map_err(|_| ServerError::Busy)?;
         Ok(locks.entry(id.into()).or_default().clone())
     }
-    async fn view(&self, server: Server) -> Result<ServerView, ServerError> {
+    pub(crate) async fn view(&self, server: Server) -> Result<ServerView, ServerError> {
         let status = match self.runtime.status(&server).await {
             Ok(status) => status,
             Err(ServerError::DockerUnavailable) => RuntimeStatus::unknown(),
@@ -93,17 +95,24 @@ impl ServerManager {
         if !directory.starts_with(&root) {
             return Err(ServerError::MissingJar);
         }
-        let jar = tokio::fs::canonicalize(
-            directory.join(
-                server
-                    .launch
-                    .as_ref()
-                    .map(|l| l.path.as_str())
-                    .unwrap_or(&server.jar),
-            ),
-        )
-        .await
-        .map_err(|_| ServerError::MissingJar)?;
+        let profile = crate::launch::current(server);
+        // Existing custom JAR records were validated by the legacy path policy.
+        // Keep their benign interior dot/separator normalization compatible; new
+        // explicit profiles and detected modpack profiles use the stricter policy.
+        if server.launch_override.is_some()
+            || server.launch.as_ref().is_some_and(|l| l.profile.is_some())
+        {
+            profile.validate()?;
+        }
+        let jar = tokio::fs::canonicalize(directory.join(&profile.path))
+            .await
+            .map_err(|_| {
+                if profile.mode == mcm_core::software::LaunchMode::Jar {
+                    ServerError::MissingJar
+                } else {
+                    ServerError::MissingLaunch
+                }
+            })?;
         if !jar.starts_with(&directory)
             || !tokio::fs::metadata(jar).await.map_err(fs_error)?.is_file()
         {
@@ -145,6 +154,31 @@ impl ServerManager {
 }
 #[async_trait]
 impl ServerService for ServerManager {
+    async fn launch_settings(&self, id: &str) -> Result<LaunchSettings, ServerError> {
+        self.read_launch(id).await
+    }
+    async fn set_launch(&self, id: &str, request: LaunchUpdate) -> Result<ServerView, ServerError> {
+        self.update_launch(id, request).await
+    }
+    async fn shutdown(&self) {
+        self.install_tasks.close();
+        self.install_tasks.wait().await;
+        self.runtime.shutdown().await;
+    }
+    async fn install_with_options(
+        &self,
+        id: &str,
+        options: mcm_core::software::InstallOptions,
+    ) -> Result<ServerView, ServerError> {
+        if matches!(
+            self.record(id).await?.software,
+            Some(mcm_core::software::Software::CurseForge { .. })
+        ) {
+            self.install_pack(id, options).await
+        } else {
+            self.install(id).await
+        }
+    }
     async fn set_resources(
         &self,
         id: &str,
@@ -262,6 +296,12 @@ impl ServerService for ServerManager {
     }
 
     async fn install(&self, id: &str) -> Result<ServerView, ServerError> {
+        if matches!(
+            self.record(id).await?.software,
+            Some(mcm_core::software::Software::CurseForge { .. })
+        ) {
+            return self.install_pack(id, Default::default()).await;
+        }
         let server = self.record(id).await?;
         let lock = self.lock(&server.id)?;
         let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
@@ -385,6 +425,7 @@ impl ServerService for ServerManager {
             software: request.software,
             launch: None,
             publish_ip: None,
+            launch_override: None,
         };
         tokio::fs::create_dir_all(&self.root)
             .await

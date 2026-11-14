@@ -47,6 +47,15 @@ pub fn routes(state: AppState) -> Router {
             get(servers::network).patch(servers::set_network),
         )
         .route("/api/v1/software", get(software::catalog))
+        .route("/api/v1/modpacks/curseforge", get(software::modpacks))
+        .route(
+            "/api/v1/modpacks/curseforge/{id}/files",
+            get(software::modpack_files),
+        )
+        .route(
+            "/api/v1/servers/{id}/launch",
+            get(servers::launch_settings).patch(servers::set_launch),
+        )
         .route("/api/v1/software/{kind}/versions", get(software::versions))
         .route(
             "/api/v1/software/{kind}/versions/{version}/builds",

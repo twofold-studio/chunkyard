@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-mod runtime;
-mod software;
+pub mod runtime;
+pub mod software;
 use async_trait::async_trait;
 use mcm_core::java::{
     AvailableJava, JavaRuntime, JavaRuntimeId, JavaRuntimeService, JavaServiceError,
