@@ -73,6 +73,10 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
         .with_properties(Arc::new(mcm_db::SqlitePropertiesRepo::new(&database))),
     );
     let state = AppState {
+        exports: Arc::new(mcm_process::ExportManager::new(
+            config.data_dir.join("exports"),
+            servers.clone(),
+        )?),
         software,
         files: servers.clone(),
         properties: servers.clone(),

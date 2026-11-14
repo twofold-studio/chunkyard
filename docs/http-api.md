@@ -1,5 +1,7 @@
 # Current backend HTTP API
 
+Compressed instance exports and the private S3/RustFS connection are documented in [the export contract](exports-contract.md). `PATCH /api/v1/servers/{id}/resources` changes `{memoryMinMb,memoryMaxMb,cpus}` while stopped and returns `{server}`. Heap bounds must satisfy `128 <= min <= max <= 262144` MiB; CPU must be finite and between 0.1 and 256. The owned stopped container is removed, preserving files; next start uses the new limits.
+
 Start with `cargo run -p mcm-server -- serve`, or run `mcm` without a subcommand. The default address is `http://127.0.0.1:8420`. It serves the built UI from `web/build/` alongside the JSON API when available; see [frontend usage](frontend.md) for build and hosting instructions. Set `CHUNKYARD_HTTP__UI_DIR=` for API-only operation.
 
 `mcm config check` prints effective configuration. Sources, in order: defaults, `--config`/`CHUNKYARD_CONFIG` (or `/etc/mcm/mcm.toml` when present), environment, and CLI `--data-dir`/`serve --listen`. Unknown config keys fail validation. See `mcm.example.toml`.
@@ -116,7 +118,7 @@ Server lifecycle and console routes are documented in [docker.md](docker.md). Th
 
 ## Version badge and changelog
 
-`GET /api/v1/system/version` returns `{enabled:true, version:"0.2.0", channel:"development"}` for the current build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
+`GET /api/v1/system/version` returns `{enabled:true, version:"0.3.0", channel:"development"}` for the current build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
 
 `[http] show_version = true` is the default. Set `CHUNKYARD_HTTP__SHOW_VERSION=false`, restart/redeploy, and reload the page to hide the badge: version metadata then returns `{enabled:false, version:null, channel:null}`, and the changelog endpoint returns 404 `version.disabled`. The UI fetches changelog content only when the modal opens. Completed, verified milestones batch notes and bump the project version under the authorized [changelog workflow](changelog.md); in-progress changes remain Unreleased.
 

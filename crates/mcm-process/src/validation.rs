@@ -16,20 +16,21 @@ pub(crate) fn validate(request: &CreateServer) -> Result<(), ServerError> {
     if request.port == Some(0) {
         return Err(ServerError::Invalid("port must be between 1 and 65535"));
     }
-    if request.memory_min_mb < 128
-        || request.memory_min_mb > request.memory_max_mb
-        || request.memory_max_mb > 262144
-    {
+    resources(request.memory_min_mb, request.memory_max_mb, request.cpus)?;
+    jar_path(&request.jar)?;
+    if let Some(image) = &request.docker_image {
+        image_name(image)?;
+    }
+    Ok(())
+}
+pub(crate) fn resources(min: u32, max: u32, cpus: f64) -> Result<(), ServerError> {
+    if min < 128 || min > max || max > 262144 {
         return Err(ServerError::Invalid(
             "memory must satisfy 128 <= min <= max <= 262144 MiB",
         ));
     }
-    if !request.cpus.is_finite() || request.cpus < 0.1 || request.cpus > 256.0 {
+    if !cpus.is_finite() || !(0.1..=256.0).contains(&cpus) {
         return Err(ServerError::Invalid("cpus must be between 0.1 and 256"));
-    }
-    jar_path(&request.jar)?;
-    if let Some(image) = &request.docker_image {
-        image_name(image)?;
     }
     Ok(())
 }

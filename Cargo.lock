@@ -1334,6 +1334,41 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
 
 [[package]]
+name = "jiff"
+version = "0.2.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26699905cc795a23e3949585cc7ba3ee8ade090872a27e4316304a777297894a"
+dependencies = [
+ "jiff-core",
+ "jiff-static",
+ "log",
+ "portable-atomic",
+ "portable-atomic-util",
+ "serde_core",
+]
+
+[[package]]
+name = "jiff-core"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffe6854081f5ac0a3046a9b223729ccd7a20b1e0e8277e44dc0660eedf67dfe2"
+dependencies = [
+ "log",
+]
+
+[[package]]
+name = "jiff-static"
+version = "0.2.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b4ff49b2887190c760b86207b55cdcaabbdecaf7a0660d68aa2ed6f652abf0a"
+dependencies = [
+ "jiff-core",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "js-sys"
 version = "0.3.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1478,7 +1513,7 @@ checksum = "4facc753ae494aeb6e3c22f839b158aebd4f9270f55cd3c79906c45476c47ab4"
 
 [[package]]
 name = "mcm-api"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "futures-util",
@@ -1497,11 +1532,12 @@ dependencies = [
 
 [[package]]
 name = "mcm-api-tests"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "axum",
  "base64 0.22.1",
+ "flate2",
  "futures-util",
  "mcm-api",
  "mcm-auth",
@@ -1514,6 +1550,7 @@ dependencies = [
  "reqwest",
  "serde_json",
  "sha2",
+ "tar",
  "tempfile",
  "tokio",
  "tokio-tungstenite",
@@ -1522,7 +1559,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-auth"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "argon2",
  "base64 0.22.1",
@@ -1539,7 +1576,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-config"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "mcm-process",
  "serde",
@@ -1551,7 +1588,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -1563,7 +1600,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-db"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "mcm-core",
@@ -1577,7 +1614,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-download"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "futures-util",
  "reqwest",
@@ -1592,7 +1629,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-fs"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -1609,7 +1646,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-install"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "mcm-core",
@@ -1622,7 +1659,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-java"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "fs2",
@@ -1642,7 +1679,7 @@ dependencies = [
 
 [[package]]
 name = "mcm-jobs"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -1659,14 +1696,16 @@ dependencies = [
 
 [[package]]
 name = "mcm-process"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "bollard",
  "futures-util",
  "mcm-core",
  "mcm-fs",
+ "reqwest",
  "rustix",
+ "rusty-s3",
  "serde",
  "serde_json",
  "sha2",
@@ -1674,13 +1713,15 @@ dependencies = [
  "thiserror",
  "time",
  "tokio",
+ "tokio-util",
  "tracing",
+ "url",
  "uuid",
 ]
 
 [[package]]
 name = "mcm-server"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -1995,6 +2036,21 @@ name = "plain"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
+
+[[package]]
+name = "portable-atomic"
+version = "1.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05c8b63e8d9609db387f0324918f81d68fe27748f084ef092fb35954d0539a85"
+
+[[package]]
+name = "portable-atomic-util"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10ab3eb7f3becc3a1cbc4f2c6f20267996cfc1a6467a873763411b136a122715"
+dependencies = [
+ "portable-atomic",
+]
 
 [[package]]
 name = "potential_utf"
@@ -2415,6 +2471,20 @@ name = "rustversion"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
+
+[[package]]
+name = "rusty-s3"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fac2edd2f0b56bd79a7343f49afc01c2d41010df480538a510e0abc56044f66c"
+dependencies = [
+ "hmac",
+ "jiff",
+ "percent-encoding",
+ "sha2",
+ "url",
+ "zeroize",
+]
 
 [[package]]
 name = "ryu"

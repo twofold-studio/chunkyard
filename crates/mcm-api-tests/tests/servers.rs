@@ -199,7 +199,8 @@ async fn a_jar_symlink_cannot_escape_the_server_directory() -> Result {
     app.close().await
 }
 async fn wait(app: &TestApp, id: &str) -> Result<Value> {
-    for _ in 0..100 {
+    // Allow scheduler/SQLite latency when the full suite also runs password hashing.
+    for _ in 0..1000 {
         let job: Value = app
             .client
             .get(format!("{}/api/v1/jobs/{id}", app.base))

@@ -20,5 +20,9 @@ tokio.workspace = true
 time = { workspace = true, features = ["parsing"] }
 tracing.workspace = true
 uuid.workspace = true
+reqwest.workspace = true
+url.workspace = true
+tokio-util.workspace = true
+rusty-s3 = { version = "0.8", default-features = false }
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1", features = ["process"] }

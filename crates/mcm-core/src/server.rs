@@ -47,6 +47,13 @@ pub struct NetworkUpdate {
 }
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ResourceUpdate {
+    pub memory_min_mb: u32,
+    pub memory_max_mb: u32,
+    pub cpus: f64,
+}
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateServer {
     #[serde(default = "default_runtime")]
     pub runtime: String,
@@ -204,6 +211,11 @@ pub enum ServerError {
 }
 #[async_trait]
 pub trait ServerRepo: Send + Sync {
+    async fn set_resources(
+        &self,
+        id: &str,
+        request: &ResourceUpdate,
+    ) -> Result<(), RepositoryError>;
     async fn set_network(
         &self,
         id: &str,
@@ -267,6 +279,11 @@ pub trait ServerRuntime: Send + Sync {
 }
 #[async_trait]
 pub trait ServerService: Send + Sync {
+    async fn set_resources(
+        &self,
+        id: &str,
+        request: ResourceUpdate,
+    ) -> Result<ServerView, ServerError>;
     async fn console_stream(&self, id: &str) -> Result<ConsoleStream, ServerError>;
     async fn network(&self, id: &str) -> Result<NetworkSettings, ServerError>;
     async fn set_network(

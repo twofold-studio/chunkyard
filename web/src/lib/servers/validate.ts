@@ -33,7 +33,7 @@ export function defaultServerForm(): ServerFormValues {
 const IMAGE_RE = /^[A-Za-z0-9/_.:@-]+$/;
 
 function isInt(value: number | null | undefined): value is number {
-	return value !== null && Number.isInteger(value);
+	return value != null && Number.isInteger(value);
 }
 
 export interface ValidateOptions {
@@ -42,6 +42,31 @@ export interface ValidateOptions {
 	 * `jar` is ignored and an empty `dockerImage` means "automatic".
 	 */
 	managed?: boolean;
+}
+
+export interface ResourceValues {
+	memoryMinMb: number | null | undefined;
+	memoryMaxMb: number | null | undefined;
+	cpus: number | null | undefined;
+}
+
+export type ResourceErrors = Partial<Record<keyof ResourceValues, string>>;
+
+/** Creation and edit limits: 128 ≤ min ≤ max ≤ 262144 MiB, 0.1 ≤ CPUs ≤ 256. */
+export function validateResources(v: ResourceValues): ResourceErrors {
+	const errors: ResourceErrors = {};
+	if (!isInt(v.memoryMinMb) || v.memoryMinMb < 128) {
+		errors.memoryMinMb = 'Minimum heap must be at least 128 MiB.';
+	}
+	if (!isInt(v.memoryMaxMb) || v.memoryMaxMb > 262144) {
+		errors.memoryMaxMb = 'Maximum heap must be at most 262144 MiB.';
+	} else if (isInt(v.memoryMinMb) && v.memoryMaxMb < v.memoryMinMb) {
+		errors.memoryMaxMb = 'Maximum heap must be at least the minimum heap.';
+	}
+	if (v.cpus == null || !Number.isFinite(v.cpus) || v.cpus < 0.1 || v.cpus > 256) {
+		errors.cpus = 'Enter between 0.1 and 256 CPUs.';
+	}
+	return errors;
 }
 
 /**
@@ -80,17 +105,7 @@ export function validateServerForm(
 	) {
 		errors.jar = 'Use a relative .jar path inside the server directory, e.g. server.jar.';
 	}
-	if (!isInt(v.memoryMinMb) || v.memoryMinMb < 128) {
-		errors.memoryMinMb = 'Minimum heap must be at least 128 MiB.';
-	}
-	if (!isInt(v.memoryMaxMb) || v.memoryMaxMb > 262144) {
-		errors.memoryMaxMb = 'Maximum heap must be at most 262144 MiB.';
-	} else if (isInt(v.memoryMinMb) && v.memoryMaxMb < v.memoryMinMb) {
-		errors.memoryMaxMb = 'Maximum heap must be at least the minimum heap.';
-	}
-	if (v.cpus === null || !Number.isFinite(v.cpus) || v.cpus < 0.1 || v.cpus > 256) {
-		errors.cpus = 'Enter between 0.1 and 256 CPUs.';
-	}
+	Object.assign(errors, validateResources(v));
 	return errors;
 }
 

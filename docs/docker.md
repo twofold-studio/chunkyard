@@ -1,5 +1,9 @@
 # Docker server runtime
 
+Existing instance CPU and heap limits can be edited in **Settings → Resources** while stopped (`PATCH /api/v1/servers/{id}/resources`). The next start recreates the container with those limits. Minecraft heap is separate from the container's additional memory overhead.
+
+Use **Exports** to compress a stopped instance's worlds, selected paths or all files. Configure an existing private S3 bucket under **Storage & exports**; RustFS works through its S3 API (for this deployment, `http://vd.netbird.cloud:9000` over NetBird, path-style, region `us-east-1`). Credentials stay in a mode-0600 file under `/data/exports/`, so the manager's persistent data volume must be retained. S3 archives are uploaded, read back and SHA-256 verified before the temporary local archive is removed. Export catalog entries survive instance deletion. Download or verify the export before explicitly deleting the instance **and its files** to reclaim disk. See [the export contract](exports-contract.md) for limits and manual restoration. There is no automatic deletion, retention policy, scheduled backup or one-click restoration yet.
+
 The backend can now create server records and control one Docker container per server: start, stop, restart, force kill, recent logs, and console commands. The frontend now exposes these operations; see [frontend usage](frontend.md). A Linux Docker engine is required; native and shim runtimes are not implemented yet.
 
 Start the manager on the host normally. Its Docker client honors `DOCKER_HOST` and Docker TLS environment settings. Local socket/named-pipe connections use the platform default. Set `CHUNKYARD_DOCKER__ENABLED=false` to disable Docker operations; the rest of the manager still works. `GET /api/v1/system/isolation` reports Docker availability.

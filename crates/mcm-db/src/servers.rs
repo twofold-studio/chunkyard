@@ -18,6 +18,16 @@ impl SqliteServerRepo {
 }
 #[async_trait]
 impl ServerRepo for SqliteServerRepo {
+    async fn set_resources(
+        &self,
+        id: &str,
+        request: &mcm_core::server::ResourceUpdate,
+    ) -> Result<(), RepositoryError> {
+        sqlx::query("UPDATE servers SET document=json_set(document,'$.memoryMinMb',?,'$.memoryMaxMb',?,'$.cpus',?) WHERE id=?")
+            .bind(request.memory_min_mb).bind(request.memory_max_mb).bind(request.cpus).bind(id)
+            .execute(&self.pool).await.map_err(storage)?;
+        Ok(())
+    }
     async fn set_network(
         &self,
         id: &str,

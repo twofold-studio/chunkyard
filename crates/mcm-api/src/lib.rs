@@ -2,6 +2,7 @@
 mod auth;
 mod console_stream;
 mod error;
+mod exports;
 mod files;
 mod java;
 mod json;
@@ -31,6 +32,11 @@ pub fn secure_router(router: Router, state: AppState) -> Router {
 pub fn routes(state: AppState) -> Router {
     let protected = Router::new()
         .merge(files::routes())
+        .merge(exports::routes())
+        .route(
+            "/api/v1/servers/{id}/resources",
+            axum::routing::patch(servers::set_resources),
+        )
         .merge(properties::routes())
         .route(
             "/api/v1/servers/{id}/console/stream",

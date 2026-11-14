@@ -342,6 +342,13 @@ export interface UpdateNetworkRequest {
 	publishIp: string | null;
 }
 
+/** `PATCH /api/v1/servers/{id}/resources` (stopped only). Applies on the next start. */
+export interface UpdateResourcesRequest {
+	memoryMinMb: number;
+	memoryMaxMb: number;
+	cpus: number;
+}
+
 // Properties -------------------------------------------------------------------
 
 /**
@@ -379,4 +386,61 @@ export interface PropertiesVersionPage {
 /** `GET /api/v1/servers/{id}/properties/versions/{version}` */
 export interface PropertiesVersion extends PropertiesVersionSummary {
 	content: string;
+}
+
+// Storage & exports ------------------------------------------------------------
+
+/**
+ * `GET|PUT /api/v1/storage`: the redacted S3 connection. Empty strings when unconfigured.
+ * The secret is never returned; `hasSecret` reports whether one is stored.
+ */
+export interface StorageConnection {
+	configured: boolean;
+	endpoint: string;
+	region: string;
+	bucket: string;
+	prefix: string;
+	accessKeyId: string;
+	hasSecret: boolean;
+}
+
+/**
+ * `PUT /api/v1/storage`. Omit `secretAccessKey` (or send it empty) to keep the stored secret;
+ * only allowed while `endpoint` and `accessKeyId` are unchanged.
+ */
+export interface UpdateStorageRequest {
+	endpoint: string;
+	region: string;
+	bucket: string;
+	prefix: string;
+	accessKeyId: string;
+	secretAccessKey?: string;
+}
+
+export type ExportScope = 'world' | 'selected' | 'all';
+export type ExportDestination = 'local' | 's3';
+
+/** `POST /api/v1/servers/{id}/exports` (202, `{job}`). `paths` only with `scope: "selected"`. */
+export interface CreateExportRequest {
+	scope: ExportScope;
+	paths?: string[];
+	destination: ExportDestination;
+}
+
+/**
+ * A completed, SHA-256 verified `.tar.gz` archive. Records outlive their server, so
+ * `serverName` is the name at export time and `serverId` may no longer exist.
+ */
+export interface ExportRecord {
+	id: string;
+	serverId: string;
+	serverName: string;
+	scope: ExportScope;
+	destination: ExportDestination;
+	createdAt: string;
+	size: number;
+	sha256: string;
+	fileName: string;
+	/** Object key in the bucket for S3 exports; `null` for local archives. */
+	objectKey: string | null;
 }

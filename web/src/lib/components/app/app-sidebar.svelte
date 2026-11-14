@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ServerIcon from '@lucide/svelte/icons/server';
+	import ArchiveIcon from '@lucide/svelte/icons/archive';
 	import CoffeeIcon from '@lucide/svelte/icons/coffee';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import PanelLeftCloseIcon from '@lucide/svelte/icons/panel-left-close';
@@ -24,6 +25,7 @@
 
 	const nav = [
 		{ label: 'Servers', href: resolve('servers'), icon: ServerIcon },
+		{ label: 'Storage & exports', href: resolve('exports'), icon: ArchiveIcon },
 		{ label: 'Java runtimes', href: resolve('java'), icon: CoffeeIcon },
 		{ label: 'API reference', href: resolve('api-docs'), icon: BookOpenIcon }
 	];

@@ -123,6 +123,8 @@
 			{@render value('Max heap', formatMemory(server.memoryMaxMb))}
 			{@render value('CPU limit', formatCpus(server.cpus))}
 		</div>
-		<p class="text-xs text-muted-foreground">Resource settings cannot be edited yet.</p>
+		<p class="text-xs text-muted-foreground">
+			Change these in Settings → Resources while the server is stopped.
+		</p>
 	</SettingsSection>
 </SettingsPanel>

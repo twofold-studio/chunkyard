@@ -216,7 +216,8 @@ async fn running_instances_allow_reads_and_refuse_all_file_mutations() -> Result
         .json()
         .await?;
     let job = pending["job"]["id"].as_str().ok_or("job")?;
-    for _ in 0..100 {
+    let mut started = false;
+    for _ in 0..200 {
         let state: Value = app
             .client
             .get(format!("{}/api/v1/jobs/{job}", app.base))
@@ -224,11 +225,17 @@ async fn running_instances_allow_reads_and_refuse_all_file_mutations() -> Result
             .await?
             .json()
             .await?;
-        if state["job"]["state"] == "succeeded" {
+        if state["state"] == "succeeded" {
+            started = true;
             break;
         }
-        tokio::task::yield_now().await;
+        assert_ne!(state["state"], "failed", "{state}");
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
+    assert!(
+        started,
+        "start job must finish before checking runtime file restrictions"
+    );
     let list: Value = app
         .client
         .get(format!("{}{server}/files", app.base))

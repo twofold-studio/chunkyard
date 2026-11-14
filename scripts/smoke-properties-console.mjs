@@ -94,8 +94,9 @@ try {
       memoryMaxMb: 256,
     })
   ).server;
-  assert.equal((await api("/api/v1/system/version")).version, "0.2.0");
-  assert.match((await api("/api/v1/system/changelog")).markdown, /## 0\.2\.0/);
+  const release = JSON.parse(await readFile(resolve("web/package.json"), "utf8")).version;
+  assert.equal((await api("/api/v1/system/version")).version, release);
+  assert((await api("/api/v1/system/changelog")).markdown.includes(`## ${release}`));
   await writeFile(
     resolve(fixture.directory, "server.jar"),
     "console fixture, not a Minecraft jar",
@@ -251,6 +252,29 @@ try {
     await page.getByRole("button", { name: "Stop", exact: true }).isDisabled(),
     true,
   );
+  await page.getByRole("tab", { name: "Settings", exact: true }).click();
+  await page.getByText("Resources", { exact: true }).locator("..").getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByLabel("Min heap (MiB)", { exact: true }).fill("128");
+  await page.getByLabel("Max heap (MiB)", { exact: true }).fill("384");
+  await page.getByLabel("CPU limit", { exact: true }).fill("0.5");
+  const savedResources = page.waitForResponse(r => r.url().endsWith("/resources") && r.request().method() === "PATCH");
+  await page.getByRole("button", { name: "Save resources", exact: true }).click();
+  assert.equal((await savedResources).status(), 200);
+  const changedResources = await api(`/api/v1/servers/${second.id}`);
+  assert.equal(changedResources.memoryMaxMb, 384);
+  assert.equal(changedResources.cpus, 0.5);
+  await page.getByRole("tab", { name: "Exports", exact: true }).click();
+  await page.getByRole("radio", { name: "Full instance", exact: true }).click();
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await page.getByText("Export verified", { exact: true }).first().waitFor();
+  const exported = (await api("/api/v1/exports")).items.find(e => e.serverId === second.id);
+  assert(exported?.sha256.length === 64);
+  const attachment = await page.request.get(`${base}/api/v1/exports/${exported.id}/download`);
+  assert.equal(attachment.status(), 200);
+  assert.equal((await attachment.body()).length, exported.size);
+  await page.getByRole("link", { name: "Storage & exports", exact: true }).click();
+  await page.getByRole("heading", { name: "Storage & exports", exact: true }).waitFor();
+  await page.getByText(second.name, { exact: true }).first().waitFor();
   await page.goto(`${base}/java`);
   assert.equal(
     await page
@@ -262,7 +286,7 @@ try {
   assert.deepEqual(errors, [], "script errors");
   assert.deepEqual(violations, [], "CSP violations");
   console.log(
-    "PASS: contextual header, structured autosave, running-version isolation, restart application, WebSocket console and metrics preference",
+    "PASS: contextual header, structured autosave, running-version isolation, restart application, WebSocket console, metrics preference, CPU/RAM editing and archive export/download",
   );
 } finally {
   if (fixture) {

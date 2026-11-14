@@ -145,6 +145,26 @@ impl ServerManager {
 }
 #[async_trait]
 impl ServerService for ServerManager {
+    async fn set_resources(
+        &self,
+        id: &str,
+        request: ResourceUpdate,
+    ) -> Result<ServerView, ServerError> {
+        validation::resources(request.memory_min_mb, request.memory_max_mb, request.cpus)?;
+        let server = self.record(id).await?;
+        let lock = self.lock(&server.id)?;
+        let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
+        let mut server = self.record(id).await?;
+        if self.runtime.status(&server).await?.state != ServerState::Stopped {
+            return Err(ServerError::AlreadyRunning);
+        }
+        self.runtime.remove(&server).await?;
+        self.repo.set_resources(&server.id, &request).await?;
+        server.memory_min_mb = request.memory_min_mb;
+        server.memory_max_mb = request.memory_max_mb;
+        server.cpus = request.cpus;
+        self.view(server).await
+    }
     async fn console_stream(&self, id: &str) -> Result<ConsoleStream, ServerError> {
         let server = self.record(id).await?;
         if self.runtime.status(&server).await?.state != ServerState::Running {

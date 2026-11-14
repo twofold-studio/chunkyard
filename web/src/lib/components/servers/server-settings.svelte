@@ -8,6 +8,7 @@
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import { prefersReducedMotion } from '#lib/motion/index.js';
 	import ServerNetwork from './server-network.svelte';
+	import ServerResources from './server-resources.svelte';
 	import type { ServerView } from '#lib/api/index.js';
 
 	interface Props {
@@ -94,6 +95,7 @@
 		class="scroll-mt-24 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card"
 	>
 		<ServerNetwork {server} {busy} {onServerUpdated} bind:open={networkOpen} />
+		<ServerResources {server} {busy} {onServerUpdated} />
 		<div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5">
 			<ScaleIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
 			<span class="text-sm font-medium">Minecraft EULA</span>

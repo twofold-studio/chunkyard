@@ -9,6 +9,16 @@ use mcm_core::{auth::Actor, jobs::JobFailure, server::CreateServer};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+pub(crate) async fn set_resources(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    ApiJson(body): ApiJson<mcm_core::server::ResourceUpdate>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(
+        json!({"server":state.servers.set_resources(&id,body).await?}),
+    ))
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct LogsQuery {

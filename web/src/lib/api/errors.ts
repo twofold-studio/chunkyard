@@ -114,6 +114,23 @@ const KNOWN: Record<string, Omit<ErrorMessage, 'detail'> & { detail?: string }> 
 		hint: 'Only UTF-8 text can be edited here. Download the file instead.'
 	},
 	'files.io': { title: 'File operation failed' },
+	'exports.invalid': { title: 'Export rejected' },
+	'exports.not_found': {
+		title: 'Archive not found',
+		hint: 'It may have been deleted. Refresh the archive list.'
+	},
+	'exports.limit': {
+		title: 'Export too large',
+		hint: 'Archives are limited to 100 GiB of input, 5 GiB compressed and 100,000 entries. Export the world or selected paths instead.'
+	},
+	'exports.storage': {
+		title: 'Storage unavailable',
+		hint: 'Check the S3 connection under Storage & exports and test it. Instance files are never removed when an upload fails.'
+	},
+	'exports.busy': {
+		title: 'Export in progress',
+		hint: 'Wait for the current export or storage change to finish.'
+	},
 	validation: { title: 'Invalid input' }
 };
 

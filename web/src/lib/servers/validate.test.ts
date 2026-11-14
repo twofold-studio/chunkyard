@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { defaultServerForm, toCreateRequest, validateServerForm } from './validate';
+import {
+	defaultServerForm,
+	toCreateRequest,
+	validateResources,
+	validateServerForm
+} from './validate';
 
 describe('validateServerForm', () => {
 	it('accepts defaults once named and uses the documented Docker image', () => {
@@ -91,6 +96,33 @@ describe('game port', () => {
 	it('rejects zero, out-of-range and fractional explicit ports', () => {
 		for (const port of [0, -1, 65536, 25565.5]) {
 			expect(validateServerForm({ ...base, port }).port).toBeDefined();
+		}
+	});
+});
+
+describe('validateResources', () => {
+	it('accepts the creation limits at their bounds', () => {
+		expect(validateResources({ memoryMinMb: 128, memoryMaxMb: 262144, cpus: 0.1 })).toEqual({});
+		expect(validateResources({ memoryMinMb: 1024, memoryMaxMb: 1024, cpus: 256 })).toEqual({});
+	});
+
+	it('rejects out-of-range, inverted and non-finite values', () => {
+		expect(validateResources({ memoryMinMb: 127, memoryMaxMb: 1024, cpus: 1 })).toHaveProperty(
+			'memoryMinMb'
+		);
+		expect(validateResources({ memoryMinMb: 2048, memoryMaxMb: 1024, cpus: 1 })).toHaveProperty(
+			'memoryMaxMb'
+		);
+		expect(validateResources({ memoryMinMb: 512, memoryMaxMb: 262145, cpus: 1 })).toHaveProperty(
+			'memoryMaxMb'
+		);
+		expect(validateResources({ memoryMinMb: 512.5, memoryMaxMb: 1024, cpus: 1 })).toHaveProperty(
+			'memoryMinMb'
+		);
+		for (const cpus of [0.09, 256.1, Number.NaN, Number.POSITIVE_INFINITY, null, undefined]) {
+			expect(validateResources({ memoryMinMb: 512, memoryMaxMb: 1024, cpus })).toHaveProperty(
+				'cpus'
+			);
 		}
 	});
 });

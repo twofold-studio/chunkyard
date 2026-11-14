@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Chunkyard API",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "Single-owner Minecraft manager. Cookie authentication is required unless CHUNKYARD_AUTH__ENABLED=false. Host/origin and X-MCM-CSRF protections apply in both modes. JSON bodies are limited to 1 MiB, except file/properties editors' 8 MiB envelopes for escaped text up to 1 MiB. Raw uploads stream up to 128 MiB. Properties revisions can be saved while running and apply on the next explicit start/restart. Console supports snapshots and same-origin WebSocket streaming; metrics are snapshots."
   },
   "servers": [
@@ -56,10 +56,16 @@
   ],
   "paths": {
     "/api/v1/servers/{id}/properties": {
-      "parameters": [{ "$ref": "#/components/parameters/FileServerId" }],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/FileServerId"
+        }
+      ],
       "get": {
         "operationId": "get_server_properties",
-        "tags": ["Properties"],
+        "tags": [
+          "Properties"
+        ],
         "summary": "Read saved properties and applied revision",
         "description": "Imports an existing file on first read. Returns desired content, not necessarily the running JVM's file. Legacy/external starts have appliedVersion=null until a managed start. Minecraft-generated defaults are recorded when observed without discarding pending owner edits.",
         "responses": {
@@ -67,19 +73,29 @@
             "description": "Saved versus applied state",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/PropertiesDocument" }
+                "schema": {
+                  "$ref": "#/components/schemas/PropertiesDocument"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/PropertiesProblem" }
+          "default": {
+            "$ref": "#/components/responses/PropertiesProblem"
+          }
         }
       },
       "put": {
         "operationId": "save_server_properties",
-        "tags": ["Properties"],
+        "tags": [
+          "Properties"
+        ],
         "summary": "Save a revision while running or stopped",
         "description": "Requires same-origin Origin/Referer. Persists desired configuration/history separately; does not restart or modify the active instance file. Start/restart applies it atomically before Docker starts. Identical text creates no revision. Stale etag returns409 properties.conflict.",
-        "parameters": [{ "$ref": "#/components/parameters/FileCsrf" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileCsrf"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -87,13 +103,18 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["content", "etag"],
+                "required": [
+                  "content",
+                  "etag"
+                ],
                 "properties": {
                   "content": {
                     "type": "string",
                     "description": "UTF-8 without NUL, at most1MiB."
                   },
-                  "etag": { "type": "string" }
+                  "etag": {
+                    "type": "string"
+                  }
                 }
               }
             }
@@ -104,19 +125,29 @@
             "description": "Saved state",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/PropertiesDocument" }
+                "schema": {
+                  "$ref": "#/components/schemas/PropertiesDocument"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/PropertiesProblem" }
+          "default": {
+            "$ref": "#/components/responses/PropertiesProblem"
+          }
         }
       }
     },
     "/api/v1/servers/{id}/properties/versions": {
-      "parameters": [{ "$ref": "#/components/parameters/FileServerId" }],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/FileServerId"
+        }
+      ],
       "get": {
         "operationId": "list_properties_versions",
-        "tags": ["Properties"],
+        "tags": [
+          "Properties"
+        ],
         "summary": "Page revision metadata newest first",
         "parameters": [
           {
@@ -132,7 +163,10 @@
           {
             "name": "before",
             "in": "query",
-            "schema": { "type": "integer", "minimum": 1 }
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
           }
         ],
         "responses": {
@@ -142,7 +176,10 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": ["items", "nextBefore"],
+                  "required": [
+                    "items",
+                    "nextBefore"
+                  ],
                   "properties": {
                     "items": {
                       "type": "array",
@@ -150,51 +187,75 @@
                         "$ref": "#/components/schemas/PropertiesVersion"
                       }
                     },
-                    "nextBefore": { "type": ["integer", "null"] }
+                    "nextBefore": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
                   }
                 }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/PropertiesProblem" }
+          "default": {
+            "$ref": "#/components/responses/PropertiesProblem"
+          }
         }
       }
     },
     "/api/v1/servers/{id}/properties/versions/{version}": {
       "parameters": [
-        { "$ref": "#/components/parameters/FileServerId" },
+        {
+          "$ref": "#/components/parameters/FileServerId"
+        },
         {
           "name": "version",
           "in": "path",
           "required": true,
-          "schema": { "type": "integer", "minimum": 1 }
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
         }
       ],
       "get": {
         "operationId": "get_properties_version",
-        "tags": ["Properties"],
+        "tags": [
+          "Properties"
+        ],
         "summary": "Read an immutable revision",
         "responses": {
           "200": {
             "description": "Revision content",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/PropertiesRevision" }
+                "schema": {
+                  "$ref": "#/components/schemas/PropertiesRevision"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/PropertiesProblem" }
+          "default": {
+            "$ref": "#/components/responses/PropertiesProblem"
+          }
         }
       }
     },
     "/api/v1/servers/{id}/properties/restore": {
       "parameters": [
-        { "$ref": "#/components/parameters/FileServerId" },
-        { "$ref": "#/components/parameters/FileCsrf" }
+        {
+          "$ref": "#/components/parameters/FileServerId"
+        },
+        {
+          "$ref": "#/components/parameters/FileCsrf"
+        }
       ],
       "post": {
         "operationId": "restore_properties_version",
-        "tags": ["Properties"],
+        "tags": [
+          "Properties"
+        ],
         "summary": "Restore a revision as a new desired version",
         "description": "Requires same-origin Origin/Referer. Does not restart or rewrite history. Etag must match the current desired revision.",
         "requestBody": {
@@ -204,10 +265,18 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["version", "etag"],
+                "required": [
+                  "version",
+                  "etag"
+                ],
                 "properties": {
-                  "version": { "type": "integer", "minimum": 1 },
-                  "etag": { "type": "string" }
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "etag": {
+                    "type": "string"
+                  }
                 }
               }
             }
@@ -218,19 +287,29 @@
             "description": "New desired state",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/PropertiesDocument" }
+                "schema": {
+                  "$ref": "#/components/schemas/PropertiesDocument"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/PropertiesProblem" }
+          "default": {
+            "$ref": "#/components/responses/PropertiesProblem"
+          }
         }
       }
     },
     "/api/v1/servers/{id}/console/stream": {
-      "parameters": [{ "$ref": "#/components/parameters/FileServerId" }],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/FileServerId"
+        }
+      ],
       "get": {
         "operationId": "stream_console",
-        "tags": ["Console"],
+        "tags": [
+          "Console"
+        ],
         "summary": "WebSocket: stream running-instance console",
         "description": "Same-origin browser WebSocket with normal cookie authentication. Matching Origin required even with auth disabled; no CSRF header for this read-only GET. Snapshot frame resets the client, followed by ordered line frames from one Docker follow request including its last200 records. Lines cap at8192 UTF-8 bytes; up to256 lines per Docker frame are retained. Stopped instances return409. Maximum16 connections with bounded buffers, heartbeat/disconnect handling and session revalidation every5s. Commands remain on the commands POST route.",
         "parameters": [
@@ -238,7 +317,10 @@
             "name": "Origin",
             "in": "header",
             "required": true,
-            "schema": { "type": "string", "format": "uri" }
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
           }
         ],
         "x-websocket": true,
@@ -247,22 +329,32 @@
             "description": "JSON text frames use ConsoleEvent.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ConsoleEvent" }
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleEvent"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/FileProblem" }
+          "default": {
+            "$ref": "#/components/responses/FileProblem"
+          }
         }
       }
     },
     "/api/v1/servers/{id}/files": {
       "parameters": [
-        { "$ref": "#/components/parameters/FileServerId" },
-        { "$ref": "#/components/parameters/FilePath" }
+        {
+          "$ref": "#/components/parameters/FileServerId"
+        },
+        {
+          "$ref": "#/components/parameters/FilePath"
+        }
       ],
       "get": {
         "operationId": "list_server_files",
-        "tags": ["Files"],
+        "tags": [
+          "Files"
+        ],
         "summary": "List an instance-relative directory",
         "description": "Empty path lists root. At most 5000 entries, directories first. Protected .chunkyard-* paths are hidden; links are listed without traversal. canWrite is false for running instances or an unavailable Docker engine.",
         "responses": {
@@ -270,41 +362,61 @@
             "description": "Directory snapshot",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/FileListing" }
+                "schema": {
+                  "$ref": "#/components/schemas/FileListing"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/FileProblem" }
+          "default": {
+            "$ref": "#/components/responses/FileProblem"
+          }
         }
       }
     },
     "/api/v1/servers/{id}/files/content": {
       "parameters": [
-        { "$ref": "#/components/parameters/FileServerId" },
-        { "$ref": "#/components/parameters/RequiredFilePath" }
+        {
+          "$ref": "#/components/parameters/FileServerId"
+        },
+        {
+          "$ref": "#/components/parameters/RequiredFilePath"
+        }
       ],
       "get": {
         "operationId": "read_server_file",
-        "tags": ["Files"],
+        "tags": [
+          "Files"
+        ],
         "summary": "Read UTF-8 text up to 1 MiB",
         "responses": {
           "200": {
             "description": "Text and SHA-256 etag",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/FileContent" }
+                "schema": {
+                  "$ref": "#/components/schemas/FileContent"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/FileProblem" }
+          "default": {
+            "$ref": "#/components/responses/FileProblem"
+          }
         }
       },
       "put": {
         "operationId": "save_server_file",
-        "tags": ["Files"],
+        "tags": [
+          "Files"
+        ],
         "summary": "Atomically save text on a stopped instance",
         "description": "Send the etag from the previous read; null/omitted is create-only. Stale saves return 409 files.conflict. NUL/binary text is rejected. Root eula.txt is read-only. Requires a same-origin Origin/Referer and X-MCM-CSRF: 1.",
-        "parameters": [{ "$ref": "#/components/parameters/FileCsrf" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileCsrf"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -312,13 +424,20 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["content"],
+                "required": [
+                  "content"
+                ],
                 "properties": {
                   "content": {
                     "type": "string",
                     "description": "UTF-8 bytes at most 1 MiB; JSON envelope at most 8 MiB."
                   },
-                  "etag": { "type": ["string", "null"] }
+                  "etag": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
                 }
               }
             }
@@ -329,61 +448,94 @@
             "description": "Saved file",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/SavedFile" }
+                "schema": {
+                  "$ref": "#/components/schemas/SavedFile"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/FileProblem" }
+          "default": {
+            "$ref": "#/components/responses/FileProblem"
+          }
         }
       }
     },
     "/api/v1/servers/{id}/files/download": {
       "parameters": [
-        { "$ref": "#/components/parameters/FileServerId" },
-        { "$ref": "#/components/parameters/RequiredFilePath" }
+        {
+          "$ref": "#/components/parameters/FileServerId"
+        },
+        {
+          "$ref": "#/components/parameters/RequiredFilePath"
+        }
       ],
       "get": {
         "operationId": "download_server_file",
-        "tags": ["Files"],
+        "tags": [
+          "Files"
+        ],
         "summary": "Stream one regular file as an attachment",
         "description": "Works while running. No directory ZIP or Range support. Maximum four concurrent downloads; 429 files.busy if all slots are occupied.",
         "responses": {
           "200": {
             "description": "Attachment",
             "headers": {
-              "Content-Disposition": { "schema": { "type": "string" } }
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                }
+              }
             },
             "content": {
               "application/octet-stream": {
-                "schema": { "type": "string", "format": "binary" }
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/FileProblem" }
+          "default": {
+            "$ref": "#/components/responses/FileProblem"
+          }
         }
       }
     },
     "/api/v1/servers/{id}/files/upload": {
       "parameters": [
-        { "$ref": "#/components/parameters/FileServerId" },
-        { "$ref": "#/components/parameters/RequiredFilePath" },
-        { "$ref": "#/components/parameters/FileCsrf" },
+        {
+          "$ref": "#/components/parameters/FileServerId"
+        },
+        {
+          "$ref": "#/components/parameters/RequiredFilePath"
+        },
+        {
+          "$ref": "#/components/parameters/FileCsrf"
+        },
         {
           "in": "query",
           "name": "overwrite",
-          "schema": { "type": "boolean", "default": false }
+          "schema": {
+            "type": "boolean",
+            "default": false
+          }
         }
       ],
       "post": {
         "operationId": "upload_server_file",
-        "tags": ["Files"],
+        "tags": [
+          "Files"
+        ],
         "summary": "Stream an upload into a stopped instance",
         "description": "Raw body, not multipart/base64. Up to 128 MiB, four concurrent uploads, 60-second idle timeout. Atomic publication; existing file remains intact on interrupted/oversized uploads. Existing destinations require explicit overwrite=true. Requires same-origin Origin/Referer.",
         "requestBody": {
           "required": true,
           "content": {
             "application/octet-stream": {
-              "schema": { "type": "string", "format": "binary" }
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
             }
           }
         },
@@ -392,29 +544,41 @@
             "description": "Uploaded entry",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/FileEntryResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/FileEntryResponse"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/FileProblem" }
+          "default": {
+            "$ref": "#/components/responses/FileProblem"
+          }
         }
       }
     },
     "/api/v1/servers/{id}/files/mkdir": {
       "parameters": [
-        { "$ref": "#/components/parameters/FileServerId" },
-        { "$ref": "#/components/parameters/FileCsrf" }
+        {
+          "$ref": "#/components/parameters/FileServerId"
+        },
+        {
+          "$ref": "#/components/parameters/FileCsrf"
+        }
       ],
       "post": {
         "operationId": "mkdir_server_file",
-        "tags": ["Files"],
+        "tags": [
+          "Files"
+        ],
         "summary": "Create a directory on a stopped instance",
         "description": "Parent must exist. Requires same-origin Origin/Referer.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/FilePathRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/FilePathRequest"
+              }
             }
           }
         },
@@ -423,29 +587,41 @@
             "description": "Created entry",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/FileEntryResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/FileEntryResponse"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/FileProblem" }
+          "default": {
+            "$ref": "#/components/responses/FileProblem"
+          }
         }
       }
     },
     "/api/v1/servers/{id}/files/move": {
       "parameters": [
-        { "$ref": "#/components/parameters/FileServerId" },
-        { "$ref": "#/components/parameters/FileCsrf" }
+        {
+          "$ref": "#/components/parameters/FileServerId"
+        },
+        {
+          "$ref": "#/components/parameters/FileCsrf"
+        }
       ],
       "post": {
         "operationId": "move_server_file",
-        "tags": ["Files"],
+        "tags": [
+          "Files"
+        ],
         "summary": "Move or rename a stopped instance's file/directory",
         "description": "No overwrite or symbolic links. Destination parent must exist. Requires same-origin Origin/Referer.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/FileTransfer" }
+              "schema": {
+                "$ref": "#/components/schemas/FileTransfer"
+              }
             }
           }
         },
@@ -454,29 +630,41 @@
             "description": "Moved entry",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/FileEntryResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/FileEntryResponse"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/FileProblem" }
+          "default": {
+            "$ref": "#/components/responses/FileProblem"
+          }
         }
       }
     },
     "/api/v1/servers/{id}/files/copy": {
       "parameters": [
-        { "$ref": "#/components/parameters/FileServerId" },
-        { "$ref": "#/components/parameters/FileCsrf" }
+        {
+          "$ref": "#/components/parameters/FileServerId"
+        },
+        {
+          "$ref": "#/components/parameters/FileCsrf"
+        }
       ],
       "post": {
         "operationId": "copy_server_file",
-        "tags": ["Files"],
+        "tags": [
+          "Files"
+        ],
         "summary": "Copy a stopped instance's file/directory",
         "description": "No overwrite or symbolic links. Bounded to 512 MiB, 5000 entries and 32 levels. Failed directory copies remove their newly created destination. Requires same-origin Origin/Referer.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/FileTransfer" }
+              "schema": {
+                "$ref": "#/components/schemas/FileTransfer"
+              }
             }
           }
         },
@@ -485,22 +673,32 @@
             "description": "Copied entry",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/FileEntryResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/FileEntryResponse"
+                }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/FileProblem" }
+          "default": {
+            "$ref": "#/components/responses/FileProblem"
+          }
         }
       }
     },
     "/api/v1/servers/{id}/files/delete": {
       "parameters": [
-        { "$ref": "#/components/parameters/FileServerId" },
-        { "$ref": "#/components/parameters/FileCsrf" }
+        {
+          "$ref": "#/components/parameters/FileServerId"
+        },
+        {
+          "$ref": "#/components/parameters/FileCsrf"
+        }
       ],
       "post": {
         "operationId": "delete_server_file",
-        "tags": ["Files"],
+        "tags": [
+          "Files"
+        ],
         "summary": "Permanently delete a stopped instance's file/directory",
         "description": "Root, EULA and protected artifacts cannot be removed. Nonempty directories require recursive=true. Requires same-origin Origin/Referer.",
         "requestBody": {
@@ -510,32 +708,49 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["path"],
+                "required": [
+                  "path"
+                ],
                 "properties": {
-                  "path": { "type": "string", "minLength": 1 },
-                  "recursive": { "type": "boolean", "default": false }
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "recursive": {
+                    "type": "boolean",
+                    "default": false
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "204": { "description": "Removed" },
-          "default": { "$ref": "#/components/responses/FileProblem" }
+          "204": {
+            "description": "Removed"
+          },
+          "default": {
+            "$ref": "#/components/responses/FileProblem"
+          }
         }
       }
     },
     "/api/v1/servers/{id}/network": {
       "get": {
         "operationId": "get_server_network",
-        "tags": ["Servers"],
+        "tags": [
+          "Servers"
+        ],
         "summary": "Read configured and current game-port binding",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "format": "uuid" }
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -543,7 +758,9 @@
             "description": "Configured/default and current binding, plus restartRequired.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/NetworkSettings" }
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkSettings"
+                }
               }
             }
           },
@@ -551,7 +768,9 @@
             "description": "Problem response",
             "content": {
               "application/problem+json": {
-                "schema": { "$ref": "#/components/schemas/Problem" }
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
               }
             }
           }
@@ -559,7 +778,9 @@
       },
       "patch": {
         "operationId": "patch_server_network",
-        "tags": ["Servers"],
+        "tags": [
+          "Servers"
+        ],
         "summary": "Change a stopped instance's network settings",
         "description": "Preserves files and removes only the owned stopped container; next start creates the new binding. Null publishIp uses CHUNKYARD_DOCKER__PUBLISH_IP (default0.0.0.0). Running instances must be stopped first. Shared ports remain allowed, with runtime start exclusion.",
         "parameters": [
@@ -567,18 +788,29 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "format": "uuid" }
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           },
           {
             "name": "X-MCM-CSRF",
             "in": "header",
             "required": true,
-            "schema": { "type": "string", "enum": ["1"] }
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            }
           },
           {
             "name": "Origin",
             "in": "header",
-            "schema": { "type": "string", "format": "uri" },
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
             "description": "Must match public origin, or use a same-origin Referer."
           }
         ],
@@ -589,13 +821,22 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
                   "publishIp": {
-                    "type": ["string", "null"],
+                    "type": [
+                      "string",
+                      "null"
+                    ],
                     "description": "IPv4/IPv6 bind address or null for manager default."
                   }
                 },
-                "required": ["port"],
+                "required": [
+                  "port"
+                ],
                 "additionalProperties": false
               }
             }
@@ -606,7 +847,9 @@
             "description": "Saved network settings",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ServerResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/ServerResponse"
+                }
               }
             }
           },
@@ -614,7 +857,9 @@
             "description": "Problem response",
             "content": {
               "application/problem+json": {
-                "schema": { "$ref": "#/components/schemas/Problem" }
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
               }
             }
           }
@@ -624,7 +869,9 @@
     "/healthz": {
       "get": {
         "operationId": "get_healthz",
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "summary": "Check database health",
         "responses": {
           "200": {
@@ -636,20 +883,15 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": ["ok", "db_unavailable"]
+                      "enum": [
+                        "ok",
+                        "db_unavailable"
+                      ]
                     }
                   },
-                  "required": ["status"]
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
+                  "required": [
+                    "status"
+                  ]
                 }
               }
             }
@@ -665,7 +907,19 @@
                       "const": "db_unavailable"
                     }
                   },
-                  "required": ["status"]
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -677,7 +931,9 @@
     "/api/v1/setup/status": {
       "get": {
         "operationId": "get_api_v1_setup_status",
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "summary": "Read setup and authentication mode",
         "responses": {
           "200": {
@@ -707,7 +963,9 @@
     "/api/v1/setup": {
       "post": {
         "operationId": "post_api_v1_setup",
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "summary": "Create the owner and session",
         "responses": {
           "201": {
@@ -740,7 +998,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["1"]
+              "enum": [
+                "1"
+              ]
             },
             "description": "Required in both authentication modes."
           },
@@ -770,7 +1030,9 @@
     "/api/v1/auth/login": {
       "post": {
         "operationId": "post_api_v1_auth_login",
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "summary": "Sign in with email and password",
         "responses": {
           "200": {
@@ -803,7 +1065,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["1"]
+              "enum": [
+                "1"
+              ]
             },
             "description": "Required in both authentication modes."
           },
@@ -833,7 +1097,9 @@
     "/api/v1/auth/me": {
       "get": {
         "operationId": "get_api_v1_auth_me",
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "summary": "Read the current principal",
         "responses": {
           "200": {
@@ -862,7 +1128,9 @@
     "/api/v1/auth/logout": {
       "post": {
         "operationId": "post_api_v1_auth_logout",
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "summary": "Revoke session and clear cookie",
         "responses": {
           "204": {
@@ -886,7 +1154,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["1"]
+              "enum": [
+                "1"
+              ]
             },
             "description": "Required in both authentication modes."
           },
@@ -906,7 +1176,9 @@
     "/api/v1/servers": {
       "get": {
         "operationId": "get_api_v1_servers",
-        "tags": ["Servers"],
+        "tags": [
+          "Servers"
+        ],
         "summary": "List managed servers",
         "responses": {
           "200": {
@@ -934,7 +1206,9 @@
       },
       "post": {
         "operationId": "post_api_v1_servers",
-        "tags": ["Servers"],
+        "tags": [
+          "Servers"
+        ],
         "summary": "Create a Docker server",
         "responses": {
           "201": {
@@ -965,7 +1239,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["1"]
+              "enum": [
+                "1"
+              ]
             },
             "description": "Required in both authentication modes."
           },
@@ -995,7 +1271,9 @@
     "/api/v1/servers/{id}": {
       "delete": {
         "operationId": "delete_api_v1_servers_id",
-        "tags": ["Servers"],
+        "tags": [
+          "Servers"
+        ],
         "summary": "Delete a stopped instance",
         "description": "Queues server.delete. Requires a stopped instance and excludes concurrent lifecycle/install work. Removes only the owned Docker container and instance record. Files are retained by default; deleteFiles=true also deletes the managed directory including worlds. Success job.result.deleted contains id, filesDeleted and retainedDirectory (null when no files remain). Interrupted cleanup can be retried on the same ID. Never force-stops a game server.",
         "parameters": [
@@ -1003,24 +1281,38 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "format": "uuid" }
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           },
           {
             "name": "deleteFiles",
             "in": "query",
-            "schema": { "type": "boolean", "default": false },
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
             "description": "Explicitly delete the instance world, configuration, logs and installed software."
           },
           {
             "name": "X-MCM-CSRF",
             "in": "header",
             "required": true,
-            "schema": { "type": "string", "enum": ["1"] }
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            }
           },
           {
             "name": "Origin",
             "in": "header",
-            "schema": { "type": "string", "format": "uri" },
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
             "description": "Must match the public origin; same-origin Referer may substitute."
           }
         ],
@@ -1029,7 +1321,9 @@
             "description": "Deletion queued; poll the returned job.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/JobResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
               }
             }
           },
@@ -1037,7 +1331,9 @@
             "description": "Problem response; auth, Host/origin and CSRF checks apply.",
             "content": {
               "application/problem+json": {
-                "schema": { "$ref": "#/components/schemas/Problem" }
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
               }
             }
           }
@@ -1045,7 +1341,9 @@
       },
       "get": {
         "operationId": "get_api_v1_servers_id",
-        "tags": ["Servers"],
+        "tags": [
+          "Servers"
+        ],
         "summary": "Read a managed server",
         "responses": {
           "200": {
@@ -1085,7 +1383,9 @@
     "/api/v1/servers/{id}/eula": {
       "post": {
         "operationId": "post_api_v1_servers_id_eula",
-        "tags": ["Servers"],
+        "tags": [
+          "Servers"
+        ],
         "summary": "Accept or revoke the Minecraft EULA",
         "responses": {
           "200": {
@@ -1126,7 +1426,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["1"]
+              "enum": [
+                "1"
+              ]
             },
             "description": "Required in both authentication modes."
           },
@@ -1156,7 +1458,9 @@
     "/api/v1/servers/{id}/start": {
       "post": {
         "operationId": "post_api_v1_servers_id_start",
-        "tags": ["Servers"],
+        "tags": [
+          "Servers"
+        ],
         "summary": "Start a server",
         "responses": {
           "202": {
@@ -1197,7 +1501,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["1"]
+              "enum": [
+                "1"
+              ]
             },
             "description": "Required in both authentication modes."
           },
@@ -1217,7 +1523,9 @@
     "/api/v1/servers/{id}/stop": {
       "post": {
         "operationId": "post_api_v1_servers_id_stop",
-        "tags": ["Servers"],
+        "tags": [
+          "Servers"
+        ],
         "summary": "Stop a server",
         "responses": {
           "202": {
@@ -1258,7 +1566,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["1"]
+              "enum": [
+                "1"
+              ]
             },
             "description": "Required in both authentication modes."
           },
@@ -1278,7 +1588,9 @@
     "/api/v1/servers/{id}/restart": {
       "post": {
         "operationId": "post_api_v1_servers_id_restart",
-        "tags": ["Servers"],
+        "tags": [
+          "Servers"
+        ],
         "summary": "Restart a server",
         "responses": {
           "202": {
@@ -1319,7 +1631,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["1"]
+              "enum": [
+                "1"
+              ]
             },
             "description": "Required in both authentication modes."
           },
@@ -1339,7 +1653,9 @@
     "/api/v1/servers/{id}/kill": {
       "post": {
         "operationId": "post_api_v1_servers_id_kill",
-        "tags": ["Servers"],
+        "tags": [
+          "Servers"
+        ],
         "summary": "Kill a server",
         "responses": {
           "202": {
@@ -1380,7 +1696,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["1"]
+              "enum": [
+                "1"
+              ]
             },
             "description": "Required in both authentication modes."
           },
@@ -1400,7 +1718,9 @@
     "/api/v1/servers/{id}/console": {
       "get": {
         "operationId": "get_api_v1_servers_id_console",
-        "tags": ["Console"],
+        "tags": [
+          "Console"
+        ],
         "summary": "Read recent console output",
         "responses": {
           "200": {
@@ -1451,7 +1771,9 @@
     "/api/v1/servers/{id}/console/commands": {
       "post": {
         "operationId": "post_api_v1_servers_id_console_commands",
-        "tags": ["Console"],
+        "tags": [
+          "Console"
+        ],
         "summary": "Send one console command",
         "responses": {
           "204": {
@@ -1484,7 +1806,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["1"]
+              "enum": [
+                "1"
+              ]
             },
             "description": "Required in both authentication modes."
           },
@@ -1514,7 +1838,9 @@
     "/api/v1/servers/{id}/metrics": {
       "get": {
         "operationId": "get_api_v1_servers_id_metrics",
-        "tags": ["Monitoring"],
+        "tags": [
+          "Monitoring"
+        ],
         "summary": "Sample container resources",
         "responses": {
           "200": {
@@ -1555,7 +1881,9 @@
     "/api/v1/system/isolation": {
       "get": {
         "operationId": "get_api_v1_system_isolation",
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "summary": "Check Docker availability",
         "responses": {
           "200": {
@@ -1584,7 +1912,9 @@
     "/api/v1/java/runtimes": {
       "get": {
         "operationId": "get_api_v1_java_runtimes",
-        "tags": ["Java"],
+        "tags": [
+          "Java"
+        ],
         "summary": "List Java runtimes",
         "responses": {
           "200": {
@@ -1613,7 +1943,9 @@
     "/api/v1/java/runtimes/discover": {
       "post": {
         "operationId": "post_api_v1_java_runtimes_discover",
-        "tags": ["Java"],
+        "tags": [
+          "Java"
+        ],
         "summary": "Discover system Java installations",
         "responses": {
           "200": {
@@ -1645,7 +1977,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["1"]
+              "enum": [
+                "1"
+              ]
             },
             "description": "Required in both authentication modes."
           },
@@ -1665,7 +1999,9 @@
     "/api/v1/java/available": {
       "get": {
         "operationId": "get_api_v1_java_available",
-        "tags": ["Java"],
+        "tags": [
+          "Java"
+        ],
         "summary": "List installable Java major versions",
         "responses": {
           "200": {
@@ -1694,7 +2030,9 @@
     "/api/v1/java/runtimes/install": {
       "post": {
         "operationId": "post_api_v1_java_runtimes_install",
-        "tags": ["Java"],
+        "tags": [
+          "Java"
+        ],
         "summary": "Install a Temurin Java runtime",
         "responses": {
           "202": {
@@ -1726,7 +2064,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["1"]
+              "enum": [
+                "1"
+              ]
             },
             "description": "Required in both authentication modes."
           },
@@ -1756,7 +2096,9 @@
     "/api/v1/jobs": {
       "get": {
         "operationId": "get_api_v1_jobs",
-        "tags": ["Jobs"],
+        "tags": [
+          "Jobs"
+        ],
         "summary": "List durable background jobs",
         "responses": {
           "200": {
@@ -1805,7 +2147,9 @@
     "/api/v1/jobs/{id}": {
       "get": {
         "operationId": "get_api_v1_jobs_id",
-        "tags": ["Jobs"],
+        "tags": [
+          "Jobs"
+        ],
         "summary": "Read a background job",
         "responses": {
           "200": {
@@ -1845,7 +2189,9 @@
     "/api/v1/openapi.json": {
       "get": {
         "operationId": "get_api_v1_openapi_json",
-        "tags": ["Documentation"],
+        "tags": [
+          "Documentation"
+        ],
         "summary": "Download the OpenAPI document",
         "responses": {
           "200": {
@@ -1875,7 +2221,9 @@
     "/api/v1/setup/verify-token": {
       "post": {
         "operationId": "post_api_v1_setup_verify_token",
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "summary": "Verify the setup token",
         "responses": {
           "204": {
@@ -1901,7 +2249,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["1"]
+              "enum": [
+                "1"
+              ]
             },
             "description": "Required in both authentication modes."
           },
@@ -1931,7 +2281,9 @@
     "/api/v1/system/version": {
       "get": {
         "operationId": "get_api_v1_system_version",
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "summary": "Read version badge availability",
         "description": "Public bootstrap metadata. When http.show_version=false, returns enabled:false with version/channel null. This is the Cargo package version; it does not increment on every development commit.",
         "security": [],
@@ -1962,7 +2314,9 @@
     "/api/v1/system/changelog": {
       "get": {
         "operationId": "get_api_v1_system_changelog",
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "summary": "Read the bundled project changelog",
         "description": "Public project release notes, available before owner setup. Returns 404 version.disabled when http.show_version=false. Contains no server data.",
         "security": [],
@@ -1993,7 +2347,9 @@
     "/api/v1/software": {
       "get": {
         "operationId": "get_api_v1_software",
-        "tags": ["Software"],
+        "tags": [
+          "Software"
+        ],
         "summary": "List supported software types",
         "parameters": [],
         "responses": {
@@ -2023,7 +2379,9 @@
     "/api/v1/software/{kind}/versions": {
       "get": {
         "operationId": "get_api_v1_software_kind_versions",
-        "tags": ["Software"],
+        "tags": [
+          "Software"
+        ],
         "summary": "List Minecraft releases, newest first",
         "parameters": [
           {
@@ -2032,7 +2390,10 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["vanilla", "paper"]
+              "enum": [
+                "vanilla",
+                "paper"
+              ]
             }
           }
         ],
@@ -2063,7 +2424,9 @@
     "/api/v1/software/{kind}/versions/{version}/builds": {
       "get": {
         "operationId": "get_api_v1_software_kind_versions_version_builds",
-        "tags": ["Software"],
+        "tags": [
+          "Software"
+        ],
         "summary": "List stable Paper builds, newest first",
         "parameters": [
           {
@@ -2072,7 +2435,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["paper"]
+              "enum": [
+                "paper"
+              ]
             }
           },
           {
@@ -2114,7 +2479,9 @@
     "/api/v1/servers/{id}/install": {
       "post": {
         "operationId": "post_api_v1_servers_id_install",
-        "tags": ["Servers"],
+        "tags": [
+          "Servers"
+        ],
         "summary": "Install selected Vanilla or Paper software",
         "responses": {
           "202": {
@@ -2155,7 +2522,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["1"]
+              "enum": [
+                "1"
+              ]
             },
             "description": "Required in both authentication modes."
           },
@@ -2171,6 +2540,362 @@
           }
         ]
       }
+    },
+    "/api/v1/storage": {
+      "get": {
+        "operationId": "get_storage",
+        "tags": [
+          "Exports"
+        ],
+        "summary": "Read redacted S3 connection",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Read redacted S3 connection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "put_storage",
+        "tags": [
+          "Exports"
+        ],
+        "summary": "Save private S3 connection; existing archives prevent retargeting",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileCsrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageConnection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Save private S3 connection; existing archives prevent retargeting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/storage/test": {
+      "post": {
+        "operationId": "test_storage",
+        "tags": [
+          "Exports"
+        ],
+        "summary": "Write, read back, verify and delete a disposable S3 object",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileCsrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Write, read back, verify and delete a disposable S3 object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/exports": {
+      "get": {
+        "operationId": "list_exports",
+        "tags": [
+          "Exports"
+        ],
+        "summary": "List completed archives, including deleted instances",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List completed archives, including deleted instances",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Export"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/exports": {
+      "post": {
+        "operationId": "create_export",
+        "tags": [
+          "Exports"
+        ],
+        "summary": "Compress a stopped instance; optionally upload and SHA-256 verify on S3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/FileCsrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Compress a stopped instance; optionally upload and SHA-256 verify on S3",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/exports/{id}": {
+      "delete": {
+        "operationId": "delete_export",
+        "tags": [
+          "Exports"
+        ],
+        "summary": "Remove an archive and catalog record; preserve instance",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/FileCsrf"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Remove an archive and catalog record; preserve instance"
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/exports/{id}/download": {
+      "get": {
+        "operationId": "download_export",
+        "tags": [
+          "Exports"
+        ],
+        "summary": "Stream authenticated local or S3 archive",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Compressed tar archive",
+            "content": {
+              "application/gzip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/resources": {
+      "patch": {
+        "operationId": "patch_resources",
+        "tags": [
+          "Servers"
+        ],
+        "summary": "Change CPU and heap limits on a stopped instance",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/FileCsrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResourceUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Change CPU and heap limits on a stopped instance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2179,26 +2904,40 @@
         "name": "id",
         "in": "path",
         "required": true,
-        "schema": { "type": "string", "format": "uuid" }
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
       },
       "FilePath": {
         "name": "path",
         "in": "query",
-        "schema": { "type": "string", "default": "" },
+        "schema": {
+          "type": "string",
+          "default": ""
+        },
         "description": "Instance-relative POSIX path. Empty only for listing root; no dot segments, backslashes, device names, or .chunkyard-* components."
       },
       "RequiredFilePath": {
         "name": "path",
         "in": "query",
         "required": true,
-        "schema": { "type": "string", "minLength": 1 },
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
         "description": "Instance-relative POSIX path; no dot segments, backslashes, device names, or .chunkyard-* components."
       },
       "FileCsrf": {
         "name": "X-MCM-CSRF",
         "in": "header",
         "required": true,
-        "schema": { "type": "string", "enum": ["1"] }
+        "schema": {
+          "type": "string",
+          "enum": [
+            "1"
+          ]
+        }
       }
     },
     "responses": {
@@ -2206,7 +2945,9 @@
         "description": "properties.conflict409; properties.not_found404; properties.invalid422; properties.too_large413; properties.storage500. Existing server.busy and files.* errors may also appear.",
         "content": {
           "application/problem+json": {
-            "schema": { "$ref": "#/components/schemas/Problem" }
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
           }
         }
       },
@@ -2214,7 +2955,9 @@
         "description": "Problem response: path_invalid 422; symlink/protected 403; not_found 404; exists/conflict/not_empty/server_running 409; too_large 413; binary 415; busy 429; io 500. File codes use files. prefix. Lifecycle conflicts use server.busy 409. Authentication/origin protections also apply.",
         "content": {
           "application/problem+json": {
-            "schema": { "$ref": "#/components/schemas/Problem" }
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
           }
         }
       }
@@ -2230,21 +2973,48 @@
     "schemas": {
       "PropertiesVersion": {
         "type": "object",
-        "required": ["version", "etag", "createdAt", "source"],
+        "required": [
+          "version",
+          "etag",
+          "createdAt",
+          "source"
+        ],
         "properties": {
-          "version": { "type": "integer", "minimum": 1 },
-          "etag": { "type": "string" },
-          "createdAt": { "type": "string", "format": "date-time" },
-          "source": { "enum": ["import", "edit", "restore"] }
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "etag": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "enum": [
+              "import",
+              "edit",
+              "restore"
+            ]
+          }
         }
       },
       "PropertiesRevision": {
         "allOf": [
-          { "$ref": "#/components/schemas/PropertiesVersion" },
+          {
+            "$ref": "#/components/schemas/PropertiesVersion"
+          },
           {
             "type": "object",
-            "required": ["content"],
-            "properties": { "content": { "type": "string" } }
+            "required": [
+              "content"
+            ],
+            "properties": {
+              "content": {
+                "type": "string"
+              }
+            }
           }
         ]
       },
@@ -2260,132 +3030,297 @@
           "status"
         ],
         "properties": {
-          "version": { "type": "integer", "minimum": 1 },
-          "etag": { "type": "string" },
-          "content": { "type": "string" },
-          "updatedAt": { "type": "string", "format": "date-time" },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "etag": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "appliedVersion": {
-            "type": ["integer", "null"],
+            "type": [
+              "integer",
+              "null"
+            ],
             "description": "Manager-tracked applied revision, or null when unknown."
           },
-          "restartRequired": { "type": "boolean" },
-          "status": { "$ref": "#/components/schemas/RuntimeStatus" }
+          "restartRequired": {
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RuntimeStatus"
+          }
         }
       },
       "ConsoleEvent": {
         "oneOf": [
           {
             "type": "object",
-            "required": ["type", "lines"],
+            "required": [
+              "type",
+              "lines"
+            ],
             "properties": {
-              "type": { "const": "snapshot" },
+              "type": {
+                "const": "snapshot"
+              },
               "lines": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/ConsoleLine" }
+                "items": {
+                  "$ref": "#/components/schemas/ConsoleLine"
+                }
               }
             }
           },
           {
             "type": "object",
-            "required": ["type", "line"],
+            "required": [
+              "type",
+              "line"
+            ],
             "properties": {
-              "type": { "const": "line" },
-              "line": { "$ref": "#/components/schemas/ConsoleLine" }
+              "type": {
+                "const": "line"
+              },
+              "line": {
+                "$ref": "#/components/schemas/ConsoleLine"
+              }
             }
           },
           {
             "type": "object",
-            "required": ["type", "code", "detail"],
+            "required": [
+              "type",
+              "code",
+              "detail"
+            ],
             "properties": {
-              "type": { "const": "error" },
-              "code": { "type": "string" },
-              "detail": { "type": "string" }
+              "type": {
+                "const": "error"
+              },
+              "code": {
+                "type": "string"
+              },
+              "detail": {
+                "type": "string"
+              }
             }
           },
           {
             "type": "object",
-            "required": ["type"],
-            "properties": { "type": { "const": "end" } }
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "end"
+              }
+            }
           }
         ]
       },
       "FileEntry": {
         "type": "object",
-        "required": ["name", "path", "kind", "size", "modifiedAt", "readOnly"],
+        "required": [
+          "name",
+          "path",
+          "kind",
+          "size",
+          "modifiedAt",
+          "readOnly"
+        ],
         "properties": {
-          "name": { "type": "string" },
-          "path": { "type": "string" },
-          "kind": { "enum": ["file", "directory", "symlink", "other"] },
-          "size": { "type": "integer", "minimum": 0 },
-          "modifiedAt": { "type": ["string", "null"], "format": "date-time" },
-          "readOnly": { "type": "boolean" }
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "file",
+              "directory",
+              "symlink",
+              "other"
+            ]
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "modifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "readOnly": {
+            "type": "boolean"
+          }
         }
       },
       "FileEntryResponse": {
         "type": "object",
-        "required": ["entry"],
-        "properties": { "entry": { "$ref": "#/components/schemas/FileEntry" } }
+        "required": [
+          "entry"
+        ],
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/FileEntry"
+          }
+        }
       },
       "FileListing": {
         "type": "object",
-        "required": ["path", "entries", "truncated", "canWrite"],
+        "required": [
+          "path",
+          "entries",
+          "truncated",
+          "canWrite"
+        ],
         "properties": {
-          "path": { "type": "string" },
+          "path": {
+            "type": "string"
+          },
           "entries": {
             "type": "array",
             "maxItems": 5000,
-            "items": { "$ref": "#/components/schemas/FileEntry" }
+            "items": {
+              "$ref": "#/components/schemas/FileEntry"
+            }
           },
-          "truncated": { "type": "boolean" },
-          "canWrite": { "type": "boolean" }
+          "truncated": {
+            "type": "boolean"
+          },
+          "canWrite": {
+            "type": "boolean"
+          }
         }
       },
       "FileContent": {
         "type": "object",
-        "required": ["path", "content", "etag", "size", "readOnly", "canWrite"],
+        "required": [
+          "path",
+          "content",
+          "etag",
+          "size",
+          "readOnly",
+          "canWrite"
+        ],
         "properties": {
-          "path": { "type": "string" },
-          "content": { "type": "string" },
-          "etag": { "type": "string" },
-          "size": { "type": "integer", "minimum": 0 },
-          "readOnly": { "type": "boolean" },
-          "canWrite": { "type": "boolean" }
+          "path": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "etag": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "canWrite": {
+            "type": "boolean"
+          }
         }
       },
       "SavedFile": {
         "type": "object",
-        "required": ["path", "etag", "size"],
+        "required": [
+          "path",
+          "etag",
+          "size"
+        ],
         "properties": {
-          "path": { "type": "string" },
-          "etag": { "type": "string" },
-          "size": { "type": "integer", "minimum": 0 }
+          "path": {
+            "type": "string"
+          },
+          "etag": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          }
         }
       },
       "FilePathRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["path"],
-        "properties": { "path": { "type": "string", "minLength": 1 } }
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       },
       "FileTransfer": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["from", "to"],
+        "required": [
+          "from",
+          "to"
+        ],
         "properties": {
-          "from": { "type": "string", "minLength": 1 },
-          "to": { "type": "string", "minLength": 1 }
+          "from": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "NetworkSettings": {
         "type": "object",
         "properties": {
-          "port": { "type": "integer" },
-          "publishIp": { "type": ["string", "null"] },
-          "effectivePublishIp": { "type": "string" },
-          "boundPublishIp": { "type": ["string", "null"] },
-          "boundPort": { "type": ["integer", "null"] },
-          "restartRequired": { "type": "boolean" },
-          "status": { "$ref": "#/components/schemas/RuntimeStatus" }
+          "port": {
+            "type": "integer"
+          },
+          "publishIp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "effectivePublishIp": {
+            "type": "string"
+          },
+          "boundPublishIp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "boundPort": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "restartRequired": {
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RuntimeStatus"
+          }
         },
         "required": [
           "port",
@@ -2416,7 +3351,13 @@
             "type": "string"
           }
         },
-        "required": ["type", "title", "status", "code", "detail"]
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "detail"
+        ]
       },
       "User": {
         "type": "object",
@@ -2437,7 +3378,12 @@
             "format": "date-time"
           }
         },
-        "required": ["id", "email", "role", "createdAt"]
+        "required": [
+          "id",
+          "email",
+          "role",
+          "createdAt"
+        ]
       },
       "Me": {
         "oneOf": [
@@ -2457,7 +3403,9 @@
                     "const": "session"
                   }
                 },
-                "required": ["kind"]
+                "required": [
+                  "kind"
+                ]
               },
               "isAdmin": {
                 "type": "boolean"
@@ -2494,13 +3442,20 @@
                     "const": "auth_disabled"
                   }
                 },
-                "required": ["kind"]
+                "required": [
+                  "kind"
+                ]
               },
               "isAdmin": {
                 "type": "boolean"
               }
             },
-            "required": ["authEnabled", "user", "principal", "isAdmin"]
+            "required": [
+              "authEnabled",
+              "user",
+              "principal",
+              "isAdmin"
+            ]
           }
         ]
       },
@@ -2514,7 +3469,10 @@
             "type": "boolean"
           }
         },
-        "required": ["required", "authEnabled"]
+        "required": [
+          "required",
+          "authEnabled"
+        ]
       },
       "SetupRequest": {
         "type": "object",
@@ -2533,7 +3491,11 @@
             "maxLength": 256
           }
         },
-        "required": ["setupToken", "email", "password"],
+        "required": [
+          "setupToken",
+          "email",
+          "password"
+        ],
         "additionalProperties": false
       },
       "LoginRequest": {
@@ -2548,7 +3510,10 @@
             "format": "password"
           }
         },
-        "required": ["email", "password"],
+        "required": [
+          "email",
+          "password"
+        ],
         "additionalProperties": false
       },
       "LoginResponse": {
@@ -2561,14 +3526,22 @@
             "$ref": "#/components/schemas/Me"
           }
         },
-        "required": ["kind", "me"]
+        "required": [
+          "kind",
+          "me"
+        ]
       },
       "RuntimeStatus": {
         "type": "object",
         "properties": {
           "state": {
             "type": "string",
-            "enum": ["stopped", "running", "paused", "unknown"]
+            "enum": [
+              "stopped",
+              "running",
+              "paused",
+              "unknown"
+            ]
           },
           "containerId": {
             "anyOf": [
@@ -2594,7 +3567,12 @@
             "type": "boolean"
           }
         },
-        "required": ["state", "containerId", "exitCode", "oomKilled"]
+        "required": [
+          "state",
+          "containerId",
+          "exitCode",
+          "oomKilled"
+        ]
       },
       "Server": {
         "type": "object",
@@ -2663,7 +3641,10 @@
             "description": "Manager selects the matching Docker JVM image when no dockerImage was supplied for a managed install."
           },
           "publishIp": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Optional instance bind-address override; null uses the manager default."
           }
         },
@@ -2696,7 +3677,9 @@
           },
           "runtime": {
             "type": "string",
-            "enum": ["docker"],
+            "enum": [
+              "docker"
+            ],
             "default": "docker"
           },
           "jar": {
@@ -2708,7 +3691,10 @@
             "type": "string"
           },
           "port": {
-            "type": ["integer", "null"],
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 1,
             "maximum": 65535,
             "description": "Omit/null to atomically choose the first unassigned managed port from 25565. Explicit ports may be shared by stopped instances; only one instance per port may run at a time. Host services outside this manager can still occupy the port."
@@ -2746,7 +3732,9 @@
             ]
           }
         },
-        "required": ["name"],
+        "required": [
+          "name"
+        ],
         "additionalProperties": false,
         "description": "Creates a stopped Docker server record and initial files. Omit software for a manual JAR server. Managed software must be installed with POST /api/v1/servers/{id}/install. Java image is selected during installation unless dockerImage was explicitly provided. No download, EULA acceptance or game start occurs as a side effect of creation."
       },
@@ -2757,7 +3745,9 @@
             "$ref": "#/components/schemas/Server"
           }
         },
-        "required": ["server"]
+        "required": [
+          "server"
+        ]
       },
       "ServerList": {
         "type": "object",
@@ -2769,7 +3759,9 @@
             }
           }
         },
-        "required": ["items"]
+        "required": [
+          "items"
+        ]
       },
       "EulaRequest": {
         "type": "object",
@@ -2778,7 +3770,9 @@
             "type": "boolean"
           }
         },
-        "required": ["accepted"],
+        "required": [
+          "accepted"
+        ],
         "additionalProperties": false
       },
       "CommandRequest": {
@@ -2791,7 +3785,9 @@
             "description": "One command, at most 4096 UTF-8 bytes. CR, LF and NUL are rejected."
           }
         },
-        "required": ["line"],
+        "required": [
+          "line"
+        ],
         "additionalProperties": false
       },
       "ConsoleLine": {
@@ -2804,7 +3800,10 @@
             "type": "string"
           }
         },
-        "required": ["stream", "text"]
+        "required": [
+          "stream",
+          "text"
+        ]
       },
       "Console": {
         "type": "object",
@@ -2816,7 +3815,9 @@
             }
           }
         },
-        "required": ["items"]
+        "required": [
+          "items"
+        ]
       },
       "DockerInfo": {
         "type": "object",
@@ -2845,7 +3846,11 @@
             ]
           }
         },
-        "required": ["available", "version", "reason"]
+        "required": [
+          "available",
+          "version",
+          "reason"
+        ]
       },
       "Isolation": {
         "type": "object",
@@ -2854,7 +3859,9 @@
             "$ref": "#/components/schemas/DockerInfo"
           }
         },
-        "required": ["docker"]
+        "required": [
+          "docker"
+        ]
       },
       "JavaRuntime": {
         "type": "object",
@@ -2917,7 +3924,9 @@
             }
           }
         },
-        "required": ["items"]
+        "required": [
+          "items"
+        ]
       },
       "AvailableJava": {
         "type": "object",
@@ -2938,7 +3947,11 @@
             "type": "integer"
           }
         },
-        "required": ["lts", "all", "mostRecentLts"]
+        "required": [
+          "lts",
+          "all",
+          "mostRecentLts"
+        ]
       },
       "InstallJava": {
         "type": "object",
@@ -2949,7 +3962,9 @@
             "maximum": 65535
           }
         },
-        "required": ["major"],
+        "required": [
+          "major"
+        ],
         "additionalProperties": false
       },
       "JobFailure": {
@@ -2962,7 +3977,10 @@
             "type": "string"
           }
         },
-        "required": ["code", "detail"]
+        "required": [
+          "code",
+          "detail"
+        ]
       },
       "Job": {
         "type": "object",
@@ -2987,7 +4005,13 @@
           },
           "state": {
             "type": "string",
-            "enum": ["queued", "running", "succeeded", "failed", "cancelled"]
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ]
           },
           "progress": {
             "anyOf": [
@@ -3080,7 +4104,9 @@
             "$ref": "#/components/schemas/Job"
           }
         },
-        "required": ["job"]
+        "required": [
+          "job"
+        ]
       },
       "JobPage": {
         "type": "object",
@@ -3102,7 +4128,10 @@
             ]
           }
         },
-        "required": ["items", "nextCursor"]
+        "required": [
+          "items",
+          "nextCursor"
+        ]
       },
       "ServerMetrics": {
         "type": "object",
@@ -3267,7 +4296,9 @@
             "description": "Bootstrap token read from the private local setup-token file."
           }
         },
-        "required": ["setupToken"],
+        "required": [
+          "setupToken"
+        ],
         "additionalProperties": false
       },
       "VersionInfo": {
@@ -3277,13 +4308,23 @@
             "type": "boolean"
           },
           "version": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "channel": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
-        "required": ["enabled", "version", "channel"]
+        "required": [
+          "enabled",
+          "version",
+          "channel"
+        ]
       },
       "Changelog": {
         "type": "object",
@@ -3296,7 +4337,10 @@
             "description": "The generated project changelog bundled with this build; no per-user or server history."
           }
         },
-        "required": ["version", "markdown"]
+        "required": [
+          "version",
+          "markdown"
+        ]
       },
       "Software": {
         "oneOf": [
@@ -3313,7 +4357,10 @@
                 "pattern": "^[A-Za-z0-9][A-Za-z0-9._+\\-]*$"
               }
             },
-            "required": ["type", "version"],
+            "required": [
+              "type",
+              "version"
+            ],
             "additionalProperties": false
           },
           {
@@ -3341,7 +4388,10 @@
                 ]
               }
             },
-            "required": ["type", "version"],
+            "required": [
+              "type",
+              "version"
+            ],
             "additionalProperties": false
           }
         ],
@@ -3376,7 +4426,13 @@
             "description": "Published SHA-1 (Vanilla) or SHA-256 (Paper) of the installed JAR."
           }
         },
-        "required": ["path", "version", "build", "javaMajor", "checksum"],
+        "required": [
+          "path",
+          "version",
+          "build",
+          "javaMajor",
+          "checksum"
+        ],
         "additionalProperties": false
       },
       "SoftwareCatalog": {
@@ -3389,7 +4445,11 @@
               "properties": {
                 "id": {
                   "type": "string",
-                  "enum": ["vanilla", "paper", "custom"]
+                  "enum": [
+                    "vanilla",
+                    "paper",
+                    "custom"
+                  ]
                 },
                 "name": {
                   "type": "string"
@@ -3408,11 +4468,18 @@
                   ]
                 }
               },
-              "required": ["id", "name", "available", "reason"]
+              "required": [
+                "id",
+                "name",
+                "available",
+                "reason"
+              ]
             }
           }
         },
-        "required": ["items"]
+        "required": [
+          "items"
+        ]
       },
       "SoftwareVersions": {
         "type": "object",
@@ -3429,11 +4496,208 @@
                   "type": "boolean"
                 }
               },
-              "required": ["id", "stable"]
+              "required": [
+                "id",
+                "stable"
+              ]
             }
           }
         },
-        "required": ["items"]
+        "required": [
+          "items"
+        ]
+      },
+      "Export": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "serverId": {
+            "type": "string"
+          },
+          "serverName": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "world",
+              "selected",
+              "all"
+            ]
+          },
+          "destination": {
+            "type": "string",
+            "enum": [
+              "local",
+              "s3"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "objectKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "serverId",
+          "serverName",
+          "scope",
+          "destination",
+          "createdAt",
+          "size",
+          "sha256",
+          "fileName",
+          "objectKey"
+        ],
+        "additionalProperties": false
+      },
+      "ExportRequest": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "world",
+              "selected",
+              "all"
+            ]
+          },
+          "destination": {
+            "type": "string",
+            "enum": [
+              "local",
+              "s3"
+            ]
+          },
+          "paths": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "scope",
+          "destination"
+        ],
+        "additionalProperties": false
+      },
+      "StorageView": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "accessKeyId": {
+            "type": "string"
+          },
+          "hasSecret": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "configured",
+          "endpoint",
+          "region",
+          "bucket",
+          "prefix",
+          "accessKeyId",
+          "hasSecret"
+        ],
+        "additionalProperties": false
+      },
+      "StorageConnection": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "format": "uri"
+          },
+          "region": {
+            "type": "string"
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "accessKeyId": {
+            "type": "string"
+          },
+          "secretAccessKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "endpoint",
+          "region",
+          "bucket",
+          "accessKeyId"
+        ],
+        "additionalProperties": false
+      },
+      "ResourceUpdate": {
+        "type": "object",
+        "properties": {
+          "memoryMinMb": {
+            "type": "integer",
+            "minimum": 128,
+            "maximum": 262144
+          },
+          "memoryMaxMb": {
+            "type": "integer",
+            "minimum": 128,
+            "maximum": 262144
+          },
+          "cpus": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 256
+          }
+        },
+        "required": [
+          "memoryMinMb",
+          "memoryMaxMb",
+          "cpus"
+        ],
+        "additionalProperties": false
       }
     }
   }

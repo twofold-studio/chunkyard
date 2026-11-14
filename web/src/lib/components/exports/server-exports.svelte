@@ -1,0 +1,346 @@
+<script lang="ts">
+	import ArchiveIcon from '@lucide/svelte/icons/archive';
+	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
+	import CloudIcon from '@lucide/svelte/icons/cloud';
+	import FolderTreeIcon from '@lucide/svelte/icons/folder-tree';
+	import GlobeIcon from '@lucide/svelte/icons/globe';
+	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
+	import ListChecksIcon from '@lucide/svelte/icons/list-checks';
+	import OctagonPauseIcon from '@lucide/svelte/icons/octagon-pause';
+	import { untrack } from 'svelte';
+	import { toast } from 'svelte-sonner';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import { ErrorAlert } from '#lib/components/app/index.js';
+	import {
+		createExport,
+		getStorage,
+		isAbortError,
+		listExports,
+		waitForJob,
+		type ExportDestination,
+		type ExportRecord,
+		type ExportScope,
+		type Job,
+		type ServerState,
+		type StorageConnection
+	} from '#lib/api/index.js';
+	import {
+		MAX_SELECTED_PATHS,
+		buildExportRequest,
+		exportFromResult,
+		shortHash,
+		upsertExport
+	} from '#lib/exports/exports.js';
+	import { formatBytes } from '#lib/metrics.js';
+	import { collapse, fadeIn } from '#lib/motion/index.js';
+	import { resolve } from '$app/paths';
+	import ChoiceGroup from './choice-group.svelte';
+	import ExportList from './export-list.svelte';
+	import RestoreNote from './restore-note.svelte';
+
+	interface Props {
+		serverId: string;
+		serverState: ServerState;
+		/** Another server operation is running. */
+		busy?: boolean;
+		/** True while an export job for this server is queued or running. */
+		exporting?: boolean;
+		/** Injected in tests. */
+		jobIntervalMs?: number;
+	}
+
+	let {
+		serverId,
+		serverState,
+		busy = false,
+		exporting = $bindable(false),
+		jobIntervalMs = 1000
+	}: Props = $props();
+	const pathsId = $props.id();
+	const PATHS_PLACEHOLDER = ['world', 'plugins/Essentials', 'ops.json'].join('\n');
+
+	let storage = $state.raw<StorageConnection | null>(null);
+	let archives = $state.raw<ExportRecord[] | null>(null);
+	let loadError = $state.raw<unknown>(null);
+
+	let scope = $state<ExportScope>('world');
+	let destination = $state<ExportDestination>('local');
+	let pathsInput = $state('');
+	let attempted = $state(false);
+
+	let job = $state.raw<Job | null>(null);
+	let jobError = $state.raw<unknown>(null);
+	let completed = $state.raw<ExportRecord | null>(null);
+
+	const abort = new AbortController();
+	$effect(() => () => abort.abort());
+
+	$effect(() => {
+		const id = serverId;
+		untrack(() => load(id));
+	});
+
+	async function load(id: string) {
+		loadError = null;
+		try {
+			const [connection, list] = await Promise.all([
+				getStorage({ signal: abort.signal }),
+				listExports({ signal: abort.signal })
+			]);
+			storage = connection;
+			archives = list.items.filter((item) => item.serverId === id);
+		} catch (cause) {
+			if (!isAbortError(cause)) loadError = cause;
+		}
+	}
+
+	const stopped = $derived(serverState === 'stopped');
+	const s3Ready = $derived(storage?.configured === true);
+	const built = $derived(buildExportRequest(scope, destination, pathsInput));
+	const pathsError = $derived(attempted && !built.ok ? built.error : null);
+	const canSubmit = $derived(
+		stopped && !busy && !exporting && (destination === 'local' || s3Ready)
+	);
+
+	// Fall back to local if S3 becomes unavailable while selected.
+	$effect(() => {
+		if (storage && !s3Ready && untrack(() => destination) === 's3') destination = 'local';
+	});
+
+	const scopeOptions = [
+		{
+			value: 'world' as const,
+			label: 'World',
+			icon: GlobeIcon,
+			hint: 'Every world folder with a level.dat, including dimensions'
+		},
+		{
+			value: 'all' as const,
+			label: 'Full instance',
+			icon: FolderTreeIcon,
+			hint: 'All files, server.properties, manifest and managed JAR'
+		},
+		{
+			value: 'selected' as const,
+			label: 'Selected paths',
+			icon: ListChecksIcon,
+			hint: 'Specific files or folders'
+		}
+	];
+	const destinationOptions = $derived([
+		{ value: 'local' as const, label: 'Manager host', icon: HardDriveIcon },
+		{
+			value: 's3' as const,
+			label: 'S3',
+			icon: CloudIcon,
+			disabled: !s3Ready,
+			hint: s3Ready ? `Bucket ${storage?.bucket}` : 'Configure S3 storage first'
+		}
+	]);
+
+	async function start(event: SubmitEvent) {
+		event.preventDefault();
+		attempted = true;
+		if (!canSubmit || !built.ok) return;
+		const target = serverId;
+		exporting = true;
+		jobError = null;
+		completed = null;
+		job = null;
+		try {
+			const { job: initial } = await createExport(target, built.request, { signal: abort.signal });
+			const final = await waitForJob(initial, {
+				signal: abort.signal,
+				intervalMs: jobIntervalMs,
+				onUpdate: (update) => (job = update)
+			});
+			if (final.state === 'succeeded') {
+				const record = exportFromResult(final.result);
+				completed = record;
+				attempted = false;
+				if (record && record.serverId === target) {
+					archives = upsertExport(archives ?? [], record);
+				} else {
+					await load(target);
+				}
+				toast.success('Export verified', {
+					description: record ? `${record.fileName} · ${formatBytes(record.size)}` : undefined
+				});
+			} else {
+				jobError = final.error ?? {
+					code: `job.${final.state}`,
+					detail: `The export job ${final.state}.`
+				};
+			}
+		} catch (cause) {
+			if (!isAbortError(cause)) jobError = cause;
+		} finally {
+			exporting = false;
+		}
+	}
+
+	function removed(id: string) {
+		archives = (archives ?? []).filter((item) => item.id !== id);
+		if (completed?.id === id) completed = null;
+	}
+</script>
+
+<div class="flex flex-col gap-4">
+	<form
+		class="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-card"
+		onsubmit={start}
+		aria-label="New export"
+		novalidate
+	>
+		<div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5">
+			<ArchiveIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+			<span class="text-sm font-medium">New export</span>
+			<span class="text-xs text-muted-foreground">Compressed .tar.gz, SHA-256 verified</span>
+			{#if !stopped}
+				<span
+					class="ml-auto inline-flex items-center gap-1.5 text-xs text-warning"
+					role="status"
+					in:fadeIn
+				>
+					<OctagonPauseIcon class="size-3.5" aria-hidden="true" />
+					Stop the server to export
+				</span>
+			{/if}
+		</div>
+
+		<div class="grid gap-x-6 gap-y-3 px-4 py-3 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
+			<span class="text-xs font-medium text-muted-foreground">Contents</span>
+			<ChoiceGroup
+				label="Export contents"
+				options={scopeOptions}
+				bind:value={scope}
+				disabled={exporting}
+			/>
+
+			{#if scope === 'selected'}
+				<label for={pathsId} class="self-start pt-1.5 text-xs font-medium text-muted-foreground"
+					>Paths</label
+				>
+				<div class="flex min-w-0 flex-col gap-1.5" transition:collapse>
+					<Textarea
+						id={pathsId}
+						bind:value={pathsInput}
+						rows={3}
+						spellcheck={false}
+						autocomplete="off"
+						placeholder={PATHS_PLACEHOLDER}
+						class="min-h-20 font-mono text-xs md:text-xs"
+						aria-invalid={pathsError ? true : undefined}
+						aria-describedby={`${pathsId}-hint`}
+						disabled={exporting}
+					/>
+					<p
+						id={`${pathsId}-hint`}
+						class={['text-xs', pathsError ? 'text-destructive' : 'text-muted-foreground']}
+					>
+						{pathsError ??
+							`One file or folder per line, relative to the server directory (up to ${MAX_SELECTED_PATHS}). Symbolic links fail the export.`}
+					</p>
+				</div>
+			{/if}
+
+			<span class="text-xs font-medium text-muted-foreground">Destination</span>
+			<div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+				<ChoiceGroup
+					label="Export destination"
+					options={destinationOptions}
+					bind:value={destination}
+					disabled={exporting}
+				/>
+				{#if storage === null && !loadError}
+					<Skeleton class="h-4 w-24" />
+				{:else if !s3Ready}
+					<a
+						href={resolve('exports')}
+						class="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+						>Set up S3 storage</a
+					>
+				{:else if destination === 's3'}
+					<span class="truncate font-mono text-xs text-muted-foreground" title={storage?.endpoint}
+						>{storage?.bucket}{storage?.prefix ? `/${storage.prefix}` : ''}</span
+					>
+				{/if}
+			</div>
+		</div>
+
+		<div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
+			<p class="min-w-0 flex-1 text-xs text-muted-foreground">
+				The server stays locked until compression{destination === 's3' ? ' and upload' : ''} finish. Nothing
+				is stopped, restarted or deleted for you.
+			</p>
+			<Button type="submit" size="sm" disabled={!canSubmit}>
+				{#if exporting}<Spinner data-icon="inline-start" />{:else}<ArchiveIcon
+						data-icon="inline-start"
+					/>{/if}
+				{exporting ? 'Exporting…' : 'Export'}
+			</Button>
+		</div>
+
+		{#if exporting}
+			<p class="flex items-center gap-2 px-4 py-2.5 text-sm" role="status" transition:collapse>
+				<Spinner class="size-3.5" />
+				<span>{job ? (job.state === 'queued' ? 'Queued' : 'Compressing') : 'Requesting'}</span>
+				{#if job?.message}<span class="truncate text-xs text-muted-foreground">{job.message}</span
+					>{/if}
+			</p>
+		{:else if completed}
+			<p
+				class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2.5 text-sm"
+				role="status"
+				transition:collapse
+			>
+				<CircleCheckIcon class="size-4 shrink-0 text-success" aria-hidden="true" />
+				<span>Export verified</span>
+				<span class="truncate font-mono text-xs text-muted-foreground" title={completed.sha256}
+					>{completed.fileName} · {formatBytes(completed.size)} · sha256 {shortHash(
+						completed.sha256
+					)}</span
+				>
+			</p>
+		{/if}
+	</form>
+
+	{#if jobError}
+		<div transition:collapse>
+			<ErrorAlert error={jobError}>
+				<p class="text-muted-foreground">Server files were not changed.</p>
+			</ErrorAlert>
+		</div>
+	{/if}
+
+	<section class="flex flex-col gap-2" aria-label="Archives of this server">
+		<div class="flex items-center gap-2">
+			<h2 class="text-sm font-medium">Archives</h2>
+			<a
+				href={resolve('exports')}
+				class="ml-auto text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+				>All archives</a
+			>
+		</div>
+		{#if loadError}
+			<ErrorAlert error={loadError}>
+				<Button variant="outline" size="sm" class="mt-2" onclick={() => load(serverId)}
+					>Retry</Button
+				>
+			</ErrorAlert>
+		{:else if archives === null}
+			<Skeleton class="h-14 w-full" />
+		{:else}
+			<ExportList
+				exports={archives}
+				emptyText="No archives of this server yet. Archives stay available after the server is deleted."
+				ondeleted={removed}
+			/>
+		{/if}
+	</section>
+
+	<RestoreNote />
+</div>

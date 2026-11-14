@@ -70,6 +70,10 @@ impl TestApp {
         );
         backend.state.files = servers.clone();
         backend.state.properties = servers.clone();
+        backend.state.exports = Arc::new(mcm_process::ExportManager::new(
+            directory.path().join("exports"),
+            servers.clone(),
+        )?);
         backend.state.servers = servers;
         let base = format!("http://{address}");
         let router = if ui {

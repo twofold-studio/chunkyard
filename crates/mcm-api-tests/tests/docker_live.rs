@@ -15,6 +15,69 @@ impl Drop for ContainerCleanup {
 }
 #[tokio::test]
 #[ignore = "requires a Linux Docker engine and mcm-manager-test-runtime:local"]
+async fn edited_resource_limits_recreate_container_preserving_files() -> Result {
+    let directory = tempfile::tempdir()?;
+    let mut config = mcm_config::Config {
+        data_dir: directory.path().to_owned(),
+        ..Default::default()
+    };
+    config.auth.enabled = false;
+    config.docker.runtime_image = "mcm-manager-test-runtime:local".into();
+    config.docker.publish_ip = [127, 0, 0, 1].into();
+    config.docker.stop_timeout_s = 3;
+    let backend = build_state(&config).await?;
+    let socket = std::net::TcpListener::bind("127.0.0.1:0")?;
+    let port = socket.local_addr()?.port();
+    drop(socket);
+    let instance=backend.state.servers.create(serde_json::from_value(json!({"name":"Resources fixture","port":port,"memoryMinMb":128,"memoryMaxMb":256,"acceptEula":true}))?).await?;
+    let id = &instance.server.id;
+    std::fs::write(instance.directory.join("server.jar"), "console fixture")?;
+    std::fs::write(instance.directory.join("marker.txt"), "preserved")?;
+    let manager = std::fs::read_to_string(directory.path().join("instance-id"))?;
+    let cleanup = ContainerCleanup(format!("mcm-{manager}-{id}"));
+    let first = backend.state.servers.start(id).await?;
+    backend.state.servers.stop(id).await?;
+    backend
+        .state
+        .servers
+        .set_resources(
+            id,
+            mcm_core::server::ResourceUpdate {
+                memory_min_mb: 128,
+                memory_max_mb: 384,
+                cpus: 0.5,
+            },
+        )
+        .await?;
+    assert_eq!(
+        std::fs::read_to_string(instance.directory.join("marker.txt"))?,
+        "preserved"
+    );
+    let next = backend.state.servers.start(id).await?;
+    assert_ne!(first.status.container_id, next.status.container_id);
+    let inspect = Command::new("docker")
+        .args(["inspect", &cleanup.0])
+        .output()?;
+    assert!(inspect.status.success());
+    let inspect: serde_json::Value = serde_json::from_slice(&inspect.stdout)?;
+    assert_eq!(inspect[0]["HostConfig"]["NanoCpus"], 500_000_000);
+    assert_eq!(
+        inspect[0]["HostConfig"]["Memory"],
+        (384 + 256) * 1024 * 1024
+    );
+    assert!(
+        inspect[0]["Config"]["Cmd"]
+            .as_array()
+            .ok_or("command")?
+            .contains(&json!("-Xmx384M"))
+    );
+    backend.state.servers.stop(id).await?;
+    backend.state.servers.delete(id, true).await?;
+    backend.shutdown().await;
+    Ok(())
+}
+#[tokio::test]
+#[ignore = "requires a Linux Docker engine and mcm-manager-test-runtime:local"]
 async fn real_docker_start_console_restart_adoption_stop_and_kill() -> Result {
     let directory = tempfile::tempdir()?;
     let mut config = mcm_config::Config {

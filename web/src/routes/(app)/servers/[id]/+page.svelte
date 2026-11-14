@@ -25,6 +25,8 @@
 	import FolderTreeIcon from '@lucide/svelte/icons/folder-tree';
 	import SlidersIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import FileCogIcon from '@lucide/svelte/icons/file-cog';
+	import ArchiveIcon from '@lucide/svelte/icons/archive';
+	import ServerExports from '#lib/components/exports/server-exports.svelte';
 	import ServerProperties from '#lib/components/properties/server-properties.svelte';
 	import EulaDialog from '#lib/components/servers/eula-dialog.svelte';
 	import DeleteServerDialog from '#lib/components/servers/delete-server-dialog.svelte';
@@ -66,6 +68,7 @@
 		{ value: 'console', label: 'Console', icon: TerminalIcon },
 		{ value: 'properties', label: 'Properties', icon: FileCogIcon },
 		{ value: 'files', label: 'Files', icon: FolderTreeIcon },
+		{ value: 'exports', label: 'Exports', icon: ArchiveIcon },
 		{ value: 'settings', label: 'Settings', icon: SlidersIcon }
 	] as const;
 	type TabValue = (typeof TABS)[number]['value'];
@@ -78,6 +81,10 @@
 	let filesDirty = $state(false);
 	/** Properties stays mounted after its first visit so its view and history survive tab switches. */
 	let propertiesVisited = $state(initialTab === 'properties');
+	/** Exports stays mounted after its first visit so a running export keeps its progress. */
+	let exportsVisited = $state(initialTab === 'exports');
+	/** An export job holds the instance lock until compression/upload finishes. */
+	let exporting = $state(false);
 	/** Properties autosave is queued or in flight (flushed on unmount, never prompted). */
 	let propertiesPending = $state(false);
 	let propertiesEditor = $state<{
@@ -128,6 +135,7 @@
 		tab = next;
 		if (next === 'files') filesVisited = true;
 		if (next === 'properties') propertiesVisited = true;
+		if (next === 'exports') exportsVisited = true;
 	}
 
 	function editNetwork() {
@@ -257,7 +265,7 @@
 		<ServerActions
 			compact
 			serverState={server.status.state}
-			busy={controller.busy || deleting || removed}
+			busy={controller.busy || deleting || removed || exporting}
 			pending={controller.action}
 			startBlocked={notInstalled}
 			{onAction}
@@ -265,7 +273,7 @@
 		<DeleteServerDialog
 			compact
 			{server}
-			disabled={controller.busy || removed || propertiesPending}
+			disabled={controller.busy || removed || propertiesPending || exporting}
 			bind:deleting
 			ondeleted={onDeleted}
 		/>
@@ -361,14 +369,19 @@
 <Tabs.Root bind:value={() => tab, selectTab} class="gap-6">
 	<Tabs.List
 		variant="line"
-		class="w-full justify-start gap-4 overflow-x-auto rounded-none border-b border-border"
+		class="scrollbar-none w-full justify-start gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-none border-b border-border"
 	>
 		{#each TABS as item (item.value)}
-			<Tabs.Trigger value={item.value} class="flex-none px-1">
+			<Tabs.Trigger
+				value={item.value}
+				class="flex-none px-1 group-data-horizontal/tabs:after:bottom-[-4px]"
+			>
 				<item.icon data-icon="inline-start" aria-hidden="true" />
 				{item.label}
 				{#if (item.value === 'files' && filesDirty) || (item.value === 'properties' && propertiesPending)}
 					<span class="size-1.5 rounded-full bg-warning" aria-label="Unsaved changes"></span>
+				{:else if item.value === 'exports' && exporting}
+					<Spinner class="size-3" aria-label="Export running" />
 				{/if}
 			</Tabs.Trigger>
 		{/each}
@@ -409,6 +422,18 @@
 					serverState={server.status.state}
 					bind:dirty={filesDirty}
 					onOpenProperties={() => selectTab('properties')}
+				/>
+			{/key}
+		{/if}
+	</Tabs.Content>
+	<Tabs.Content value="exports">
+		{#if exportsVisited}
+			{#key server.id}
+				<ServerExports
+					serverId={server.id}
+					serverState={server.status.state}
+					busy={controller.busy || deleting || removed}
+					bind:exporting
 				/>
 			{/key}
 		{/if}

@@ -2,6 +2,10 @@ import { request, type Fetch } from './client';
 import type {
 	AvailableJava,
 	Changelog,
+	CreateExportRequest,
+	ExportRecord,
+	StorageConnection,
+	UpdateStorageRequest,
 	BuildSoftwareKind,
 	ConsoleLine,
 	CreateServerRequest,
@@ -17,6 +21,7 @@ import type {
 	SavedFile,
 	ServerNetwork,
 	UpdateNetworkRequest,
+	UpdateResourcesRequest,
 	Items,
 	JavaRuntime,
 	Job,
@@ -233,6 +238,17 @@ export const updateServerNetwork = (id: string, body: UpdateNetworkRequest, o: O
 		body
 	});
 
+/**
+ * Stopped servers only. Replaces the owned stopped container so the next start uses the new
+ * heap bounds and CPU limit. Same limits as creation.
+ */
+export const updateServerResources = (id: string, body: UpdateResourcesRequest, o: Opts = {}) =>
+	request<{ server: ServerView }>(`/api/v1/servers/${enc(id)}/resources`, {
+		...o,
+		method: 'PATCH',
+		body
+	});
+
 // Server properties (desired versions) --------------------------------------------
 // Editable while the server runs; saved versions apply on the next explicit start/restart.
 
@@ -266,3 +282,34 @@ export const restoreProperties = (
 	body: { version: number; etag: string },
 	o: Opts = {}
 ) => request<PropertiesDocument>(propertiesUrl(id, '/restore'), { ...o, method: 'POST', body });
+
+// Storage & exports ---------------------------------------------------------------
+// Archives are independent of server records and stay listed after a server is deleted.
+
+export const getStorage = (o: Opts = {}) => request<StorageConnection>('/api/v1/storage', o);
+
+/** Saves the S3 connection; omit/empty `secretAccessKey` keeps the stored secret. */
+export const updateStorage = (body: UpdateStorageRequest, o: Opts = {}) =>
+	request<StorageConnection>('/api/v1/storage', { ...o, method: 'PUT', body });
+
+/** Writes, verifies and removes a disposable object using the saved connection. */
+export const testStorage = (o: Opts = {}) =>
+	request<{ ok: true }>('/api/v1/storage/test', { ...o, method: 'POST' });
+
+/** Newest first, including archives of deleted servers. */
+export const listExports = (o: Opts = {}) => request<Items<ExportRecord>>('/api/v1/exports', o);
+
+/** Stopped servers only (202). The job's successful `result` is an {@link ExportRecord}. */
+export const createExport = (serverId: string, body: CreateExportRequest, o: Opts = {}) =>
+	request<{ job: Job }>(`/api/v1/servers/${enc(serverId)}/exports`, {
+		...o,
+		method: 'POST',
+		body
+	});
+
+/** Same-origin attachment URL, streamed through the backend for local and S3 archives. */
+export const exportDownloadUrl = (id: string) => `/api/v1/exports/${enc(id)}/download`;
+
+/** Removes the archive and its catalog record (204). Never touches the server. */
+export const deleteExport = (id: string, o: Opts = {}) =>
+	request<void>(`/api/v1/exports/${enc(id)}`, { ...o, method: 'DELETE' });

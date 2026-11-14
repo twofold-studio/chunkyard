@@ -166,6 +166,14 @@
 	}
 }
 
+/* Horizontal scrollers (e.g. tab rows) that stay swipeable without scrollbar chrome or arrows. */
+@utility scrollbar-none {
+	scrollbar-width: none;
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}
+
 @keyframes motion-highlight {
 	from {
 		background-color: color-mix(in oklch, var(--success) 18%, transparent);
