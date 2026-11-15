@@ -1,6 +1,6 @@
 # Phase 4 — Pack import pipeline
 
-Implemented in `mcm-modplatforms::pack`. Pure planning is separated from I/O so most logic is unit-testable.
+Implemented in `chunkyard-modplatforms::pack`. Pure planning is separated from I/O so most logic is unit-testable.
 
 ## Stages (job progress)
 
@@ -11,7 +11,7 @@ Implemented in `mcm-modplatforms::pack`. Pure planning is separated from I/O so 
 | 3 | `plan` | 10 % | `ImportPlan` (below), persisted to `pack_imports.plan` |
 | 4 | `install_loader` | 20 % | Loader + MC server installed via phase-3 `Installer`; `LaunchSpec` set |
 | 5 | `download_files` | 35 % | Direct files downloaded in parallel (6 concurrent, per-host max 4), hard-linked from cache |
-| 6 | `apply_overrides` | 10 % | `overrides/` (+ `server-overrides/`) extracted via `mcm-fs` |
+| 6 | `apply_overrides` | 10 % | `overrides/` (+ `server-overrides/`) extracted via `chunkyard-fs` |
 | 7 | `detect_client_only` | 3 % | Suspects renamed to `.disabled` |
 | 8 | `record` | 2 % | `installed_content` rows, `pending_manual_downloads` rows, import report in `<data>/state/<id>/install.log` |
 
@@ -66,7 +66,7 @@ When the server pack is used, the client pack's `manifest.json` (downloaded in p
 
 Verdict `starter` + client manifest → switch to client-pack conversion, add `pack.server_pack_starter_fallback` warning naming the triggering signal(s). Verdict `starter` without a manifest (uploaded zip) → `pack.server_pack_starter_unsupported`.
 
-Fixture: `CfServerPackBuilder::server_starter()` (in `mcm-testkit::packs`) synthesises a ServerStarter-style zip: `server-setup-config.yaml`, `startserver.sh` with `curl`/`java -jar serverstarter-2.4.0.jar`, `serverstarter-2.4.0.jar` stub, empty `mods/`, `config/`.
+Fixture: `CfServerPackBuilder::server_starter()` (in `chunkyard-testkit::packs`) synthesises a ServerStarter-style zip: `server-setup-config.yaml`, `startserver.sh` with `curl`/`java -jar serverstarter-2.4.0.jar`, `serverstarter-2.4.0.jar` stub, empty `mods/`, `config/`.
 
 ## Untrusted metadata
 

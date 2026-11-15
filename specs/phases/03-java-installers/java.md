@@ -1,4 +1,4 @@
-# Phase 3 — Java runtime management (`mcm-java`)
+# Phase 3 — Java runtime management (`chunkyard-java`)
 
 ## Model
 
@@ -19,7 +19,7 @@ pub trait JavaRuntimeService: Send + Sync {
 }
 ```
 
-Repo trait `JavaRuntimeRepo` (in `mcm-core`, impl in `mcm-db`).
+Repo trait `JavaRuntimeRepo` (in `chunkyard-core`, impl in `chunkyard-db`).
 
 ## Discovery (system JREs)
 
@@ -46,7 +46,7 @@ Discovery also checks `%JAVA_HOME%/bin/java.exe`, every `java.exe` on `%PATH%`, 
 
 ## Managed install (Adoptium)
 
-Client trait `AdoptiumApi` (base URL `https://api.adoptium.net`; override only under the `test-hooks` feature), built on `mcm_download::SafeHttp`.
+Client trait `AdoptiumApi` (base URL `https://api.adoptium.net`; override only under the `test-hooks` feature), built on `chunkyard_download::SafeHttp`.
 
 | Call | Use |
 |---|---|
@@ -57,8 +57,8 @@ Fields used: `binary.package.link` (URL), `binary.package.checksum` (sha256 hex)
 
 Steps (job `java.install`, params `{ major }`):
 1. Resolve asset; `os` from libc detection ([process-model.md](../../architecture/process-model.md#java-runtimes-and-libc)); `arch` from `std::env::consts::ARCH`.
-2. Download via `mcm-download::HttpDownloader` over `SafeHttp` (cache key `sha256:<checksum>`), verifying sha256 and size; allowed hosts: `api.adoptium.net`, `github.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com` (redirect targets; to verify).
-3. Extract `.tar.gz` with `mcm-fs::archive` (sandboxed, symlink entries **allowed only if their target stays within the archive root** — JRE tarballs contain relative symlinks such as `legal/` links; `mcm-fs` exposes `ExtractOptions { allow_internal_symlinks: true }` used only here).
+2. Download via `chunkyard-download::HttpDownloader` over `SafeHttp` (cache key `sha256:<checksum>`), verifying sha256 and size; allowed hosts: `api.adoptium.net`, `github.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com` (redirect targets; to verify).
+3. Extract `.tar.gz` with `chunkyard-fs::archive` (sandboxed, symlink entries **allowed only if their target stays within the archive root** — JRE tarballs contain relative symlinks such as `legal/` links; `chunkyard-fs` exposes `ExtractOptions { allow_internal_symlinks: true }` used only here).
 4. Strip the single top-level directory (`jdk-21.0.5+11-jre/`) into `<data>/runtimes/java/temurin-<major>-<semver>-<os>-<arch>.tmp/`, then rename to final dir (atomic).
 5. `chmod +x bin/*`; verify by running `bin/java -version` → major matches.
 6. Insert row (`managed=1`, `sha256`), emit `JavaRuntimeInstalled`.
@@ -86,7 +86,7 @@ Updates: `POST /java/runtimes/install {major}` when a newer patch exists install
 | 1.20.5 – 1.21.x | 21 |
 | Year-based (26.x+) | No table entry → requires Mojang JSON; error `java.requirement_unknown` if unavailable (expected 25, to verify) |
 
-Mojang JSON fetched via `mcm-installers::vanilla::MojangApi`. `mcm-installers` depends on `mcm-java`, so the requirement function takes a `&dyn VersionMetaSource` trait object defined in `mcm-java` and implemented in `mcm-installers`, injected by `mcm-server::wiring`. Both crates share downloads via `mcm-download`, so there is no java↔installers edge in the other direction.
+Mojang JSON fetched via `chunkyard-installers::vanilla::MojangApi`. `chunkyard-installers` depends on `chunkyard-java`, so the requirement function takes a `&dyn VersionMetaSource` trait object defined in `chunkyard-java` and implemented in `chunkyard-installers`, injected by `chunkyard-server::wiring`. Both crates share downloads via `chunkyard-download`, so there is no java↔installers edge in the other direction.
 
 ### Selection (`ensure`)
 

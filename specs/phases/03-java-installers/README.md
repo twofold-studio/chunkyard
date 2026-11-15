@@ -8,9 +8,9 @@ Create a working server of any mainstream flavor and version in a few clicks, wi
 
 | Area | Included |
 |---|---|
-| `mcm-java` | System JRE discovery, managed Temurin JRE downloads from Adoptium, `java_runtimes` table, MC-version → Java-major requirement resolution |
-| `mcm-installers` | `Installer` trait; vanilla, Paper, Purpur, Fabric, Quilt, Forge, NeoForge, **Velocity, BungeeCord, Waterfall**; `run.sh` parser for Forge/NeoForge launch derivation; `LaunchSpec` output |
-| `mcm-download` | Shared downloader with content-addressed cache and hash verification (over `SafeHttp`), used by java and installers |
+| `chunkyard-java` | System JRE discovery, managed Temurin JRE downloads from Adoptium, `java_runtimes` table, MC-version → Java-major requirement resolution |
+| `chunkyard-installers` | `Installer` trait; vanilla, Paper, Purpur, Fabric, Quilt, Forge, NeoForge, **Velocity, BungeeCord, Waterfall**; `run.sh` parser for Forge/NeoForge launch derivation; `LaunchSpec` output |
+| `chunkyard-download` | Shared downloader with content-addressed cache and hash verification (over `SafeHttp`), used by java and installers |
 | Jobs | `java.install`, `server.install` (create and reinstall/version switch) |
 | Server create | Wizard with flavor → MC version → loader/build → Java (auto) → memory/port → EULA |
 | Version switch | Reinstall/upgrade/downgrade an existing stopped server; previous launch artefacts kept in `<data>/state/<id>/previous/` |
@@ -45,7 +45,7 @@ Create a working server of any mainstream flavor and version in a few clicks, wi
 - [Phase 0](../00-foundation/README.md): jobs, audit, settings.
 - [Phase 1](../01-lifecycle-console/README.md): `servers` table, `LaunchSpec`, supervisor (incl. `Installing` state), console ring, EULA POST, `ProcessSpawner`.
 - [Phase 2](../02-settings-files/README.md): `SandboxRoot`, archive extraction with limits, `.properties` writer (initial `server.properties` with managed keys).
-- `mcm-download` (`SafeHttp`, created in P1) gains `HttpDownloader` + cache in this phase.
+- `chunkyard-download` (`SafeHttp`, created in P1) gains `HttpDownloader` + cache in this phase.
 - Architecture: [process-model.md](../../architecture/process-model.md) (launch target, libc detection), [security.md](../../architecture/security.md) (T7, T8).
 
 ## Files in this phase
@@ -56,7 +56,7 @@ Create a working server of any mainstream flavor and version in a few clicks, wi
 
 - [ ] All `P3-FR-*` implemented; each covered by tests in [tests.md](tests.md).
 - [ ] Every installer passes wiremock tests incl. failure fixtures (404, 429, 5xx retry, hash mismatch, truncated body).
-- [ ] Fake installer shims (Forge/NeoForge/Quilt) exercised end-to-end through the real spawn path in `mcm-api` tests.
+- [ ] Fake installer shims (Forge/NeoForge/Quilt) exercised end-to-end through the real spawn path in `chunkyard-api` tests.
 - [ ] Nightly smoke suite green: `smoke_vanilla_latest`, `smoke_paper_latest`, `smoke_fabric_1_20_1`, `smoke_forge_1_20_1`, `smoke_forge_1_21`, `smoke_neoforge_latest`, `smoke_legacy_1_12_2_java8`, `smoke_velocity_latest` ([e2e.md](../../testing/e2e.md#real-server-smoke-suite-opt-in)).
 - [ ] Download cache dedupes identical artefacts across servers (asserted by test).
 - [ ] No vendor shell scripts executed (asserted: spawn log never contains `run.sh`); `run_script_parse` fuzz target passes the CI smoke.

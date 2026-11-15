@@ -6,7 +6,7 @@ A **releasable and tested** (not yet useful) secure shell: one `mcm` binary that
 
 ## Scope
 
-- Cargo workspace with the crates needed now: `mcm-core`, `mcm-config`, `mcm-db`, `mcm-auth`, `mcm-api`, `mcm-server` (bin + lib `wiring`), `mcm-testkit`, `mcm-api-tests`, plus `xtask/`. Other crates (e.g. `mcm-download` with the shared SSRF-safe client, P1) are created by the phase that first needs them.
+- Cargo workspace with the crates needed now: `chunkyard-core`, `chunkyard-config`, `chunkyard-db`, `chunkyard-auth`, `chunkyard-api`, `chunkyard-server` (bin + lib `wiring`), `chunkyard-testkit`, `chunkyard-api-tests`, plus `xtask/`. Other crates (e.g. `chunkyard-download` with the shared SSRF-safe client, P1) are created by the phase that first needs them.
 - `xtask check-deps` enforcing [workspace-layout rules](../../architecture/workspace-layout.md#rules-enforced-in-ci-by-cargo-xtask-check-deps).
 - CI pipeline jobs from [testing/ci.md](../../testing/ci.md) that apply to this phase (all except fuzz targets not yet existing and `smoke-real`).
 - Config loading (`mcm.toml` + env + CLI), validation, `mcm config check`.
@@ -16,8 +16,8 @@ A **releasable and tested** (not yet useful) secure shell: one `mcm` binary that
 - **TOTP 2FA** (enroll/confirm/disable, recovery codes, login challenge) and **session list/revoke** — moved here from P8.
 - **Security headers and CSP** per [security.md](../../architecture/security.md#http-security-headers-and-csp-p0) — moved here from P8.
 - API tokens CRUD (personal tokens of the current user).
-- Jobs framework: `JobService`, persistence, progress events, cancel, restart recovery; WS `jobs` topic. Exercised by a `debug.sleep` job that exists only when `mcm-server` is built with the `test-hooks` feature.
-- Audit catalog (`mcm_core::audit::Action`, [audit.md](../../architecture/audit.md)), allow-list scrubber, audit service; `GET /api/v1/audit` (admin, basic list with filters).
+- Jobs framework: `JobService`, persistence, progress events, cancel, restart recovery; WS `jobs` topic. Exercised by a `debug.sleep` job that exists only when `chunkyard-server` is built with the `test-hooks` feature.
+- Audit catalog (`chunkyard_core::audit::Action`, [audit.md](../../architecture/audit.md)), allow-list scrubber, audit service; `GET /api/v1/audit` (admin, basic list with filters).
 - WS hub: connect, auth, Origin check, subscribe/unsubscribe/ping, heartbeat, per-connection queue.
 - `/healthz`, `/api/v1/system/info`, `/api/v1/openapi.json`.
 - OpenAPI generation (`mcm openapi`), TS type generation, drift check.
@@ -30,7 +30,7 @@ A **releasable and tested** (not yet useful) secure shell: one `mcm` binary that
 
 - Any Minecraft server functionality (phase 1).
 - Creating additional users, roles UI, per-server permissions, owner-enforced 2FA for admins (P8). Only the owner exists; `admin`/`user` roles exist in the schema.
-- The SSRF-safe outbound client (`mcm-download::SafeHttp`) — P0 makes no outbound HTTP calls; it arrives in P1.
+- The SSRF-safe outbound client (`chunkyard-download::SafeHttp`) — P0 makes no outbound HTTP calls; it arrives in P1.
 - Notifications (P8), built-in TLS certificate generation (optional later; config `[http.tls]` with provided cert/key **is** in scope).
 - OTLP export.
 
@@ -58,7 +58,7 @@ None.
 
 - [ ] All P0 FRs implemented; every test in [tests.md](tests.md) passes in CI.
 - [ ] `mcm` musl release binary ≤ 40 MiB, starts in < 1 s on an empty data dir.
-- [ ] Coverage gates met (`mcm-auth` ≥ 95 %, `mcm-api` ≥ 90 %, workspace ≥ 85 %, web lib ≥ 80 %).
+- [ ] Coverage gates met (`chunkyard-auth` ≥ 95 %, `chunkyard-api` ≥ 90 %, workspace ≥ 85 %, web lib ≥ 80 %).
 - [ ] `openapi-drift`, `deps-check`, `migrations` CI jobs green.
 - [ ] Docker image runs with a volume at `/data`, healthcheck on `/healthz`.
 - [ ] systemd unit tested manually on a Debian 12 VM (documented in PR).

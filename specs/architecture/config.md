@@ -1,6 +1,6 @@
 # Configuration
 
-Owned by `mcm-config`, which **composes** the `*Config` sub-structs defined by each crate ([patterns.md §8](patterns.md#8-typed-config)). Static config is read at startup; runtime-editable settings live in the `settings` table and are edited through the UI.
+Owned by `chunkyard-config`, which **composes** the `*Config` sub-structs defined by each crate ([patterns.md §8](patterns.md#8-typed-config)). Static config is read at startup; runtime-editable settings live in the `settings` table and are edited through the UI.
 
 ## Sources (later wins)
 
@@ -15,7 +15,7 @@ Unknown keys are an error. `mcm config check` validates and prints the effective
 
 **Listen/origin rule:** if `http.listen` is not a loopback address, `http.public_url` is required (startup error `config.public_url_required`); see [auth.md](auth.md#first-run-setup).
 
-**Test hooks** (upstream `*_base_url` overrides, the debug no-op job route, fake clock) exist only when `mcm-server` is built with the `test-hooks` cargo feature, which release builds never enable. They are not config keys in release builds (unknown-key error).
+**Test hooks** (upstream `*_base_url` overrides, the debug no-op job route, fake clock) exist only when `chunkyard-server` is built with the `test-hooks` cargo feature, which release builds never enable. They are not config keys in release builds (unknown-key error).
 
 ## Example `mcm.toml`
 

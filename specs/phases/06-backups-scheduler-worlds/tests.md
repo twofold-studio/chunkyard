@@ -2,9 +2,9 @@
 
 Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust). Kinds: U unit, P property, I crate integration, A API integration (`TestApp` + fake-mc), C component, E E2E, F fuzz. Fake server commands used: `save-off`, `save-on`, `save-all flush`, `list`, `say`, `fakejoin`, `fakechat` ([fake-server.md](../../testing/fake-server.md)).
 
-**Time:** `FakeClock`/paused time only for pure-logic tests that use in-memory fakes of the core traits (`FakeServerService`, `RecordingCommandSink`, `FakeBackupService`, `FakePlayerCountSource` from `mcm-testkit`). Every test that runs `fake-mc-server` uses real time with shortened timeouts injected via `test-hooks` (e.g. `save_done_timeout_s = 1`, `starting_wait_s = 2`).
+**Time:** `FakeClock`/paused time only for pure-logic tests that use in-memory fakes of the core traits (`FakeServerService`, `RecordingCommandSink`, `FakeBackupService`, `FakePlayerCountSource` from `chunkyard-testkit`). Every test that runs `fake-mc-server` uses real time with shortened timeouts injected via `test-hooks` (e.g. `save_done_timeout_s = 1`, `starting_wait_s = 2`).
 
-## mcm-backup
+## chunkyard-backup
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
@@ -20,9 +20,9 @@ Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust
 | `pipeline_memory_bounded_for_large_tree` (2 GiB sparse files, assert peak RSS delta < 96 MiB) | `tests/pipeline.rs` | 05 | I |
 | `pipeline_sha256_matches_stored_object` | `tests/pipeline.rs` | 05, 10 | I |
 | `hot_backup_sends_save_off_flush_on_in_order` | `tests/hot.rs` (`RecordingCommandSink`) | 06 | I |
-| `hot_backup_with_fake_mc_paper_and_vanilla_formats` (real `ServerCommandSink` from mcm-process, fake-mc `flavor=paper`/`vanilla`, real time) | `p6_hot_backup.rs` (mcm-api-tests) | 06 | A |
-| `hot_backup_ignores_chat_saved_the_game_spoof` (`fakechat Mallory Saved the game` + `say Saved the game` before the real line; archive must start only after the real line) | `p6_hot_backup.rs` (mcm-api-tests) | 06, Sec | A |
-| `save_done_custom_body_pattern_keeps_prefix_check` | `p6_hot_backup.rs` (mcm-api-tests) | 06 | A |
+| `hot_backup_with_fake_mc_paper_and_vanilla_formats` (real `ServerCommandSink` from chunkyard-process, fake-mc `flavor=paper`/`vanilla`, real time) | `p6_hot_backup.rs` (chunkyard-api-tests) | 06 | A |
+| `hot_backup_ignores_chat_saved_the_game_spoof` (`fakechat Mallory Saved the game` + `say Saved the game` before the real line; archive must start only after the real line) | `p6_hot_backup.rs` (chunkyard-api-tests) | 06, Sec | A |
+| `save_done_custom_body_pattern_keeps_prefix_check` | `p6_hot_backup.rs` (chunkyard-api-tests) | 06 | A |
 | `hot_backup_waits_for_saved_line_before_archiving` | `tests/hot.rs` | 06 | I |
 | `hot_backup_save_on_sent_when_archive_fails` (fault-injecting `StorageTarget`) | `tests/hot.rs` | 07 | I |
 | `hot_backup_save_on_sent_when_job_cancelled` | `tests/hot.rs` | 07 | I |
@@ -60,7 +60,7 @@ Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust
 | `restore_skips_legacy_mcm_dir_entries` | `tests/restore.rs` | 20, 41 | I |
 | `prop_manifest_parse_never_panics` | `src/manifest.rs` | 41 | P |
 
-## mcm-worlds
+## chunkyard-worlds
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
@@ -74,9 +74,9 @@ Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust
 | `world_delete_moves_group_to_state_trash` | `tests/worlds.rs` | 40 | I |
 | `world_download_running_holds_save_pause_guard` (`FakeSavePause` records acquire/release) | `tests/worlds.rs` | 36 | I |
 
-## mcm-scheduler
+## chunkyard-scheduler
 
-Engine/steps tests use `FakeClock` + `tokio::time::pause()` with in-memory fakes (`RecordingCommandSink`, `FakeServerService`, `FakeBackupService`, `FakePlayerCountSource`) — no real processes. Fake-mc coverage of steps is in `mcm-api-tests/p6_schedules.rs` with real time.
+Engine/steps tests use `FakeClock` + `tokio::time::pause()` with in-memory fakes (`RecordingCommandSink`, `FakeServerService`, `FakeBackupService`, `FakePlayerCountSource`) — no real processes. Fake-mc coverage of steps is in `chunkyard-api-tests/p6_schedules.rs` with real time.
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
@@ -113,7 +113,7 @@ Engine/steps tests use `FakeClock` + `tokio::time::pause()` with in-memory fakes
 | `history_retention_keeps_last_50` | `tests/runs.rs` | 30 | I |
 | `server_delete_cancels_runs_and_removes_schedules` | `tests/runs.rs` | 32 | I |
 
-## mcm-api-tests (`crates/mcm-api-tests/tests/p6_*.rs`)
+## chunkyard-api-tests (`crates/chunkyard-api-tests/tests/p6_*.rs`)
 
 | Test | File | FR | Kind |
 |---|---|---|---|

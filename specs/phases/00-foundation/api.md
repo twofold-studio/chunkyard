@@ -58,7 +58,7 @@ type Job = { id: string; kind: string; serverId: string | null;
              error: { code: string; detail: string } | null; result: unknown | null;
              createdBy: string | null; createdAt: string; startedAt: string | null; finishedAt: string | null };
 type AuditEntry = { id: number; ts: string; actor: { userId: string | null; username: string | null; tokenId: string | null; ip: string | null };
-                    action: AuditAction /* enum from mcm_core::audit::Action */; target: { type: string; id: string } | null; serverId: string | null;
+                    action: AuditAction /* enum from chunkyard_core::audit::Action */; target: { type: string; id: string } | null; serverId: string | null;
                     outcome: "success" | "failure"; details: Record<string, unknown> | null };
 type SystemInfo = { version: string; gitSha: string; buildDate: string; uptimeS: number;
                     platform: { os: string; arch: string; libc: "glibc" | "musl" | "unknown" };
@@ -81,7 +81,7 @@ Envelope per [api-conventions](../../architecture/api-conventions.md#envelope). 
 
 Close codes: `1008` auth expired/revoked, `1013` outbound queue overflow, `1001` server shutdown.
 
-## Events (`mcm_core::events::Event`)
+## Events (`chunkyard_core::events::Event`)
 
 | Variant | Emitted when |
 |---|---|
@@ -96,7 +96,7 @@ Close codes: `1008` auth expired/revoked, `1013` outbound queue overflow, `1001`
 
 ## DB migration
 
-File: `crates/mcm-db/migrations/<NNNN>_p0_foundation.sql`
+File: `crates/chunkyard-db/migrations/<NNNN>_p0_foundation.sql`
 
 ```sql
 CREATE TABLE users (

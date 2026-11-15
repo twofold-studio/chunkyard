@@ -2,12 +2,12 @@
 
 Conventions: [patterns.md](../../architecture/patterns.md). Every FR lists crates, permission, audit action ([audit catalog](../../architecture/audit.md)) and events. Pipeline details: [import-pipeline.md](import-pipeline.md).
 
-`mcm-modplatforms` depends on `mcm-core`, `mcm-fs`, `mcm-installers`, `mcm-download` only ([workspace-layout.md](../../architecture/workspace-layout.md)). Persistence goes through core repo traits (`PackImportRepo`, `ContentRepo`, `PendingDownloadRepo`, impls in `mcm-db`); all HTTP (API calls and file downloads) goes through `mcm_download::SafeHttp` / `Downloader` and its content-addressed cache.
+`chunkyard-modplatforms` depends on `chunkyard-core`, `chunkyard-fs`, `chunkyard-installers`, `chunkyard-download` only ([workspace-layout.md](../../architecture/workspace-layout.md)). Persistence goes through core repo traits (`PackImportRepo`, `ContentRepo`, `PendingDownloadRepo`, impls in `chunkyard-db`); all HTTP (API calls and file downloads) goes through `chunkyard_download::SafeHttp` / `Downloader` and its content-addressed cache.
 
-## Crate structure (`mcm-modplatforms`)
+## Crate structure (`chunkyard-modplatforms`)
 
 ```
-crates/mcm-modplatforms/src/
+crates/chunkyard-modplatforms/src/
 ├── lib.rs
 ├── platform.rs            # ModPlatform trait, Platform enum, ProjectKind, common models
 ├── error.rs               # ModPlatformError (thiserror) + Classify
@@ -47,8 +47,8 @@ Platform-specific extras (fingerprints, `version_files`) are inherent methods on
 |---|---|---|---|---|---|
 | P4-FR-01 | CurseForge API key resolved from env `CHUNKYARD_INTEGRATIONS__CURSEFORGE_API_KEY` > config > setting `integrations.curseforge_api_key` (encrypted). Admin can set/clear the setting and run a test call (`GET /v1/games/432`). Status reports `configured`, `source` (`env`/`config`/`settings`), `lastCheck`. Key never returned by any endpoint. | modplatforms, api, config | admin | `integrations.curseforge.update` (details `op: set|clear`) | — |
 | P4-FR-02 | Any CF-backed endpoint without a key → `424 curseforge.api_key_missing`; CF `401/403` → `424 curseforge.api_key_invalid`. Modrinth/Hangar work without keys. | modplatforms, api | — | — | — |
-| P4-FR-03 | All clients use `mcm_download::SafeHttp` (SSRF-safe, IP-pinned) and send `User-Agent: mcm/<version> (+<user_agent_contact>)`, timeout 20 s, retry idempotent GETs 3× on 5xx/timeouts (backoff 0.5/1/2 s), honour `429` `Retry-After` up to 30 s then fail `upstream.rate_limited`. Modrinth client tracks `X-Ratelimit-Remaining` and pre-emptively waits when < 5. | modplatforms, download | — | — | — |
-| P4-FR-04 | Metadata responses cached in `cache/meta/` (via `mcm-download`'s cache, TTL per entry) keyed by URL+key-hash: search 5 min, project/versions 15 min, file/version by id 24 h. | modplatforms, download | — | — | — |
+| P4-FR-03 | All clients use `chunkyard_download::SafeHttp` (SSRF-safe, IP-pinned) and send `User-Agent: mcm/<version> (+<user_agent_contact>)`, timeout 20 s, retry idempotent GETs 3× on 5xx/timeouts (backoff 0.5/1/2 s), honour `429` `Retry-After` up to 30 s then fail `upstream.rate_limited`. Modrinth client tracks `X-Ratelimit-Remaining` and pre-emptively waits when < 5. | modplatforms, download | — | — | — |
+| P4-FR-04 | Metadata responses cached in `cache/meta/` (via `chunkyard-download`'s cache, TTL per entry) keyed by URL+key-hash: search 5 min, project/versions 15 min, file/version by id 24 h. | modplatforms, download | — | — | — |
 
 ### Browse
 
@@ -64,7 +64,7 @@ Platform-specific extras (fingerprints, `version_files`) are inherent methods on
 |---|---|---|---|---|---|
 | P4-FR-08 | `POST /servers/import-pack` and `POST /servers` with `source.kind = "pack"` ([server-api.md](../../architecture/server-api.md)) are equivalent: both create a server record (state `Installing`) and job `pack.import` from `{platform, projectId, fileId}` (Modrinth: `fileId` = version id) or `{uploadId}`, and both return the same `202 { server, job, warnings }`. | modplatforms, api, core | `server.create` | `pack.import` | `ServerCreated`, job events |
 | P4-FR-09 | CurseForge: if the chosen file is itself `isServerPack`, or has `serverPackFileId`, use the **server-pack flow**; otherwise the **client-pack conversion flow**. User may force client-pack conversion (`preferServerPack=false`) because some server packs are stale/broken. | modplatforms | — | — | — |
-| P4-FR-10 | Server-pack flow (unless P4-FR-30 triggers the fallback): download zip (hash-verified), extract via `mcm-fs` with archive limits, strip a single top-level directory, detect MC version + loader (detection order in [import-pipeline.md](import-pipeline.md#loader-detection)), install loader via phase-3 `Installer`, discard pack-bundled loader artifacts we replace, keep `mods/`, `config/`, `defaultconfigs/`, `kubejs/`, etc. Pack scripts are copied but never executed and are listed in the import report. | modplatforms, installers, fs, download | — | — | — |
+| P4-FR-10 | Server-pack flow (unless P4-FR-30 triggers the fallback): download zip (hash-verified), extract via `chunkyard-fs` with archive limits, strip a single top-level directory, detect MC version + loader (detection order in [import-pipeline.md](import-pipeline.md#loader-detection)), install loader via phase-3 `Installer`, discard pack-bundled loader artifacts we replace, keep `mods/`, `config/`, `defaultconfigs/`, `kubejs/`, etc. Pack scripts are copied but never executed and are listed in the import report. | modplatforms, installers, fs, download | — | — | — |
 | P4-FR-11 | Client-pack conversion: parse `manifest.json`, batch-resolve files (`POST /v1/mods/files`, `POST /v1/mods`), skip `required=false` files unless user opted in, download direct files, run client-only detection (P4-FR-14), copy `overrides/` (name from manifest). | modplatforms | — | — | — |
 | P4-FR-12 | `.mrpack` import (API or upload): validate index, skip `env.server == "unsupported"`, include `optional` by default (user can deselect in plan preview), download from allow-listed hosts only, verify `sha512` (and `sha1`), apply `overrides/` then `server-overrides/` (later wins), install loader from `dependencies`. | modplatforms, fs, installers | — | — | — |
 | P4-FR-13 | Before execution the job computes an **import plan** (files, sizes, loader, MC version, Java major, client-only suspects, manual downloads) stored in `pack_imports.plan` and visible via API while the job runs. | modplatforms | `server.view` | — | — |
@@ -76,7 +76,7 @@ Platform-specific extras (fingerprints, `version_files`) are inherent methods on
 | P4-FR-19 | Import sets server defaults: flavor/loader/mc version from detection, Java via phase-3 auto-selection (`java: {mode:"auto"}` unless given), EULA per phase-2 flow (`acceptEula` in request). **Memory:** the pack suggestion (4096 MiB for > 50 mods, 6144 for > 150) applies **only when the request leaves `memoryMaxMb`/`memoryMinMb` unset**; an explicit value always wins, and if it is below the suggestion the response carries warning `pack.memory_below_suggestion`. | modplatforms, installers | — | — | — |
 | P4-FR-20 | Cancelling `pack.import` deletes the partially-created server dir and record (unless `keepOnFailure=true`); failure keeps the server in `Stopped` with `install_failed` note and `<data>/state/<id>/install.log`. | modplatforms, core | — | `pack.import.cancel` | — |
 | P4-FR-30 | **Starter-dependent server packs fall back to client-pack conversion.** A server pack is classified `starter` when any holds: ServerStarter `server-setup-config.yaml` at root; a top-level script (`startserver.sh`, `start.sh`, `ServerStart.sh`, `*.bat`) containing install/download markers (`curl`, `wget`, `Invoke-WebRequest`, `serverstarter`, `-jar .*installer.*\.jar`, `--installServer`) — Forge-generated `run.sh` (only `java @user_jvm_args.txt @libraries/…`) is **not** a marker; or `mods/` holds < 3 jars while the client manifest lists ≥ 10 required files. Then, if the client manifest is available (API-sourced import), the job switches to the client-pack conversion flow and records warning `pack.server_pack_starter_fallback` (plan, job result, import report). Uploaded server packs without a client manifest fail with `422 pack.server_pack_starter_unsupported` (hint: import via CurseForge browse). Rules in [import-pipeline.md](import-pipeline.md#starter-detection). | modplatforms | — | — | — |
-| P4-FR-31 | **Pack metadata is untrusted input.** `manifest.json`, `modrinth.index.json`, `variables.txt`, pack `server.properties`, and any `mcm-backup.json`/launcher files inside packs are parsed with size caps (manifest/index ≤ 8 MiB, properties ≤ 1 MiB), paths only via `RelPath`, unknown fields ignored. The `LaunchSpec` is always derived by the phase-3 `Installer` (incl. its run-script parser) — never `Custom`, never taken from pack files; Java paths in packs are ignored (re-resolved by mcm). | modplatforms, fs, installers | — | — | — |
+| P4-FR-31 | **Pack metadata is untrusted input.** `manifest.json`, `modrinth.index.json`, `variables.txt`, pack `server.properties`, and any `chunkyard-backup.json`/launcher files inside packs are parsed with size caps (manifest/index ≤ 8 MiB, properties ≤ 1 MiB), paths only via `RelPath`, unknown fields ignored. The `LaunchSpec` is always derived by the phase-3 `Installer` (incl. its run-script parser) — never `Custom`, never taken from pack files; Java paths in packs are ignored (re-resolved by mcm). | modplatforms, fs, installers | — | — | — |
 
 ### Content management
 
@@ -102,7 +102,7 @@ CurseForge lets authors disable third-party distribution. mcm **must not** downl
 |---|---|
 | Server pack zip has nested `ServerFiles-1.2/` dir | Strip single top-level dir if it's the only entry at root |
 | Server pack contains a full Forge install (`libraries/`, `run.sh`) | Detect version from `libraries/net/minecraftforge/forge/<mc>-<ver>/`; re-run installer anyway (ensures integrity) unless args file + all libraries present and the user chose `reuseBundledLoader` |
-| Server pack contains `server.properties`, `eula.txt` | `server.properties` merged: pack values kept except mcm-managed keys (`server-port`; RCON/management keys once P5 manages them; `server-ip` for router-only servers); `eula.txt` from pack ignored (EULA is the user's decision) |
+| Server pack contains `server.properties`, `eula.txt` | `server.properties` merged: pack values kept except chunkyard-managed keys (`server-port`; RCON/management keys once P5 manages them; `server-ip` for router-only servers); `eula.txt` from pack ignored (EULA is the user's decision) |
 | ServerStarter / script-installer server pack | P4-FR-30 fallback to client conversion; warning in report |
 | Server pack missing mods present in client manifest | Not reconciled; server pack is authoritative |
 | Manifest loader id formats | `forge-47.2.0`, `neoforge-21.1.77`, `fabric-0.15.11`, `quilt-0.26.0`; NeoForge 1.20.1 packs may say `neoforge-47.1.x` → maps to artifact `net.neoforged:forge` (phase-3 installer handles) |
@@ -111,7 +111,7 @@ CurseForge lets authors disable third-party distribution. mcm **must not** downl
 | Hash mismatch | Retry download once; then fail file → job fails `download.hash_mismatch` |
 | Modrinth download URL host not allow-listed | Skip file, error `download.host_not_allowed`; required file → job fails |
 | `.mrpack` `path` escapes (`../`, absolute, `C:`) | `RelPath` rejects → `pack.invalid_manifest` |
-| Overrides contain symlinks or > limits | Rejected by `mcm-fs` archive extractor (phase 2 limits) |
+| Overrides contain symlinks or > limits | Rejected by `chunkyard-fs` archive extractor (phase 2 limits) |
 | Two files map to same path | Last wins, warning in report |
 | Pack > 2 GiB or > 5000 files | `413 pack.too_large` |
 | CF key revoked mid-import | Job fails `curseforge.api_key_invalid`; already-downloaded files stay in cache |

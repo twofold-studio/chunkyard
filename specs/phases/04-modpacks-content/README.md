@@ -8,7 +8,7 @@ Create a working server from a CurseForge or Modrinth modpack in a few clicks, a
 
 | In | Detail |
 |---|---|
-| `mcm-modplatforms` crate | `ModPlatform` trait + `CurseForgeClient`, `ModrinthClient`, `HangarClient`; pack importers; jar metadata reader; client-only detection |
+| `chunkyard-modplatforms` crate | `ModPlatform` trait + `CurseForgeClient`, `ModrinthClient`, `HangarClient`; pack importers; jar metadata reader; client-only detection |
 | CurseForge packs | Server-pack flow (`serverPackFileId`), client-pack conversion flow (`manifest.json`), manual-download flow for files with distribution disabled |
 | Modrinth packs | `.mrpack` import from Modrinth API or upload |
 | Uploaded packs | CurseForge zip or `.mrpack` uploaded via the phase 2 chunked upload |
@@ -45,8 +45,8 @@ Create a working server from a CurseForge or Modrinth modpack in a few clicks, a
 |---|---|
 | [0](../00-foundation/README.md) | Jobs, audit, settings table + secret encryption, auth |
 | [1](../01-lifecycle-console/README.md) | Server entity, supervisor (start blocked while pending downloads) |
-| [2](../02-settings-files/README.md) | `mcm-fs` `SandboxRoot`, archive extraction with limits, chunked uploads (`uploadId`), EULA handling |
-| [3](../03-java-installers/README.md) | `Installer` trait for Forge/NeoForge/Fabric/Quilt/vanilla, `LaunchSpec` (incl. run-script parsing), Java auto-selection; `mcm-download` downloader + cache |
+| [2](../02-settings-files/README.md) | `chunkyard-fs` `SandboxRoot`, archive extraction with limits, chunked uploads (`uploadId`), EULA handling |
+| [3](../03-java-installers/README.md) | `Installer` trait for Forge/NeoForge/Fabric/Quilt/vanilla, `LaunchSpec` (incl. run-script parsing), Java auto-selection; `chunkyard-download` downloader + cache |
 
 ## Files
 

@@ -41,7 +41,7 @@ export const test = base.extend<{ mcm: McmInstance }>({
 
 ## Real-server smoke suite (opt-in)
 
-Rust tests in `crates/mcm-server/tests/smoke_*.rs`, compiled only with `--features smoke`, run only when `CHUNKYARD_SMOKE=1`:
+Rust tests in `crates/chunkyard-server/tests/smoke_*.rs`, compiled only with `--features smoke`, run only when `CHUNKYARD_SMOKE=1`:
 
 | Test | Does |
 |---|---|
@@ -54,7 +54,7 @@ Rust tests in `crates/mcm-server/tests/smoke_*.rs`, compiled only with `--featur
 | `smoke_legacy_1_12_2_java8` | Java 8 selection, start/stop |
 | `smoke_curseforge_server_pack` | Requires `CHUNKYARD_CURSEFORGE_API_KEY`; imports a small known pack |
 | `smoke_mrpack_import` | Imports a small Modrinth pack |
-| `smoke_capture_log_fixtures` | For vanilla, paper, fabric, forge, neoforge, velocity: start, run `say Done (1.0s)! For help, type "help"` and `say Alice joined the game` (spoof attempts via the `[Server]` broadcast path), `save-all flush`, stop; write the console output to `target/log-fixtures/<flavour>-<ver>.log` for review and commit into `crates/mcm-protocol/tests/fixtures/logs/`. Player-chat lines (needs a real client) are added by hand from a manual session and marked `# manual` in the fixture |
+| `smoke_capture_log_fixtures` | For vanilla, paper, fabric, forge, neoforge, velocity: start, run `say Done (1.0s)! For help, type "help"` and `say Alice joined the game` (spoof attempts via the `[Server]` broadcast path), `save-all flush`, stop; write the console output to `target/log-fixtures/<flavour>-<ver>.log` for review and commit into `crates/chunkyard-protocol/tests/fixtures/logs/`. Player-chat lines (needs a real client) are added by hand from a manual session and marked `# manual` in the fixture |
 | `smoke_fake_parity` | Runs the shared lifecycle scenario against real Paper and asserts identical observable events as with fake-mc |
 
 Runtime budget ≈ 30 min; uses a persistent download cache in CI (`actions/cache` keyed by week).

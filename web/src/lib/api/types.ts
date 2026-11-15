@@ -1,5 +1,5 @@
 /**
- * Wire types mirroring the Rust DTOs in crates/mcm-core and crates/mcm-api.
+ * Wire types mirroring the Rust DTOs in crates/chunkyard-core and crates/chunkyard-api.
  * Keep these in sync with docs/http-api.md and docs/docker.md.
  */
 

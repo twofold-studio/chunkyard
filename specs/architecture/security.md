@@ -44,7 +44,7 @@ Consequences (enforced from P8, documented from P1):
 
 ## JVM arguments
 
-- **Non-admins** (any runtime): every arg must match the vetted allow-list in `crates/mcm-core/data/jvm_allowlist.toml`, each entry a regex for the full token:
+- **Non-admins** (any runtime): every arg must match the vetted allow-list in `crates/chunkyard-core/data/jvm_allowlist.toml`, each entry a regex for the full token:
   - GC/tuning: `-XX:[+-](UseG1GC|UseZGC|ZGenerational|UseShenandoahGC|UseParallelGC|ParallelRefProcEnabled|DisableExplicitGC|AlwaysPreTouch|PerfDisableSharedMem|UnlockExperimentalVMOptions|UseStringDeduplication|UseCompactObjectHeaders)`; `-XX:(MaxGCPauseMillis|G1NewSizePercent|G1MaxNewSizePercent|G1HeapRegionSize|G1ReservePercent|G1HeapWastePercent|G1MixedGCCountTarget|G1MixedGCLiveThresholdPercent|G1RSetUpdatingPauseTimePercent|InitiatingHeapOccupancyPercent|SurvivorRatio|MaxTenuringThreshold|ActiveProcessorCount|MaxMetaspaceSize|ReservedCodeCacheSize)=[0-9]+[kKmMgG]?`; `-Xss[0-9]+[kKmM]`.
   - `-D` only for vetted keys with value regexes: `file.encoding`, `user.timezone`, `java.net.preferIPv4Stack`, `log4j2.formatMsgNoLookups`, `using.aikars.flags`, `aikars.new.flags`, `terminal.jline`, `terminal.ansi`, `IReallyKnowWhatIAmDoingISwear`, `paper.disableChannelLimit`.
   - `-Xms`/`-Xmx` are rejected in `jvmArgs` (use memory fields: `settings.memory_in_jvm_args`); everything else → `422 settings.jvm_arg_not_allowed` naming the token.
@@ -55,7 +55,7 @@ Consequences (enforced from P8, documented from P1):
 
 Everything under `<data>/servers/<id>/` is writable by users (files, uploads, packs, restores) and is **untrusted input** to mcm:
 - mcm state (pid, console logs, crash logs, install log, trash metadata, shim sockets) lives in `<data>/state/<id>/` ([filesystem-layout.md](filesystem-layout.md)).
-- Backup manifests (`mcm-backup.json`) and pack metadata read from archives are parsed as untrusted: paths via `RelPath`, `LaunchSpec::Custom` rejected, Java paths ignored (re-resolved by mcm), unknown fields ignored, size-capped.
+- Backup manifests (`chunkyard-backup.json`) and pack metadata read from archives are parsed as untrusted: paths via `RelPath`, `LaunchSpec::Custom` rejected, Java paths ignored (re-resolved by mcm), unknown fields ignored, size-capped.
 - Vendor scripts are parsed, never executed.
 
 ## Secret properties
@@ -64,7 +64,7 @@ Keys marked `secret` in the properties schema (`rcon.password`, `management-serv
 
 ## Outbound HTTP (SSRF)
 
-`mcm_download::SafeHttp` is the **only** outbound HTTP client (P1 onward): installers, packs, Java, webhooks, custom URLs, Mojang profile lookups.
+`chunkyard_download::SafeHttp` is the **only** outbound HTTP client (P1 onward): installers, packs, Java, webhooks, custom URLs, Mojang profile lookups.
 - Custom DNS resolver: resolves, then rejects loopback, private (RFC 1918), CGNAT 100.64/10, link-local, ULA `fc00::/7`, multicast, unspecified, and IPv4-mapped forms of these unless `security.allow_private_targets = true` (or the URL matches a configured test base URL under `test-hooks`).
 - **IP pinning**: the vetted address is used for the connection (no second resolution → no DNS rebinding).
 - Redirects followed manually (max 5), re-validating scheme (HTTPS only, except test hooks) and target IP per hop.
@@ -75,7 +75,7 @@ Keys marked `secret` in the properties schema (`rcon.password`, `management-serv
 - When a server is reachable through the router (P7) or relay (P9) and its backend does not accept PROXY protocol, every player appears as `127.0.0.1`/the relay address. The Network tab and players page show a warning ("IP bans and IP-based plugins will not work").
 - `ban-ip`/`pardon-ip` (P2) rejects loopback (`127.0.0.0/8`, `::1`), unspecified, and configured relay/trusted-proxy addresses: `422 players.ban_ip_forbidden`.
 
-## SandboxRoot (path safety) — `mcm-fs`
+## SandboxRoot (path safety) — `chunkyard-fs`
 
 ```rust
 pub struct SandboxRoot { root: PathBuf /* canonicalized */ }
@@ -107,7 +107,7 @@ Trash: deletes move items to `<data>/state/<id>/trash/` (with metadata there). I
 | `Cross-Origin-Opener-Policy` | `same-origin` |
 | `Strict-Transport-Security` | only when mcm terminates TLS |
 
-- SvelteKit `kit.csp = { mode: "hash" }` hashes its inline bootstrap; the build emits those hashes, and `mcm-server` reads them from the built `index.html` meta at startup to put in the header (single source).
+- SvelteKit `kit.csp = { mode: "hash" }` hashes its inline bootstrap; the build emits those hashes, and `chunkyard-server` reads them from the built `index.html` meta at startup to put in the header (single source).
 - `style-src 'unsafe-inline'` is required by CodeMirror 6 and xterm.js (dynamic `style` attributes). No inline `<script>` beyond SvelteKit's.
 - `mode-watcher`: its inline head script is disabled (`disableHeadScriptInjection`, to verify); theme is applied by `/theme-init.js`, a static same-origin file referenced from `app.html`.
 - E2E asserts zero CSP violations on every page ([../testing/e2e.md](../testing/e2e.md)).

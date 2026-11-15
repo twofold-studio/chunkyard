@@ -1,6 +1,6 @@
-# Phase 3 — Installer reference (`mcm-installers`)
+# Phase 3 — Installer reference (`chunkyard-installers`)
 
-Every upstream sits behind a trait (`MojangApi`, `PaperApi` (fill v3; also used for Velocity/Waterfall), `PurpurApi`, `FabricMetaApi`, `QuiltMetaApi`, `MavenApi`, `JenkinsApi`) whose impl is built on `mcm_download::SafeHttp` and takes a `base_url` (overridable only under the `test-hooks` feature; wiremock in tests). All requests send `User-Agent: mcm/<version> (+<integrations.user_agent_contact>)`. Metadata responses cached in `<data>/cache/meta/` (TTL: manifests 10 min, build lists 10 min, maven metadata 1 h; stale cache served with a warning if upstream fails).
+Every upstream sits behind a trait (`MojangApi`, `PaperApi` (fill v3; also used for Velocity/Waterfall), `PurpurApi`, `FabricMetaApi`, `QuiltMetaApi`, `MavenApi`, `JenkinsApi`) whose impl is built on `chunkyard_download::SafeHttp` and takes a `base_url` (overridable only under the `test-hooks` feature; wiremock in tests). All requests send `User-Agent: mcm/<version> (+<integrations.user_agent_contact>)`. Metadata responses cached in `<data>/cache/meta/` (TTL: manifests 10 min, build lists 10 min, maven metadata 1 h; stale cache served with a warning if upstream fails).
 
 ## Core types
 
@@ -22,15 +22,15 @@ pub struct InstallPlan {           // pure data, produced by plan(), shown to us
     async fn plan(&self, req: &InstallRequest) -> Result<InstallPlan, InstallerError>;
     async fn execute(&self, plan: &InstallPlan, ctx: &InstallCtx) -> Result<LaunchSpec, InstallerError>;
 }
-pub struct InstallCtx { staging: SandboxRoot, java: JavaRuntime, downloader: Arc<dyn Downloader> /* mcm-core trait, impl mcm-download */,
-    runner: Arc<dyn CommandRunner> /* mcm-core trait, impl in mcm-process */, progress: ProgressSink, log: LogSink, cancel: CancellationToken }
+pub struct InstallCtx { staging: SandboxRoot, java: JavaRuntime, downloader: Arc<dyn Downloader> /* chunkyard-core trait, impl chunkyard-download */,
+    runner: Arc<dyn CommandRunner> /* chunkyard-core trait, impl in chunkyard-process */, progress: ProgressSink, log: LogSink, cancel: CancellationToken }
 ```
 
 `GameVersion { id, kind: Release|Snapshot|OldBeta|OldAlpha, release_time, server_available: bool }`. `LoaderBuild { id, stable: bool, recommended: bool, released_at: Option }`.
 
-## Downloader (`mcm-download`, shared)
+## Downloader (`chunkyard-download`, shared)
 
-Implemented once in `mcm-download::HttpDownloader` (consumed by `mcm-installers`, `mcm-java`, later `mcm-modplatforms`); all traffic through `SafeHttp`.
+Implemented once in `chunkyard-download::HttpDownloader` (consumed by `chunkyard-installers`, `chunkyard-java`, later `chunkyard-modplatforms`); all traffic through `SafeHttp`.
 
 - Cache dir `<data>/cache/downloads/<algo>-<hex>`; lookup by expected hash before network; unhashed downloads stored under their computed sha256 after download (dedupe only).
 - Stream to `<data>/tmp/dl-<uuid>.part`, hashing incrementally; verify size + hash; rename into cache; then hard-link (fallback copy) into staging.
@@ -163,7 +163,7 @@ Output renamed to `proxy.jar`; launch `Jar { "proxy.jar" }`; owned paths `proxy.
 
 ## Installer subprocess rules
 
-- Run via `CommandRunner` (implemented by `mcm-process`): own process group, env cleared except `PATH`, `HOME=<staging>`, `LANG=C.UTF-8`; selected Java; stdout+stderr lines → job `message` (last line), server console ring as `System` lines prefixed `[install] `, and `<data>/state/<id>/install.log`.
+- Run via `CommandRunner` (implemented by `chunkyard-process`): own process group, env cleared except `PATH`, `HOME=<staging>`, `LANG=C.UTF-8`; selected Java; stdout+stderr lines → job `message` (last line), server console ring as `System` lines prefixed `[install] `, and `<data>/state/<id>/install.log`.
 - Cancellation or 20 min timeout → `killpg` SIGTERM, 10 s, SIGKILL; staging deleted.
 - Exit code ≠ 0 → `installer.process_failed` with the last 20 log lines in `error_detail`.
 - The installer itself downloads libraries from `libraries.minecraft.net` / maven repos — outside mcm's allow-list (documented limitation; the Docker runtime in P10 can restrict egress).

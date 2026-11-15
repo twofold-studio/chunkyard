@@ -8,9 +8,9 @@ Let users configure a server without SSH: a typed `server.properties` editor, ge
 
 | Area | Included |
 |---|---|
-| `mcm-fs` | `SandboxRoot` (no-follow, openat-style), file ops, trash (in `<data>/state/<id>/trash/`), archive create/extract with limits + free-space precheck, streaming zip writer, `.properties` lossless parser/writer + secret redaction, managed-key registry, player-list JSON editors, chunked upload store |
-| `mcm-download` | Mojang profile client (`MojangProfiles` impl over `SafeHttp`) |
-| `mcm-core` | JVM-arg allow-list data + `JvmArgPolicy`, new service traits |
+| `chunkyard-fs` | `SandboxRoot` (no-follow, openat-style), file ops, trash (in `<data>/state/<id>/trash/`), archive create/extract with limits + free-space precheck, streaming zip writer, `.properties` lossless parser/writer + secret redaction, managed-key registry, player-list JSON editors, chunked upload store |
+| `chunkyard-download` | Mojang profile client (`MojangProfiles` impl over `SafeHttp`) |
+| `chunkyard-core` | JVM-arg allow-list data + `JvmArgPolicy`, new service traits |
 | Settings | P2 rows of the `PATCH /servers/{id}` contract ([server-api.md](../../architecture/server-api.md)): memory with host-RAM check, JVM args (allow-list for non-admins, free-form + warning for admins), env, port, launch |
 | Properties | Schema-driven typed editor (incl. 1.21.9 `management-server-*` keys), unknown keys as raw strings, managed keys read-only (P2: `server-port` only), secret values redacted without `console.write`, "restart required" indicator |
 | EULA | `GET`/`POST` EULA endpoints and UI (phase 1 has the minimal POST) |
@@ -45,8 +45,8 @@ Let users configure a server without SSH: a typed `server.properties` editor, ge
 ## Dependencies
 
 - [Phase 0](../00-foundation/README.md): auth, jobs, audit, problem+json, OpenAPI pipeline.
-- [Phase 1](../01-lifecycle-console/README.md): `servers` table, `ServerHandle` (send command, status), console ring, minimal EULA POST, `mcm-download::SafeHttp`, `<data>/state/<id>/` state dir.
-- Architecture: [security.md § SandboxRoot](../../architecture/security.md#sandboxroot-path-safety--mcm-fs), [patterns.md](../../architecture/patterns.md), [filesystem-layout.md](../../architecture/filesystem-layout.md).
+- [Phase 1](../01-lifecycle-console/README.md): `servers` table, `ServerHandle` (send command, status), console ring, minimal EULA POST, `chunkyard-download::SafeHttp`, `<data>/state/<id>/` state dir.
+- Architecture: [security.md § SandboxRoot](../../architecture/security.md#sandboxroot-path-safety--chunkyard-fs), [patterns.md](../../architecture/patterns.md), [filesystem-layout.md](../../architecture/filesystem-layout.md).
 
 ## Files in this phase
 
@@ -57,7 +57,7 @@ Let users configure a server without SSH: a typed `server.properties` editor, ge
 - [ ] All `P2-FR-*` implemented; every FR has passing tests listed in [tests.md](tests.md).
 - [ ] Fuzz targets `sandbox_resolve`, `zip_extract`, `tar_extract`, `properties_parse` exist and pass the 60 s CI smoke.
 - [ ] Proptests: sandbox never escapes; properties round-trip is byte-identical for unmodified files.
-- [ ] Coverage ≥ 95 % for `mcm-fs::sandbox`, `mcm-fs::archive`, `mcm-fs::properties`.
+- [ ] Coverage ≥ 95 % for `chunkyard-fs::sandbox`, `chunkyard-fs::archive`, `chunkyard-fs::properties`.
 - [ ] Secret redaction verified on properties API, file read, download and zip download for a principal without `console.write`.
 - [ ] JVM-arg allow-list vectors (`testdata/validation/jvm_args.json`) pass in Rust and Vitest.
 - [ ] A 4 GiB upload interrupted mid-way resumes and completes in E2E (`p2-files.spec.ts`, using a sparse generated file).

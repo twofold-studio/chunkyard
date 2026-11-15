@@ -1,11 +1,11 @@
 # Audit log
 
-Catalog and types: `mcm-core::audit`. The `AuditService` trait is in `mcm-core`, implemented on top of `AuditRepo` (`mcm-db`) and wired in `mcm-server`. Table: `audit_log` ([data-model.md](data-model.md)).
+Catalog and types: `chunkyard-core::audit`. The `AuditService` trait is in `chunkyard-core`, implemented on top of `AuditRepo` (`chunkyard-db`) and wired in `chunkyard-server`. Table: `audit_log` ([data-model.md](data-model.md)).
 
 ## Naming
 
 - Format: `<area>.<object>.<verb>` or `<area>.<verb>`; segments match `[a-z][a-z_]*`; the **verb is always last**.
-- Every name below is a variant of `mcm_core::audit::Action`. Phase specs must use these exact strings; adding an action means adding it here and to the enum.
+- Every name below is a variant of `chunkyard_core::audit::Action`. Phase specs must use these exact strings; adding an action means adding it here and to the enum.
 - Failed attempts are recorded under the same action with `outcome = "failure"` (e.g. failed login = `auth.login` + failure), never under a separate name.
 - System-initiated actions (auto-start, crash restart, schedules, retention) use `actor_user_id = NULL` and `details.trigger` (`autostart`, `crash_restart`, `schedule:<id>`, `retention`).
 
@@ -32,7 +32,7 @@ Note: **event** names (notifications, bus events such as `server.crashed`, `back
 
 - `details` is built with `AuditDetails::builder()` using an **explicit allow-list of fields per action** defined next to the enum (e.g. `server.properties.update` → `changed_keys`, plus `values` only for keys not marked secret in the properties schema; `files.write` → `path`, `size`; `auth.login` → `username` on failure only).
 - Never included: request bodies, file contents, passwords, tokens, RCON/management secrets, webhook URLs, S3 credentials.
-- Test: `audit_details_only_contain_allow_listed_fields` (iterates all actions with a fuzzed input map) in `mcm-core`.
+- Test: `audit_details_only_contain_allow_listed_fields` (iterates all actions with a fuzzed input map) in `chunkyard-core`.
 
 ## Visibility
 

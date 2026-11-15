@@ -1,6 +1,6 @@
 # Phase 7 — API, WebSocket, migrations
 
-Conventions: [api-conventions.md](../../architecture/api-conventions.md). Paths under `/api/v1`. Handlers in `mcm-api/src/routes/{routes,network}.rs`; DTOs in `mcm-api::dto::network`.
+Conventions: [api-conventions.md](../../architecture/api-conventions.md). Paths under `/api/v1`. Handlers in `chunkyard-api/src/routes/{routes,network}.rs`; DTOs in `chunkyard-api::dto::network`.
 
 ## DTOs
 
@@ -70,11 +70,11 @@ Topic `network` (registered in [api-conventions.md](../../architecture/api-conve
 
 ## Core traits introduced
 
-| Trait (`mcm-core`) | Impl | Used by |
+| Trait (`chunkyard-core`) | Impl | Used by |
 |---|---|---|
-| `ServerNetworkInfo { backend_expects_proxy(ServerId) -> bool; real_ip_visible(ServerId) -> bool }` | `mcm-router` | `mcm-process` (ready SLP fallback), `mcm-metrics` (SLP fallback, players banner), `mcm-api` |
-| `RouteRepo`, `PortMappingRepo` | `mcm-db` | `mcm-router`, `mcm-portmap` |
-| `ServerFileAccess` (sandboxed read/write of a server-relative file) | `mcm-fs` | `mcm-router` (`paper-global.yml`) |
+| `ServerNetworkInfo { backend_expects_proxy(ServerId) -> bool; real_ip_visible(ServerId) -> bool }` | `chunkyard-router` | `chunkyard-process` (ready SLP fallback), `chunkyard-metrics` (SLP fallback, players banner), `chunkyard-api` |
+| `RouteRepo`, `PortMappingRepo` | `chunkyard-db` | `chunkyard-router`, `chunkyard-portmap` |
+| `ServerFileAccess` (sandboxed read/write of a server-relative file) | `chunkyard-fs` | `chunkyard-router` (`paper-global.yml`) |
 
 ## Config and settings
 
@@ -102,7 +102,7 @@ Warning codes (not errors): `real_ip_hidden`, `proxy.backend_unsupported`, `prox
 
 Numbers assigned at merge ([patterns.md §3](../../architecture/patterns.md#3-repository-pattern)).
 
-`crates/mcm-db/migrations/<NNNN>_p7_proxy_routes.sql`:
+`crates/chunkyard-db/migrations/<NNNN>_p7_proxy_routes.sql`:
 
 ```sql
 CREATE TABLE proxy_routes (
@@ -124,7 +124,7 @@ CREATE TABLE proxy_route_stats (
 );                                      -- flushed from memory every 60 s
 ```
 
-`crates/mcm-db/migrations/<NNNN>_p7_port_mappings.sql`:
+`crates/chunkyard-db/migrations/<NNNN>_p7_port_mappings.sql`:
 
 ```sql
 CREATE TABLE port_mappings (

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Opt-in smoke test against a real CLI daemon and the live Adoptium provider.
 
-Run after `cargo build -p mcm-server`: python3 scripts/smoke-backend.py
+Run after `cargo build -p chunkyard-server`: python3 scripts/smoke-backend.py
 Uses temporary credentials/storage; no secrets are printed. Downloads one JRE.
 """
 import http.cookiejar

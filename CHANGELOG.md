@@ -4,6 +4,12 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## 0.14.1 - 2026-11-16
+
+
+### Changed
+
+- Rename Rust workspace crates and directories from mcm-* to chunkyard-*, with chunkyard_* Rust imports. Source builds and integrations must use the new Cargo package names, such as cargo build -p chunkyard-server. The mcm executable, REST contracts, data paths and existing Docker ownership identifiers remain compatible.
 ## 0.14.0 - 2026-11-15
 
 

@@ -24,7 +24,7 @@ Conventions: [patterns.md](../../architecture/patterns.md). "Primary" = mcm with
 
 | ID | Requirement | Crates |
 |---|---|---|
-| P11-FR-09 | `AppState` services become **routers**: `ServerServiceRouter { local: Arc<dyn ServerService>, remotes: NodeRegistry }` dispatching by `servers.node_id` (NULL = local). Same for `FileService`, `ConsoleService`, `JavaRuntimeService` (per node), installer/content job submission, `BackupService` (execution), `MetricsSource`. `mcm-api` handlers are unchanged. | node, api (wiring in server) |
+| P11-FR-09 | `AppState` services become **routers**: `ServerServiceRouter { local: Arc<dyn ServerService>, remotes: NodeRegistry }` dispatching by `servers.node_id` (NULL = local). Same for `FileService`, `ConsoleService`, `JavaRuntimeService` (per node), installer/content job submission, `BackupService` (execution), `MetricsSource`. `chunkyard-api` handlers are unchanged. | node, api (wiring in server) |
 | P11-FR-10 | Config push: on any change to a remote server's config, primary increments `servers.config_rev` and `PUT /node/v1/servers/{id}/spec` (`ServerSpec` = everything the agent needs: launch, java, memory, jvm args, env, ports, restart policy, runtime/limits, auto_start). Agent rejects stale revs (`409 node.stale_rev`). | node, api::node |
 | P11-FR-11 | Reconciliation on (re)connect: agent `GET /node/v1/servers` returns `{id, configRev, status}`; primary pushes newer specs; agent servers unknown to primary are reported as `orphaned` in node detail (admin can adopt → creates primary row, or delete). Servers in primary but missing on agent → `missing` state with error. | node |
 | P11-FR-12 | Offline semantics: while a node is offline its servers show `state: "unknown"` (last known status kept as `lastKnown`), all mutating calls and console/file reads return `503 node.offline`; schedules targeting them record `schedule_runs.outcome=failed, detail=node.offline` and emit `schedule.failed`. Agents continue running servers and applying their own crash/auto-start policies. | node, scheduler |
@@ -50,7 +50,7 @@ Conventions: [patterns.md](../../architecture/patterns.md). "Primary" = mcm with
 
 | ID | Requirement | Crates | Perm | Audit |
 |---|---|---|---|---|
-| P11-FR-20 | `POST /servers/{id}/migrate {targetNodeId|null, keepSource: bool, startAfter: bool}` → job `server.migrate`: (1) mark server busy; (2) graceful stop if running; (3) target prepares: ensures Java runtime (download via mcm-java on target) and allocates port (P11-FR-22); (4) source streams `tar.zst` of the server dir (excluding `.mcm/console*`) → primary → target (single pass, sha256 computed on both ends, must match); (5) target writes spec with new port/RCON port and rewrites `server.properties` `server-port`/`rcon.port`/`query.port`; (6) primary updates `servers.node_id`, `config_rev`; (7) source deletes dir unless `keepSource`; (8) start if `startAfter` and was running. Failure at any step before (6) leaves the source authoritative and cleans up target. | node, fs, api | admin | `server.migrate` |
+| P11-FR-20 | `POST /servers/{id}/migrate {targetNodeId|null, keepSource: bool, startAfter: bool}` → job `server.migrate`: (1) mark server busy; (2) graceful stop if running; (3) target prepares: ensures Java runtime (download via chunkyard-java on target) and allocates port (P11-FR-22); (4) source streams `tar.zst` of the server dir (excluding `.mcm/console*`) → primary → target (single pass, sha256 computed on both ends, must match); (5) target writes spec with new port/RCON port and rewrites `server.properties` `server-port`/`rcon.port`/`query.port`; (6) primary updates `servers.node_id`, `config_rev`; (7) source deletes dir unless `keepSource`; (8) start if `startAfter` and was running. Failure at any step before (6) leaves the source authoritative and cleans up target. | node, fs, api | admin | `server.migrate` |
 | P11-FR-21 | Migration progress reports bytes transferred / estimated total (from source disk usage). Cancel before step 6 is supported. | node | | |
 
 ## Ports, scheduling, backups, network
@@ -88,5 +88,5 @@ Conventions: [patterns.md](../../architecture/patterns.md). "Primary" = mcm with
 
 - Agent-initiated reverse connection (yamux over TLS like the relay) to support agents behind NAT without VPN.
 - Direct agent→agent transfer for large migrations (halves traffic through primary).
-- Whether to share the relay's `mcm-tunnel-proto` for node streaming to unify transports.
+- Whether to share the relay's `chunkyard-tunnel-proto` for node streaming to unify transports.
 - axum WebSocket over HTTP/2 (RFC 8441) support — we use HTTP/1.1 upgrade for the stream WS to avoid depending on it.

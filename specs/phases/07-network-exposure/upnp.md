@@ -1,9 +1,9 @@
-# Phase 7 — Port mapping (`mcm-portmap`)
+# Phase 7 — Port mapping (`chunkyard-portmap`)
 
 ## Structure
 
 ```
-crates/mcm-portmap/src/
+crates/chunkyard-portmap/src/
 ├── mapper.rs            # PortMapper actor: owns mappings, renewal timers (Clock injected)
 ├── schedule.rs          # renewal/backoff schedule (pure)
 ├── gateway.rs           # trait Gateway { external_ip, add_mapping, remove_mapping }
@@ -13,7 +13,7 @@ crates/mcm-portmap/src/
 └── config.rs            # PortmapConfig ([portmap] section)
 ```
 
-Depends only on `mcm-core` (persistence via the `PortMappingRepo` trait).
+Depends only on `chunkyard-core` (persistence via the `PortMappingRepo` trait).
 
 `Gateway` is a trait so tests run against in-process fakes (an SSDP+SOAP fake for IGD, a UDP fake for NAT-PMP).
 

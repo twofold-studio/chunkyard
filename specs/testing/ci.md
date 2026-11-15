@@ -25,8 +25,8 @@ flowchart LR
 | `rust-test` | `cargo nextest run --workspace --profile ci` (Linux x86_64); `cargo test --doc`; macOS job runs unit tests only (`--lib`) | all pass |
 | `coverage` | `cargo llvm-cov nextest --workspace --lcov`; per-module gates via `xtask coverage-gate` | see strategy.md |
 | `web-check-test` | `pnpm i --frozen-lockfile`; `pnpm check`; `pnpm lint`; `pnpm test:cov`; `pnpm build` | all pass, cov ≥ 80 % |
-| `openapi-drift` | `cargo run -p mcm-server -- openapi > web/src/lib/api/openapi.json`; `pnpm gen:api`; `git diff --exit-code` | no diff |
-| `build-release` | `cargo build --release -p mcm-server -p fake-mc-server` (musl via `cross` or `cargo-zigbuild`) with embedded UI; upload artifacts | builds |
+| `openapi-drift` | `cargo run -p chunkyard-server -- openapi > web/src/lib/api/openapi.json`; `pnpm gen:api`; `git diff --exit-code` | no diff |
+| `build-release` | `cargo build --release -p chunkyard-server -p fake-mc-server` (musl via `cross` or `cargo-zigbuild`) with embedded UI; upload artifacts | builds |
 | `e2e-chromium` | download artifacts; `pnpm --dir e2e exec playwright test --project=chromium` | all pass |
 | `fuzz-smoke` | nightly toolchain; `cargo fuzz run <t> -- -max_total_time=60` for each target | no crashes |
 | `migrations` | Check numbering is contiguous and unique; apply all migrations to an empty DB and to the previous release's snapshot (`testdata/db/<tag>.sqlite`) | pass |
@@ -48,27 +48,27 @@ flowchart LR
 
 | Job | Notes |
 |---|---|
-| `docker-integration` | Runner with Docker: `CHUNKYARD_TEST_DOCKER=1 cargo nextest run -p mcm-api-tests -p mcm-process -p mcm-backup --features docker` (MinIO S3 tests, Docker runtime P10). Required check on the merge queue to `main`; also nightly |
+| `docker-integration` | Runner with Docker: `CHUNKYARD_TEST_DOCKER=1 cargo nextest run -p chunkyard-api-tests -p chunkyard-process -p chunkyard-backup --features docker` (MinIO S3 tests, Docker runtime P10). Required check on the merge queue to `main`; also nightly |
 
 ## Release (tag `v*`)
 
-Build musl binaries for x86_64/aarch64 (`mcm`, `mcm-relay`), OCI images (multi-arch), SBOM (`cargo cyclonedx`), checksums, signed with cosign; GitHub release notes from changelog.
+Build musl binaries for x86_64/aarch64 (`mcm`, `chunkyard-relay`), OCI images (multi-arch), SBOM (`cargo cyclonedx`), checksums, signed with cosign; GitHub release notes from changelog.
 
 ## Fuzz targets (cumulative)
 
 | Target | Crate under test | Phase |
 |---|---|---|
-| `sandbox_resolve` | mcm-fs | 2 |
-| `zip_extract` / `tar_extract` | mcm-fs | 2 |
-| `properties_parse` | mcm-fs | 2 |
-| `varint_decode`, `handshake_parse`, `slp_response_parse` | mcm-protocol | 1 |
-| `rcon_packet_decode` | mcm-protocol | 1 |
-| `tps_parse` | mcm-protocol | 5 |
-| `cf_manifest_parse`, `mrpack_index_parse`, `jar_meta_parse` | mcm-modplatforms | 4 |
-| `proxy_v2_roundtrip` | mcm-protocol | 7 |
-| `log_prefix_parse` | mcm-protocol | 1 |
-| `run_script_parse` | mcm-installers | 3 |
-| `tunnel_frame_decode` | mcm-tunnel-proto | 9 |
+| `sandbox_resolve` | chunkyard-fs | 2 |
+| `zip_extract` / `tar_extract` | chunkyard-fs | 2 |
+| `properties_parse` | chunkyard-fs | 2 |
+| `varint_decode`, `handshake_parse`, `slp_response_parse` | chunkyard-protocol | 1 |
+| `rcon_packet_decode` | chunkyard-protocol | 1 |
+| `tps_parse` | chunkyard-protocol | 5 |
+| `cf_manifest_parse`, `mrpack_index_parse`, `jar_meta_parse` | chunkyard-modplatforms | 4 |
+| `proxy_v2_roundtrip` | chunkyard-protocol | 7 |
+| `log_prefix_parse` | chunkyard-protocol | 1 |
+| `run_script_parse` | chunkyard-installers | 3 |
+| `tunnel_frame_decode` | chunkyard-tunnel-proto | 9 |
 
 ## Local equivalents
 

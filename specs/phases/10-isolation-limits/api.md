@@ -32,7 +32,7 @@ No new topics. `server:<id>` status carries `state: "unknown"`, `adopted`, `exit
 
 ## DB migration
 
-File: `crates/mcm-db/migrations/<NNNN>_p10_isolation_limits.sql` (number assigned at merge).
+File: `crates/chunkyard-db/migrations/<NNNN>_p10_isolation_limits.sql` (number assigned at merge).
 
 ```sql
 ALTER TABLE servers ADD COLUMN runtime TEXT NOT NULL DEFAULT 'native'
@@ -48,7 +48,7 @@ ALTER TABLE servers ADD COLUMN runtime_state TEXT;   -- JSON: {containerId?, las
 
 ## Config additions (`mcm.toml`)
 
-Each section is a sub-struct owned by its crate (`mcm-process`), composed by `mcm-config`.
+Each section is a sub-struct owned by its crate (`chunkyard-process`), composed by `chunkyard-config`.
 
 ```toml
 [process]
@@ -62,8 +62,8 @@ leave_running_on_shutdown = true
 
 [docker]
 socket = ""                           # empty = DOCKER_HOST or /var/run/docker.sock
-runtime_image = ""                    # empty = ghcr.io/<org>/mcm-runtime:<version>
-network = "mcm-net"
+runtime_image = ""                    # empty = ghcr.io/<org>/chunkyard-runtime:<version>
+network = "chunkyard-net"
 publish_ip = "0.0.0.0"
 host_data_dir = ""                    # when mcm runs in a container and auto-detect fails
 leave_running_on_shutdown = true
@@ -99,4 +99,4 @@ WORKDIR /data
 # no JRE: mounted at /opt/java by mcm
 ```
 
-Published multi-arch with each release; digest recorded in `mcm-server` build metadata.
+Published multi-arch with each release; digest recorded in `chunkyard-server` build metadata.

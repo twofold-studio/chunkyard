@@ -1,6 +1,6 @@
 # Phase 8 — API, WebSocket, migration, events
 
-Conventions: [api-conventions.md](../../architecture/api-conventions.md). Auth column: `none`, `self` (any authenticated principal acting on itself), `session` (cookie only), `admin`, `owner`, or a per-server permission. Every operation carries `x-mcm-permission` (P8-FR-18).
+Conventions: [api-conventions.md](../../architecture/api-conventions.md). Auth column: `none`, `self` (any authenticated principal acting on itself), `session` (cookie only), `admin`, `owner`, or a per-server permission. Every operation carries `x-chunkyard-permission` (P8-FR-18).
 
 ## Users and invites
 
@@ -53,7 +53,7 @@ Own sessions, TOTP enrolment/disable and recovery codes are phase 0 endpoints (`
 | Method | Path | Auth | Request | Success |
 |---|---|---|---|---|
 | GET | `/api/v1/audit` | admin | phase 0 filters + `outcome?`, `targetType?`, `actorUserId?`, `actionPrefix?` | `200 Page<AuditEntry>` (+`actorUsername`) |
-| GET | `/api/v1/audit/export.csv` | admin | same filters | `200 text/csv` streamed, `Content-Disposition: attachment; filename="mcm-audit-<from>-<to>.csv"` |
+| GET | `/api/v1/audit/export.csv` | admin | same filters | `200 text/csv` streamed, `Content-Disposition: attachment; filename="chunkyard-audit-<from>-<to>.csv"` |
 
 CSV columns: `id,ts,actor_user_id,actor_username,actor_token_id,actor_ip,action,target_type,target_id,server_id,outcome,details`.
 
@@ -126,7 +126,7 @@ Generic webhook body (P8-FR-31):
 
 ## DB migration
 
-File: `crates/mcm-db/migrations/<NNNN>_p8_users_permissions_notifications.sql` (number assigned at merge). TOTP columns and `totp_recovery_codes` already exist from phase 0.
+File: `crates/chunkyard-db/migrations/<NNNN>_p8_users_permissions_notifications.sql` (number assigned at merge). TOTP columns and `totp_recovery_codes` already exist from phase 0.
 
 ```sql
 ALTER TABLE users ADD COLUMN can_create_servers INTEGER NOT NULL DEFAULT 0;

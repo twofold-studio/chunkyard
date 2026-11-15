@@ -30,5 +30,5 @@ Full design: [testing/fake-server.md](../../testing/fake-server.md). Phase 1 cre
 ## Build integration
 
 - When the smoke suite's captured fixtures ([log-formats.md § Fixtures](../../architecture/log-formats.md#fixtures)) differ from what the fake emits, the fake is updated (parity test `log_format_matches_family_fixture_for_each_flavor`).
-- `crates/fake-mc-server` is a workspace member with `publish = false`; `mcm-testkit` locates it via `escargot` (builds once per test run, cached in `target/`), exposed as `FakeMc::path()`.
+- `crates/fake-mc-server` is a workspace member with `publish = false`; `chunkyard-testkit` locates it via `escargot` (builds once per test run, cached in `target/`), exposed as `FakeMc::path()`.
 - E2E: CI builds it in `build-release` and passes `FAKE_MC_BIN`; the E2E fixture creates a FakeJava dir and creates servers with `javaPath` pointing at it and a `server.jar` profile file served by the upstream mock (URL source).

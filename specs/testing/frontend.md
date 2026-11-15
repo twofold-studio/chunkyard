@@ -21,7 +21,7 @@
 | Formatting utils | unit | bytes, durations, MC colour codes → spans |
 | Routes | none directly | Covered by E2E; routes contain no logic by convention |
 
-Shared validation vectors: `testdata/validation/<schema>.json` (`[{input, valid, errorField?}]`) consumed by both `mcm-api` tests and Vitest to keep client/server validation aligned.
+Shared validation vectors: `testdata/validation/<schema>.json` (`[{input, valid, errorField?}]`) consumed by both `chunkyard-api` tests and Vitest to keep client/server validation aligned.
 
 ## Conventions
 

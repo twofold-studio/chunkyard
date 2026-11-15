@@ -1,6 +1,6 @@
 # Data model (SQLite)
 
-Owned by `mcm-db`. This file is the cumulative **sketch** of core shape. **Each phase's `api.md` migration is authoritative** and may add columns/tables noted under "Deltas" below; when they differ, the phase file wins. Column types are SQLite affinities; `id` columns are UUIDv7 TEXT; timestamps are INTEGER unix milliseconds UTC; booleans INTEGER 0/1; JSON columns are TEXT validated by serde on read.
+Owned by `chunkyard-db`. This file is the cumulative **sketch** of core shape. **Each phase's `api.md` migration is authoritative** and may add columns/tables noted under "Deltas" below; when they differ, the phase file wins. Column types are SQLite affinities; `id` columns are UUIDv7 TEXT; timestamps are INTEGER unix milliseconds UTC; booleans INTEGER 0/1; JSON columns are TEXT validated by serde on read.
 
 ## Connection settings
 

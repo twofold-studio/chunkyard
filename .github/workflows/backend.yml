@@ -48,11 +48,11 @@ jobs:
       - run: pnpm --dir web test:e2e
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build -p mcm-server --locked
+      - run: cargo build -p chunkyard-server --locked
       - run: node scripts/smoke-ui.mjs
       - run: node scripts/smoke-editor-integrations.mjs
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install openapi-spec-validator==0.7.2
-      - run: openapi-spec-validator crates/mcm-api/src/openapi.json
+      - run: openapi-spec-validator crates/chunkyard-api/src/openapi.json

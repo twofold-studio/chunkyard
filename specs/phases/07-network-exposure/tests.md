@@ -1,10 +1,10 @@
 # Phase 7 — Test plan
 
-Kinds: U unit, P property, I crate integration, A API integration (`mcm-api-tests`, `TestApp`), C component, E E2E, F fuzz, S soak/load. Backends are `fake-mc-server` instances (login → disconnect reason names the server; `--accept-proxy-protocol` / `proxy-protocol=true` parses a v2 header and echoes the client address; `LOCAL` headers are logged to the control channel) — see [fake-server.md](../../testing/fake-server.md).
+Kinds: U unit, P property, I crate integration, A API integration (`chunkyard-api-tests`, `TestApp`), C component, E E2E, F fuzz, S soak/load. Backends are `fake-mc-server` instances (login → disconnect reason names the server; `--accept-proxy-protocol` / `proxy-protocol=true` parses a v2 header and echoes the client address; `LOCAL` headers are logged to the control channel) — see [fake-server.md](../../testing/fake-server.md).
 
 Time: pure-logic tests (route table, renewal schedule, backoff math) may use `FakeClock`/paused time; tests with sockets or fake-mc use **real time** with short configured timeouts (e.g. a 200 ms handshake timeout and `lease_s = 2` via test config; durations are `Duration`-typed internally) and `wait_until` ([patterns.md §10](../../architecture/patterns.md#10-test-layout-rust)).
 
-## mcm-protocol
+## chunkyard-protocol
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
@@ -26,7 +26,7 @@ Time: pure-logic tests (route table, renewal schedule, backoff math) may use `Fa
 | `proxy_v2_roundtrip` | `fuzz/fuzz_targets/proxy_v2_roundtrip.rs` | 09, 10 | F |
 | `slp_client_with_proxy_local_writes_header_first` | `tests/slp.rs` | 17 | I |
 
-## mcm-router
+## chunkyard-router
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
@@ -77,10 +77,10 @@ Time: pure-logic tests (route table, renewal schedule, backoff math) may use `Fa
 
 | Test | Crate / location | FR | Kind |
 |---|---|---|---|
-| `ready_slp_fallback_sends_proxy_local_when_backend_expects_proxy` (fake-mc with PROXY and no ready line) | `mcm-process/tests/ready.rs` | 17 | I |
-| `slp_fallback_sends_proxy_local_when_backend_expects_proxy` | `mcm-metrics/tests/players.rs` | 17 | I |
+| `ready_slp_fallback_sends_proxy_local_when_backend_expects_proxy` (fake-mc with PROXY and no ready line) | `chunkyard-process/tests/ready.rs` | 17 | I |
+| `slp_fallback_sends_proxy_local_when_backend_expects_proxy` | `chunkyard-metrics/tests/players.rs` | 17 | I |
 
-## mcm-portmap
+## chunkyard-portmap
 
 Fake gateways: `tests/support/fake_igd.rs` (SSDP responder + SOAP HTTP server with programmable errors 718/725) and `tests/support/fake_natpmp.rs` (UDP).
 
@@ -101,7 +101,7 @@ Fake gateways: `tests/support/fake_igd.rs` (SSDP responder + SOAP HTTP server wi
 | `shutdown_removes_mappings_within_3s` | `tests/portmap.rs` | 23 | I |
 | `startup_readds_enabled_mappings` | `tests/portmap.rs` | 23 | I |
 
-## mcm-api-tests (`crates/mcm-api-tests/tests/`)
+## chunkyard-api-tests (`crates/chunkyard-api-tests/tests/`)
 
 | Test | File | FR | Kind |
 |---|---|---|---|
@@ -143,4 +143,4 @@ Fake gateways: `tests/support/fake_igd.rs` (SSDP responder + SOAP HTTP server wi
 | `p7-router.spec.ts › wake on join starts stopped server` | US-03 / 08 |
 | `p7-network.spec.ts › exposure card lists paths; real-IP banner shown on network tab and players panel` | US-06 / 15, 19 |
 
-UPnP is not exercised in E2E (no gateway in CI); covered by `mcm-portmap` integration tests with fake gateways (US-04, US-05).
+UPnP is not exercised in E2E (no gateway in CI); covered by `chunkyard-portmap` integration tests with fake gateways (US-04, US-05).

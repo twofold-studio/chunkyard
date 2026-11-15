@@ -1,10 +1,10 @@
 # Phase 1 — Test plan
 
-Kinds: U unit, P property, F fuzz, I crate integration, A API integration (`crates/mcm-api-tests/tests/p1_*.rs` via `TestApp` built with `test-hooks`, + fake-mc), S snapshot, V Vitest unit, C component, E Playwright, X smoke.
+Kinds: U unit, P property, F fuzz, I crate integration, A API integration (`crates/chunkyard-api-tests/tests/p1_*.rs` via `TestApp` built with `test-hooks`, + fake-mc), S snapshot, V Vitest unit, C component, E Playwright, X smoke.
 
 Rules: lifecycle tests use `fake-mc-server` via `FakeJava` and **real time** with short timeouts (`stop_timeout_s = 2`, `RestartPolicy` base 100 ms, `start_timeout_s` set directly on `SpawnSpec` in crate tests) and `wait_until` polling; paused time / `FakeClock` only in pure-logic unit tests. `TestApp` registers wiremock's base URL as a `test-hooks` upstream so `SafeHttp` may reach loopback for URL sources; the SSRF tests use an app without that override.
 
-## mcm-protocol
+## chunkyard-protocol
 
 | Test | File | FR | Kind |
 |---|---|---|---|
@@ -37,7 +37,7 @@ Rules: lifecycle tests use `fake-mc-server` via `FakeJava` and **real time** wit
 | `log_matchers_never_panic` | `src/text/log_prefix.rs` | 05 | P |
 | fuzz `varint_decode`, `handshake_parse`, `slp_response_parse`, `rcon_packet_decode`, `log_prefix_parse` | `fuzz/fuzz_targets/` | 01–05 | F |
 
-## mcm-download
+## chunkyard-download
 
 | Test | File | FR | Kind |
 |---|---|---|---|
@@ -50,14 +50,14 @@ Rules: lifecycle tests use `fake-mc-server` via `FakeJava` and **real time** wit
 | `downloader_hash_mismatch_removes_tmp` | `tests/downloader.rs` | 06 | I |
 | `downloader_content_length_over_cap_aborts_before_write` | `tests/downloader.rs` | 06 | I |
 
-## mcm-db / mcm-core
+## chunkyard-db / chunkyard-core
 
 | Test | File | FR | Kind |
 |---|---|---|---|
-| `launch_spec_serde_tagged_kind` | `mcm-core/src/server.rs` | 07 | U |
-| `server_repo_roundtrip_and_port_unique_with_null_node` | `mcm-db/tests/servers.rs` | 07, 10 | I |
+| `launch_spec_serde_tagged_kind` | `chunkyard-core/src/server.rs` | 07 | U |
+| `server_repo_roundtrip_and_port_unique_with_null_node` | `chunkyard-db/tests/servers.rs` | 07, 10 | I |
 
-## mcm-fs (P1 modules)
+## chunkyard-fs (P1 modules)
 
 | Test | File | FR | Kind |
 |---|---|---|---|
@@ -69,7 +69,7 @@ Rules: lifecycle tests use `fake-mc-server` via `FakeJava` and **real time** wit
 | `eula_write_and_parse` / `eula_parse_garbage_is_false` | `src/eula.rs` | 30 | U |
 | `trash_move_then_purge` | `tests/trash.rs` | 29 | I |
 
-## mcm-process
+## chunkyard-process
 
 | Test | File | FR | Kind |
 |---|---|---|---|
@@ -106,7 +106,7 @@ Rules: lifecycle tests use `fake-mc-server` via `FakeJava` and **real time** wit
 | `console_file_in_state_dir_rotates_at_10mib` | `tests/console_file.rs` | 35 | I |
 | `shutdown_stops_all_servers_within_deadline` | `tests/shutdown.rs` | 24 | I |
 
-## API (`crates/mcm-api-tests/tests/`)
+## API (`crates/chunkyard-api-tests/tests/`)
 
 | Test | File | FR | Kind |
 |---|---|---|---|
@@ -122,14 +122,14 @@ Rules: lifecycle tests use `fake-mc-server` via `FakeJava` and **real time** wit
 | `create_server_validation_errors_table` (`testdata/validation/create_server.json`) | `p1_servers_create.rs` | 13 | A |
 | `create_server_non_admin_custom_launch_forbidden` | `p1_servers_create.rs` | 13 | A |
 | `create_server_does_not_enable_rcon` (properties lack `enable-rcon=true`, DTO has no rcon fields) | `p1_servers_create.rs` | 11 | A |
-| `port_allocation_skips_used_and_unbindable` | `crates/mcm-server/src/ports.rs` | 10 | U |
+| `port_allocation_skips_used_and_unbindable` | `crates/chunkyard-server/src/ports.rs` | 10 | U |
 | `port_explicit_conflict_is_409` / `concurrent_creates_get_distinct_ports` | `p1_servers_create.rs` | 10 | A |
 | `java_detected_lists_fake_java_from_java_home` / `java_invalid_path_is_422` | `p1_java.rs` | 12 | A |
 | `start_stop_roundtrip_updates_status_over_ws` | `p1_servers_power.rs` | 14, 16, 18, 25 | A |
 | `start_when_running_is_409` / `start_with_port_in_use_is_409` / `start_with_missing_jar_is_409` / `start_during_job_is_409_busy` | `p1_servers_power.rs` | 16 | A |
 | `kill_sets_reason_killed` / `restart_emits_stopping_then_running` | `p1_servers_power.rs` | 19 | A |
 | `power_requires_server_power_permission` | `p1_servers_power.rs` | 16 | A |
-| `autostart_starts_flagged_servers_with_stagger_and_audits_trigger` | `crates/mcm-server/tests/autostart.rs` | 22 | I |
+| `autostart_starts_flagged_servers_with_stagger_and_audits_trigger` | `crates/chunkyard-server/tests/autostart.rs` | 22 | I |
 | `list_and_get_embed_status_and_my_permissions` | `p1_servers_crud.rs` | 26 | A |
 | `patch_returns_server_and_warnings` / `patch_unknown_field_is_422` / `patch_name_conflict_is_409` | `p1_servers_crud.rs` | 27 | A |
 | `patch_validation_table_p1_rows` (shared vectors `testdata/validation/patch_server.json`) | `p1_servers_crud.rs` | 27 | A |
@@ -156,9 +156,9 @@ Rules: lifecycle tests use `fake-mc-server` via `FakeJava` and **real time** wit
 
 `slp_roundtrip_with_mcm_protocol_client`, `rcon_auth_failure_returns_minus_one`, `rcon_fragmentation_over_4096`, `stop_command_exits_zero`, `eula_missing_exits_with_message`, `java_shim_parses_jar_and_ignores_jvm_flags`, `java_version_flag_prints_to_stderr`, `sigterm_exits_143`, `fakechat_logs_in_family_chat_format`, `log_format_matches_family_fixture_for_each_flavor`.
 
-## mcm-testkit — FR 38
+## chunkyard-testkit — FR 38
 
-`fake_java_install_creates_executable_symlink`, `test_app_create_server_reaches_running`, `test_app_restart_changes_epoch_keeps_data` (`crates/mcm-testkit/tests/`).
+`fake_java_install_creates_executable_symlink`, `test_app_create_server_reaches_running`, `test_app_restart_changes_epoch_keeps_data` (`crates/chunkyard-testkit/tests/`).
 
 ## Frontend
 

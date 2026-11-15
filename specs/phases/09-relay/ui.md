@@ -15,7 +15,7 @@ New feature `features/relays`; extends `features/network` and `features/portmap`
 | Component | Behaviour |
 |---|---|
 | `RelayTable` | Name, endpoint, status badge (connected / connecting / error with reason), agent name, assignment (hostnames, ports), streams, traffic. Live from `network` topic. Actions: Enable/disable, Re-pair, Delete (ConfirmDialog lists bound routes). |
-| `AddRelayDialog` | Name + pairing string textarea (masked after paste, "show" toggle); parsed client-side (`features/relays/pairing.ts`) to preview endpoint and fingerprint (first 16 hex chars grouped) before submit; server `relay.pairing_invalid` details inline. Help panel: 4-step VPS guide (`mcm-relay init`, `agent add`, DNS wildcard record, firewall ports 7835/25565/dedicated range) with copy buttons. |
+| `AddRelayDialog` | Name + pairing string textarea (masked after paste, "show" toggle); parsed client-side (`features/relays/pairing.ts`) to preview endpoint and fingerprint (first 16 hex chars grouped) before submit; server `relay.pairing_invalid` details inline. Help panel: 4-step VPS guide (`chunkyard-relay init`, `agent add`, DNS wildcard record, firewall ports 7835/25565/dedicated range) with copy buttons. |
 | `RelayDetailSheet` | Connection log (last 20 status changes from WS), public addresses, announced routes with accepted/rejected reason, counters. |
 | `RelaysEmptyState` | "No relay configured" + short explanation of when a relay is needed, "Add relay" button, and a link to the **Behind CGNAT / alternatives** docs page (frp, playit.gg, WireGuard, Tailscale Funnel caveats). |
 

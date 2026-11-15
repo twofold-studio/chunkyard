@@ -28,7 +28,7 @@ type NodeDetail = Node & { fingerprint: string; capabilities: IsolationCapabilit
 
 ## Node API (`/node/v1`, agent; TLS; `Authorization: Bearer mcmn_…`)
 
-Agent routes live in `mcm-api::node`; documented in a separate OpenAPI document (`mcm openapi --node`). Shapes reuse phase DTOs unless noted.
+Agent routes live in `chunkyard-api::node`; documented in a separate OpenAPI document (`mcm openapi --node`). Shapes reuse phase DTOs unless noted.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -70,7 +70,7 @@ Envelope identical to the browser WS ([api-conventions.md](../../architecture/ap
 
 ## DB migrations
 
-Primary: `crates/mcm-db/migrations/<NNNN>_p11_nodes.sql`
+Primary: `crates/chunkyard-db/migrations/<NNNN>_p11_nodes.sql`
 
 ```sql
 CREATE TABLE nodes (
@@ -87,7 +87,7 @@ ALTER TABLE jobs ADD COLUMN node_id TEXT;
 ALTER TABLE storage_targets ADD COLUMN node_id TEXT;   -- NULL = primary-local or remote-capable (s3)
 ```
 
-Agent: `crates/mcm-db/migrations-agent/<NNNN>_agent_init.sql` (separate migrator, `sqlx::migrate!("migrations-agent")`)
+Agent: `crates/chunkyard-db/migrations-agent/<NNNN>_agent_init.sql` (separate migrator, `sqlx::migrate!("migrations-agent")`)
 
 ```sql
 CREATE TABLE agent_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);   -- primary_instance_id, node_token_hash

@@ -11,7 +11,7 @@
 │       ├── world/ …
 │       └── mods/ | plugins/ | config/ | libraries/ …
 ├── state/
-│   └── <server-id>/                mcm-owned, never exposed to the file manager
+│   └── <server-id>/                chunkyard-owned, never exposed to the file manager
 │       ├── pid                     "<pid> <starttime> <epoch>"
 │       ├── console.log[.1-5], crash-<ts>.log, install.log
 │       ├── trash/                  deleted files + trash.json metadata (P2)

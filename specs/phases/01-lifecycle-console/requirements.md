@@ -4,7 +4,7 @@ References (binding): [process-model.md](../../architecture/process-model.md), [
 
 Permissions from [auth.md](../../architecture/auth.md#permission-catalog-per-server); audit actions from the [catalog](../../architecture/audit.md), recorded on success and failure. System-initiated starts (auto-start, crash restart) are audited as `server.start` with `actor = null` and `details.trigger`.
 
-## Protocol crate (`mcm-protocol`, leaf)
+## Protocol crate (`chunkyard-protocol`, leaf)
 
 | ID | Requirement | Crates |
 |---|---|---|
@@ -14,7 +14,7 @@ Permissions from [auth.md](../../architecture/auth.md#permission-catalog-per-ser
 | P1-FR-04 | `rcon`: codec (LE i32 length/id/type, body + 2 NULs, received length 10…4110) and `RconClient` (auth id `-1` → `AuthFailed`; `exec` sends the sentinel **after the first response fragment arrives**, reassembles until the sentinel reply, 300 ms idle fallback; commands > 1400 bytes rejected). Implemented and tested in P1 (the fake server needs the codec); **mcm does not enable or use RCON until P5**. | protocol |
 | P1-FR-05 | `text::log_prefix` per [log-formats.md](../../architecture/log-formats.md): families `vanilla`, `fabric`, `paper`, `forge`, `bungee`; anchored prefix parsing, source checks, chat-marker rejection; matchers `ready`, `eula`, `save_done`, `saving_disabled/enabled`, `join`, `leave`, `uuid` (later phases consume the last five). Flavour → family table; `custom` defaults to `vanilla`. | protocol |
 
-## Downloads (`mcm-download`, created in P1)
+## Downloads (`chunkyard-download`, created in P1)
 
 | ID | Requirement | Crates |
 |---|---|---|
@@ -24,11 +24,11 @@ Permissions from [auth.md](../../architecture/auth.md#permission-catalog-per-ser
 
 | ID | Requirement | Crates | Permission | Audit |
 |---|---|---|---|---|
-| P1-FR-07 | Domain `Server` in `mcm-core` mirrors the `servers` table; `LaunchSpec` enum `Jar{path}`, `ArgsFile{path}`, `Custom{args}` (serde tag `kind`); `ServerRepo` trait in `mcm-core::repo`, `SqliteServerRepo` in `mcm-db`. | core, db | — | — |
+| P1-FR-07 | Domain `Server` in `chunkyard-core` mirrors the `servers` table; `LaunchSpec` enum `Jar{path}`, `ArgsFile{path}`, `Custom{args}` (serde tag `kind`); `ServerRepo` trait in `chunkyard-core::repo`, `SqliteServerRepo` in `chunkyard-db`. | core, db | — | — |
 | P1-FR-08 | `POST /servers` per [server-api.md](../../architecture/server-api.md#create--post-servers): P1 accepts `source.kind ∈ {url, import}`, `javaPath`, and the other P1 fields; any later-phase field (`java`, `acceptEula`, `runtime`, `source.kind=installer|pack`) is an unknown field → `422`. Validates; derives a unique `slug` (display handle only); allocates the game port (FR-10); inserts the row (`flavor = "custom"`); creates `<data>/servers/<id>/` and `<data>/state/<id>/`; writes managed properties (FR-11); submits job `server.create` (FR-09). Response `202 {server, job, warnings}`; state `installing` during the job. Admins supplying `jvmArgs` get warning `jvm_args_admin_freeform` (the non-admin allow-list arrives with P2 editing). | core, fs, api, server | `server.create` (+ admin for url/import/custom launch) | `server.create` |
-| P1-FR-09 | Sources (both admin-only). **url** — via `HttpDownloader` (FR-06), max 512 MiB, renamed into `servers/<id>/server.jar` (or `fileName`, `^[\w.-]{1,128}\.jar$`); `sha256` mismatch fails the job. **import** — `path` must canonicalize inside one of `process.import_roots` (empty ⇒ `422 import.disabled`; outside ⇒ `422 import.outside_roots`); copied with `mcm-fs::copy` (preserve mtimes, skip symlinks with warning, abort on special files) or moved when `move: true` (same filesystem only). Any `.mcm/` directory in the imported tree is copied as ordinary user data and never read. Launch jar: `jarPath` else the single top-level `*.jar`, else job fails `import.jar_ambiguous` listing candidates. | download, fs, server | admin | — |
+| P1-FR-09 | Sources (both admin-only). **url** — via `HttpDownloader` (FR-06), max 512 MiB, renamed into `servers/<id>/server.jar` (or `fileName`, `^[\w.-]{1,128}\.jar$`); `sha256` mismatch fails the job. **import** — `path` must canonicalize inside one of `process.import_roots` (empty ⇒ `422 import.disabled`; outside ⇒ `422 import.outside_roots`); copied with `chunkyard-fs::copy` (preserve mtimes, skip symlinks with warning, abort on special files) or moved when `move: true` (same filesystem only). Any `.mcm/` directory in the imported tree is copied as ordinary user data and never read. Launch jar: `jarPath` else the single top-level `*.jar`, else job fails `import.jar_ambiguous` listing candidates. | download, fs, server | admin | — |
 | P1-FR-10 | Port allocation (game port only): explicit `port` validated per server-api.md, unique among servers (`409 server.port_taken`), bindable (bind probe on `0.0.0.0:port`, `409 server.port_in_use`); else lowest free+bindable port in `process.port_range`. Serialized by a mutex in `ServerService`. No RCON port is allocated in P1. | server | — | — |
-| P1-FR-11 | Managed properties: at creation and before every start, `mcm-fs::properties` merges only `server-port=<port>` into `server.properties` (creating it if missing), preserving other keys, comments and order; idempotent. **RCON keys are not touched in P1** (P5 owns them); `query.port`, `server-ip`, `management-server-*` likewise belong to later phases. | fs, process | — | — |
+| P1-FR-11 | Managed properties: at creation and before every start, `chunkyard-fs::properties` merges only `server-port=<port>` into `server.properties` (creating it if missing), preserving other keys, comments and order; idempotent. **RCON keys are not touched in P1** (P5 owns them); `query.port`, `server-ip`, `management-server-*` likewise belong to later phases. | fs, process | — | — |
 | P1-FR-12 | Java (P1): `java_path` absolute, executable, and `java -version` (5 s, via `CommandRunner`) parses. `GET /java/detected` lists candidates from `$JAVA_HOME/bin/java`, `PATH`, `/usr/lib/jvm/*/bin/java`, `/opt/java/*/bin/java` with `{path, version, major, vendor, source}` (cached 60 s). | process, server | `server.create` | — |
 | P1-FR-13 | Validation per the P1 rows of the [server-api.md validation table](../../architecture/server-api.md#validation-table) plus create-only rules: memory 256 ≤ min ≤ max ≤ 1 048 576 MiB (defaults 1024/2048 only when unset); `launch.custom` admin-only; count ≤ `limits.max_servers` (`409 server.limit`). Errors `422 validation` with field list. | api, core | — | — |
 
@@ -37,7 +37,7 @@ Permissions from [auth.md](../../architecture/auth.md#permission-catalog-per-ser
 | ID | Requirement | Crates | Permission | Audit |
 |---|---|---|---|---|
 | P1-FR-14 | `ServerRegistry` holds one `ServerHandle` per server (startup + create; removed on delete). Supervisor actor per process-model with `Cmd::{Start, Stop, Restart, Kill, Send(line), UpdateSpec(Server), Shutdown}`; mpsc 32; caller timeout 5 s → `503 supervisor.unavailable`. Uses the `ProcessSpawner` trait **as defined in [process-model.md](../../architecture/process-model.md#spawner-trait-single-definition)** (not redefined here); P1 provides `NativeSpawner`. | process, server | — | — |
-| P1-FR-15 | **Dedicated spawner thread**: `NativeSpawner` performs every `Command::spawn` on one long-lived OS thread `mcm-spawner` (started at boot, never exits before process shutdown) fed by a channel, because `PR_SET_PDEATHSIG` fires when the forking *thread* exits. `pre_exec`: `prctl(PR_SET_PDEATHSIG, SIGTERM)`, then `_exit(1)` if `getppid()` ≠ mcm's pid; `process_group(0)`; env cleared + allow-list. No spawn from tokio workers or `spawn_blocking`. | process | — | — |
+| P1-FR-15 | **Dedicated spawner thread**: `NativeSpawner` performs every `Command::spawn` on one long-lived OS thread `chunkyard-spawner` (started at boot, never exits before process shutdown) fed by a channel, because `PR_SET_PDEATHSIG` fires when the forking *thread* exits. `pre_exec`: `prctl(PR_SET_PDEATHSIG, SIGTERM)`, then `_exit(1)` if `getppid()` ≠ mcm's pid; `process_group(0)`; env cleared + allow-list. No spawn from tokio workers or `spawn_blocking`. | process | — | — |
 | P1-FR-16 | Start: preconditions — state ∈ {Stopped, Crashed}; no job holds the server lock (`409 server.busy`); launch target exists (`409 server.launch_missing`); java executable (`409 server.java_missing`); game port bindable (`409 server.port_in_use`). Applies FR-11; spawns via FR-15 with cwd `servers/<id>`; writes `state/<id>/pid` as `<pid> <starttime> <epoch>`. Start while Running → `409 server.running`. | process | `server.power` | `server.start` |
 | P1-FR-17 | Ready detection: the flavour-aware `ready` matcher (FR-05) for the server's `log_family` (default `vanilla` for custom; editable via PATCH `logFamily`), with `ready_pattern` replacing only the body regex; prefix/source anchoring means chat such as `<Alice> Done (1.0s)! For help, type "help"` never marks a server ready. In parallel from +5 s, SLP every 5 s on `127.0.0.1:<port>`; first success → `Running`. `start_timeout_s` elapsing emits `Event::ServerStartSlow` once and keeps waiting. | process, protocol | — | — |
 | P1-FR-18 | Stop: stop command → `stop_timeout_s` → `killpg SIGTERM` → 15 s → `killpg SIGKILL`; each escalation written as a `System` console line. Stop when Stopped → `204` no-op. Stop during Starting allowed. | process | `server.power` | `server.stop` |
@@ -75,14 +75,14 @@ Permissions from [auth.md](../../architecture/auth.md#permission-catalog-per-ser
 | ID | Requirement | Crates |
 |---|---|---|
 | P1-FR-37 | `fake-mc-server` implements the P1 subset in [fake-server-scope.md](fake-server-scope.md), emitting the **real per-family log format** of its `flavor` and supporting `fakechat <name> <msg>`. | fake-mc-server |
-| P1-FR-38 | `mcm-testkit`: `FakeMc::path()`, `FakeJava::install(dir)` (`<dir>/bin/java` → fake), `TestApp::create_server(profile)`, `TestApp::restart()` (same data dir, new epoch). | testkit |
+| P1-FR-38 | `chunkyard-testkit`: `FakeMc::path()`, `FakeJava::install(dir)` (`<dir>/bin/java` → fake), `TestApp::create_server(profile)`, `TestApp::restart()` (same data dir, new epoch). | testkit |
 
 ## Edge cases and failure modes
 
 | Case | Expected |
 |---|---|
 | mcm restarts (upgrade, crash, `systemctl restart`) | **Native servers stop** (graceful on clean shutdown; PDEATHSIG + orphan kill otherwise); auto-start servers come back. See README limitation. |
-| Spawn requested from a `spawn_blocking` context | Routed to `mcm-spawner`; child survives the blocking thread's reaping (FR-15). |
+| Spawn requested from a `spawn_blocking` context | Routed to `chunkyard-spawner`; child survives the blocking thread's reaping (FR-15). |
 | Player types `Done (0.1s)! For help, type "help"` in chat during startup | Not matched (prefix/source anchoring); SLP still decides. |
 | Browser reconnects after mcm restart with old `{epoch, seq}` | `reset` with full ring; never mixes seqs across epochs. |
 | Output faster than WS clients read | Ring + broadcast lag; `lagged`; Java never blocks. |

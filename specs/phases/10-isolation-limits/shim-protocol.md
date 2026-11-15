@@ -1,12 +1,12 @@
-# Phase 10 — `mcm-shim` design and wire protocol
+# Phase 10 — `chunkyard-shim` design and wire protocol
 
-Crate `mcm-shim`: a **leaf** crate (no `mcm-*` deps) with a binary `mcm-shim` and a small client library used by `mcm-process::shim` (`ShimSpawner`). Errors are mapped into `ProcessError` by `mcm-process` (leaf exemption, [patterns.md §1](../../architecture/patterns.md#1-errors)).
+Crate `chunkyard-shim`: a **leaf** crate (no `mcm-*` deps) with a binary `chunkyard-shim` and a small client library used by `chunkyard-process::shim` (`ShimSpawner`). Errors are mapped into `ProcessError` by `chunkyard-process` (leaf exemption, [patterns.md §1](../../architecture/patterns.md#1-errors)).
 
 ## Process topology
 
 ```
 mcm (any thread; via spawner thread)            survives mcm exit
-  └─ spawn mcm-shim  ── setsid(), no PDEATHSIG, stdio=/dev/null, cwd=<data>/state/<id>/
+  └─ spawn chunkyard-shim  ── setsid(), no PDEATHSIG, stdio=/dev/null, cwd=<data>/state/<id>/
         └─ java (process_group(0), PDEATHSIG=SIGTERM tied to shim's main thread, cwd=<data>/servers/<id>/)
 ```
 
@@ -17,7 +17,7 @@ mcm (any thread; via spawner thread)            survives mcm exit
 ## Invocation
 
 ```
-mcm-shim --server-id <id> --state-dir <data>/state/<id> --cwd <data>/servers/<id> \
+chunkyard-shim --server-id <id> --state-dir <data>/state/<id> --cwd <data>/servers/<id> \
          --log-max-bytes 8388608 -- <java> <jvm args…> <launch target> nogui
 ```
 

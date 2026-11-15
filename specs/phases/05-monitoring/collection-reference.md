@@ -53,7 +53,7 @@ Names: `[A-Za-z0-9_]{1,16}`. Floodgate/Geyser prefixes (`.Name`, `*Name`) — ac
 
 Spark detection (RCON only; skipped when `rconDisabled`): once per server start, send `spark` and check the response is not `Unknown or incomplete command` (verify spark's RCON behaviour — spark may require permission from console sender, RCON sender has op level 4).
 
-All parsers: pure functions in `mcm-protocol::text::{tps, list, join}` that strip `§x` codes first; tolerate `*20.0` (Paper caps at 20 and prefixes `*`).
+All parsers: pure functions in `chunkyard-protocol::text::{tps, list, join}` that strip `§x` codes first; tolerate `*20.0` (Paper caps at 20 and prefixes `*`).
 
 ## Rollup math
 

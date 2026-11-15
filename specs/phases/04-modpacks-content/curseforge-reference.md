@@ -1,6 +1,6 @@
 # CurseForge API reference (as used by mcm)
 
-Base `https://api.curseforge.com` (configurable `integrations.curseforge_base_url`, test-only). Header `x-api-key: <key>`, `Accept: application/json`. Responses are wrapped: `{ "data": ..., "pagination"?: {...} }`. Client lives in `mcm-modplatforms::curseforge`.
+Base `https://api.curseforge.com` (configurable `integrations.curseforge_base_url`, test-only). Header `x-api-key: <key>`, `Accept: application/json`. Responses are wrapped: `{ "data": ..., "pagination"?: {...} }`. Client lives in `chunkyard-modplatforms::curseforge`.
 
 ## Constants
 

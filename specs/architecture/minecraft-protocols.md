@@ -1,6 +1,6 @@
 # Minecraft protocols reference
 
-Owned by `mcm-protocol` (leaf crate: codecs + small async clients over `tokio::io`). Used by P1 (ready probe), 5 (players/TPS), 7 (router), and `fake-mc-server`.
+Owned by `chunkyard-protocol` (leaf crate: codecs + small async clients over `tokio::io`). Used by P1 (ready probe), 5 (players/TPS), 7 (router), and `fake-mc-server`.
 
 ## VarInt / VarLong
 
@@ -99,7 +99,7 @@ Vanilla 1.21.9+ ships a JSON-RPC 2.0 API over WebSocket (`ws(s)://host:port`), c
 | NeoForge | `neoforge tps` | Same shape as Forge (to verify) |
 | Spark installed | `spark tps` | Preferred when present (to verify format) |
 
-All parsers are pure functions with fixtures in `crates/mcm-protocol/tests/fixtures/tps/*.txt` and proptest for "never panics".
+All parsers are pure functions with fixtures in `crates/chunkyard-protocol/tests/fixtures/tps/*.txt` and proptest for "never panics".
 
 ## Player list
 

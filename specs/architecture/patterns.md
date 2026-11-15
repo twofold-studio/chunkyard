@@ -7,36 +7,36 @@ Every phase spec assumes these. Reviewers reject code that deviates without upda
 | Layer | Rule |
 |---|---|
 | Library crates | One `thiserror` enum per crate (or per module when large): `pub enum FsError { #[error("path escapes sandbox")] Escape, ... }`. No `anyhow`, no `Box<dyn Error>` in public signatures, no `String` errors. |
-| Cross-crate | Each non-leaf crate error implements `mcm_core::error::Classify` → `ErrorKind { Invalid, Unauthorized, Forbidden, NotFound, Conflict, PreconditionFailed, PreconditionRequired, TooLarge, InsufficientStorage, RateLimited, Unavailable, Upstream, UpstreamConfig, Internal }` plus a stable `code()` string (`"fs.escape"`, `"server.busy"`). **Leaf crates** (`mcm-protocol`, `mcm-tunnel-proto`, `mcm-shim`) are exempt: they don't depend on `mcm-core`; the consuming crate wraps their errors in its own variants and classifies them. |
-| HTTP | `mcm-api::error::ApiError` is the **only** place errors become HTTP. `impl<E: Classify> From<E> for ApiError`. Mapping table lives in [errors-and-logging.md](errors-and-logging.md). |
+| Cross-crate | Each non-leaf crate error implements `chunkyard_core::error::Classify` → `ErrorKind { Invalid, Unauthorized, Forbidden, NotFound, Conflict, PreconditionFailed, PreconditionRequired, TooLarge, InsufficientStorage, RateLimited, Unavailable, Upstream, UpstreamConfig, Internal }` plus a stable `code()` string (`"fs.escape"`, `"server.busy"`). **Leaf crates** (`chunkyard-protocol`, `chunkyard-tunnel-proto`, `chunkyard-shim`) are exempt: they don't depend on `chunkyard-core`; the consuming crate wraps their errors in its own variants and classifies them. |
+| HTTP | `chunkyard-api::error::ApiError` is the **only** place errors become HTTP. `impl<E: Classify> From<E> for ApiError`. Mapping table lives in [errors-and-logging.md](errors-and-logging.md). |
 | Panics | Never in request paths. `unwrap`/`expect` only in tests and `main` with a reason. |
 | Context | Add context via enum variants with fields (`#[error("download {url} failed")] Download { url: Url, #[source] source: reqwest::Error }`), not string concatenation. |
 
 ## 2. IDs and newtypes
 
 ```rust
-// mcm-core/src/ids.rs
+// chunkyard-core/src/ids.rs
 macro_rules! id_type { ($name:ident, $prefix:literal) => { ... } }
 id_type!(ServerId, "srv");   // stored as TEXT uuid v7; displayed raw
 id_type!(UserId, "usr");
 id_type!(JobId, "job");
 ```
 
-- All entity IDs are UUIDv7 newtypes (`#[serde(transparent)]`, `sqlx::Type` via `#[sqlx(transparent)]` in `mcm-db` through a wrapper impl). Never pass raw `Uuid`/`String` across crate boundaries.
+- All entity IDs are UUIDv7 newtypes (`#[serde(transparent)]`, `sqlx::Type` via `#[sqlx(transparent)]` in `chunkyard-db` through a wrapper impl). Never pass raw `Uuid`/`String` across crate boundaries.
 - Other newtypes: `Port(u16)`, `MemoryMb(u32)`, `McVersion(String)` (validated), `RelPath` (validated sandbox-relative path, see [security.md](security.md)), `Secret<String>` (redacted `Debug`, zeroized on drop).
 
 ## 3. Repository pattern
 
-- **Repo traits live in `mcm-core::repo`** (`pub trait ServerRepo: Send + Sync { async fn get(&self, id: ServerId) -> Result<Option<Server>, RepoError>; ... }`), one per aggregate; `mcm-db` provides the `Sqlite*Repo` impls. Domain crates (`mcm-java`, `mcm-backup`, …) depend on the traits, never on `mcm-db`.
-- Repos return **domain types** from `mcm-core`, not row structs. Row ↔ domain conversion is private to `mcm-db`.
+- **Repo traits live in `chunkyard-core::repo`** (`pub trait ServerRepo: Send + Sync { async fn get(&self, id: ServerId) -> Result<Option<Server>, RepoError>; ... }`), one per aggregate; `chunkyard-db` provides the `Sqlite*Repo` impls. Domain crates (`chunkyard-java`, `chunkyard-backup`, …) depend on the traits, never on `chunkyard-db`.
+- Repos return **domain types** from `chunkyard-core`, not row structs. Row ↔ domain conversion is private to `chunkyard-db`.
 - Transactions: `Db::tx(|tx| async { ... })` helper; repos expose `*_tx` variants that take `&mut Tx` only where a service needs atomic multi-repo writes.
 - Queries use `sqlx::query_as!` (compile-time checked, offline data committed in `.sqlx/`).
-- One migration file per change: `crates/mcm-db/migrations/<NNNN>_<desc>.sql`. **Numbers are not pre-allocated per phase**: `NNNN` is the next monotonic number, assigned when the change merges (a CI check rejects gaps and duplicates). Phase specs name migrations by description only (e.g. `p1_servers.sql` means `<NNNN>_p1_servers.sql`). Migrations are forward-only and never edited after release; each is tested by `migrations_apply_cleanly_from_previous_release`.
+- One migration file per change: `crates/chunkyard-db/migrations/<NNNN>_<desc>.sql`. **Numbers are not pre-allocated per phase**: `NNNN` is the next monotonic number, assigned when the change merges (a CI check rejects gaps and duplicates). Phase specs name migrations by description only (e.g. `p1_servers.sql` means `<NNNN>_p1_servers.sql`). Migrations are forward-only and never edited after release; each is tested by `migrations_apply_cleanly_from_previous_release`.
 
 ## 4. Services and dependency injection
 
-- Business logic lives in **services**: structs in domain crates implementing traits declared in `mcm-core::services`. Any trait used across crates (`ServerService`, `ServerLookup`, `ServerCommandSink`, `CommandRunner`, `BackupService`, `JavaRuntimeRepo`, `PropertiesEditor`, …) **must** be in `mcm-core`, so a crate that needs another area's behaviour (scheduler → backup/process, proxy → server start/properties, installers → run installer jars) depends only on `mcm-core` and receives the impl via DI. Traits used only inside one crate stay there (e.g. `VersionMetaSource` in `mcm-java`, implemented by `mcm-installers` and injected at wiring time).
-- `AppState` (in `mcm-api`) holds `Arc<dyn Trait>` for each service:
+- Business logic lives in **services**: structs in domain crates implementing traits declared in `chunkyard-core::services`. Any trait used across crates (`ServerService`, `ServerLookup`, `ServerCommandSink`, `CommandRunner`, `BackupService`, `JavaRuntimeRepo`, `PropertiesEditor`, …) **must** be in `chunkyard-core`, so a crate that needs another area's behaviour (scheduler → backup/process, proxy → server start/properties, installers → run installer jars) depends only on `chunkyard-core` and receives the impl via DI. Traits used only inside one crate stay there (e.g. `VersionMetaSource` in `chunkyard-java`, implemented by `chunkyard-installers` and injected at wiring time).
+- `AppState` (in `chunkyard-api`) holds `Arc<dyn Trait>` for each service:
 
 ```rust
 #[derive(Clone)]
@@ -52,10 +52,10 @@ pub struct AppState {
 }
 ```
 
-- `mcm-server::wiring::build_state(cfg) -> AppState` is the single composition root. `mcm-testkit::TestApp` calls the same function with overrides (`StateOverrides { adoptium: Some(fake), .. }`); override hooks compile only with the `test-hooks` feature.
+- `chunkyard-server::wiring::build_state(cfg) -> AppState` is the single composition root. `chunkyard-testkit::TestApp` calls the same function with overrides (`StateOverrides { adoptium: Some(fake), .. }`); override hooks compile only with the `test-hooks` feature.
 - Handlers never touch repos directly; they call services.
 - Time is injected (`Clock` trait: `now()`, `sleep()`), so scheduler/retention/rollup tests use `FakeClock`.
-- Seams for later runtimes/nodes: services address servers only by `ServerId` through `ServerService`/`ProcessSpawner`; nothing outside `mcm-process`/`mcm-fs` builds a filesystem path to a server dir. This is the only P11 (multi-node) preparation required before 1.0.
+- Seams for later runtimes/nodes: services address servers only by `ServerId` through `ServerService`/`ProcessSpawner`; nothing outside `chunkyard-process`/`chunkyard-fs` builds a filesystem path to a server dir. This is the only P11 (multi-node) preparation required before 1.0.
 
 ## 5. Actor / handle pattern (per-server supervisor)
 
@@ -87,8 +87,8 @@ ServerHandle (Clone)             Supervisor task (owns state)
 
 ## 8. Typed config
 
-- Each crate defines its own sub-struct (`BackupConfig`, `RouterConfig`, …) with `Deserialize + Default`, `#[serde(deny_unknown_fields)]` and a `validate()`; `mcm-config` composes them into `Config` and runs all validations before startup.
-- Crates receive **only their own sub-struct**, never the whole `Config`, and never depend on `mcm-config`.
+- Each crate defines its own sub-struct (`BackupConfig`, `RouterConfig`, …) with `Deserialize + Default`, `#[serde(deny_unknown_fields)]` and a `validate()`; `chunkyard-config` composes them into `Config` and runs all validations before startup.
+- Crates receive **only their own sub-struct**, never the whole `Config`, and never depend on `chunkyard-config`.
 
 ## 9. Rust module layout and naming
 
@@ -102,7 +102,7 @@ ServerHandle (Clone)             Supervisor task (owns state)
 
 - Unit tests inline: `#[cfg(test)] mod tests` at the bottom of each file.
 - Integration tests per crate in `crates/<crate>/tests/<area>.rs`; shared helpers in `tests/common/mod.rs`.
-- HTTP/WS-level tests live in **`crates/mcm-api-tests/tests/<phase>_<area>.rs`** using `mcm_testkit::TestApp` (see [workspace-layout.md](workspace-layout.md) rule 9). Phase test plans write their location as `mcm-api-tests/<file>`.
+- HTTP/WS-level tests live in **`crates/chunkyard-api-tests/tests/<phase>_<area>.rs`** using `mcm_testkit::TestApp` (see [workspace-layout.md](workspace-layout.md) rule 9). Phase test plans write their location as `chunkyard-api-tests/<file>`.
 - **Time in tests**: `tokio::time::pause()` / `FakeClock` only for pure-logic tests (backoff calculation, cron, retention, rollups, actor logic with a fake spawner). Tests that run real processes (fake-mc-server) use real time with short configured timeouts (e.g. `stop_timeout_s = 2`) and `wait_until` polling — never paused time.
 - Test names: `<unit>_<condition>_<expected>`, e.g. `resolve_dotdot_outside_root_is_rejected`. Phase test plans use these exact names.
 - Recorded fixtures: `crates/<crate>/tests/fixtures/<vendor>/<endpoint>.json`.
@@ -134,7 +134,7 @@ web/src/
 
 ## 12. Audit actions
 
-- One catalog: `mcm_core::audit::Action`, an enum with `as_str()` giving dot-separated, lowercase, `<area>.<object>.<verb>` or `<area>.<verb>` names (`auth.login`, `server.start`, `server.properties.update`, `files.write`, `console.command`, `backup.restore`). Phase specs reference names from this catalog; a test (`audit_catalog_names_are_unique_and_well_formed`) enforces format and uniqueness, and the catalog is exported in OpenAPI as an enum.
+- One catalog: `chunkyard_core::audit::Action`, an enum with `as_str()` giving dot-separated, lowercase, `<area>.<object>.<verb>` or `<area>.<verb>` names (`auth.login`, `server.start`, `server.properties.update`, `files.write`, `console.command`, `backup.restore`). Phase specs reference names from this catalog; a test (`audit_catalog_names_are_unique_and_well_formed`) enforces format and uniqueness, and the catalog is exported in OpenAPI as an enum.
 - `details` is built from an **explicit per-action field allow-list** (`AuditDetails::builder().field("keys", …)`); arbitrary request bodies are never serialized into the audit log. See [audit.md](audit.md).
 
 ## 13. Definition of a "feature" in a phase spec

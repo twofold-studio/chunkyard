@@ -19,7 +19,7 @@ flowchart LR
   end
   Browser["Browser (SPA)"] -- "HTTPS REST + WebSocket" --> MCM
   Player["Minecraft client"] -- "TCP 25565 (router)" --> MCM
-  MCM -- "outbound TLS tunnel (P9)" --> Relay["mcm-relay (VPS)"]
+  MCM -- "outbound TLS tunnel (P9)" --> Relay["chunkyard-relay (VPS)"]
   Player2["Remote player"] --> Relay
   MCM -- "HTTPS" --> Ext["Mojang, Paper, Fabric, Forge,<br/>NeoForge, Quilt, Adoptium,<br/>CurseForge, Modrinth, Hangar"]
   MCM -- "webhooks" --> Discord["Discord / HTTP"]
@@ -30,9 +30,9 @@ flowchart LR
 
 | Component | Form | Responsibility |
 |---|---|---|
-| `mcm` | Binary crate `mcm-server` | HTTP/WS API, static SPA, server supervisors, jobs, scheduler, metrics, router, port mapping, tunnel client |
-| `mcm-relay` | Binary crate `mcm-relay` (P9) | Public-facing TCP relay; accepts agent tunnels; routes players by hostname or port |
-| `mcm-shim` | Binary crate `mcm-shim` (P10) | Holds a server's stdio across mcm restarts (unix socket + log file) |
+| `mcm` | Binary crate `chunkyard-server` | HTTP/WS API, static SPA, server supervisors, jobs, scheduler, metrics, router, port mapping, tunnel client |
+| `chunkyard-relay` | Binary crate `chunkyard-relay` (P9) | Public-facing TCP relay; accepts agent tunnels; routes players by hostname or port |
+| `chunkyard-shim` | Binary crate `chunkyard-shim` (P10) | Holds a server's stdio across mcm restarts (unix socket + log file) |
 | `fake-mc-server` | Test-only binary | Mimics a Minecraft server (stdout, stdin, SLP, RCON) so CI does not need Java |
 | SPA | SvelteKit static build | UI; talks only to `/api/v1` and `/api/v1/ws` |
 
@@ -60,7 +60,7 @@ flowchart LR
 |---|---|
 | Linux x86_64 / aarch64 (glibc and musl) | **Supported.** All features. |
 | macOS | Development only. Builds and unit tests run in CI; not a release target. |
-| Windows | **Not supported in v1.** Recommended path is WSL2 or the Docker image. Platform-specific code (process groups, signals, file permissions) lives behind the `mcm_process::platform` module so a Windows backend (Job Objects, `CTRL_BREAK`) can be added without touching callers. |
+| Windows | **Not supported in v1.** Recommended path is WSL2 or the Docker image. Platform-specific code (process groups, signals, file permissions) lives behind the `chunkyard_process::platform` module so a Windows backend (Job Objects, `CTRL_BREAK`) can be added without touching callers. |
 
 > Native-runtime servers stop when mcm restarts (P1–P9); the shim and Docker runtimes (P10) survive restarts. See [process-model.md](process-model.md).
 
@@ -69,23 +69,23 @@ flowchart LR
 ```mermaid
 flowchart TB
   main["main: load config → open DB → migrate → build AppState → spawn subsystems → serve"]
-  main --> api["axum Router (mcm-api)"]
-  main --> sup["ServerRegistry: one Supervisor actor per server (mcm-process)"]
-  main --> jobs["JobRunner (mcm-core::jobs)"]
-  main --> sched["Scheduler (mcm-scheduler)"]
-  main --> met["MetricsCollector (mcm-metrics)"]
-  main --> router["McRouter listener (mcm-router, P7)"]
-  main --> tunnel["Tunnel client (mcm-tunnel, P9)"]
+  main --> api["axum Router (chunkyard-api)"]
+  main --> sup["ServerRegistry: one Supervisor actor per server (chunkyard-process)"]
+  main --> jobs["JobRunner (chunkyard-core::jobs)"]
+  main --> sched["Scheduler (chunkyard-scheduler)"]
+  main --> met["MetricsCollector (chunkyard-metrics)"]
+  main --> router["McRouter listener (chunkyard-router, P7)"]
+  main --> tunnel["Tunnel client (chunkyard-tunnel, P9)"]
   main --> bus["EventBus (tokio broadcast)"]
   sup --> bus
   jobs --> bus
   met --> bus
   bus --> ws["WS hub → browsers"]
-  bus --> notify["Notifier (mcm-notify)"]
+  bus --> notify["Notifier (chunkyard-notify)"]
 ```
 
 - All long-lived subsystems receive a child `CancellationToken` of the root token; SIGINT/SIGTERM cancels root → graceful shutdown (see [process-model.md](process-model.md#manager-shutdown)).
-- Cross-subsystem communication goes through the typed `EventBus` (`mcm_core::events::Event`), never direct calls in both directions.
+- Cross-subsystem communication goes through the typed `EventBus` (`chunkyard_core::events::Event`), never direct calls in both directions.
 
 ## Request lifecycle
 

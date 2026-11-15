@@ -1,11 +1,13 @@
 # Backend development
 
+Rust packages and directories use the `chunkyard-` prefix (`chunkyard-core`, `chunkyard-api`, `chunkyard-server`, etc.); Rust imports use `chunkyard_core`, `chunkyard_api`, etc. Existing source integrations must update their Cargo package/import names. The executable remains `mcm`, and this source rename does not migrate databases, instance directories, cookies or Docker ownership labels.
+
 Chunkyard runs Minecraft in Docker. Java is supplied by each server's container image; the manager does not discover, install or execute Java on the host. Managed installers choose the Java image required by the selected Minecraft version or mod loader.
 
 ```sh
-cargo run -p mcm-server -- serve
-cargo run -p mcm-server -- config check
-cargo run -p mcm-server -- migrate
+cargo run -p chunkyard-server -- serve
+cargo run -p chunkyard-server -- config check
+cargo run -p chunkyard-server -- migrate
 ```
 
 Build the UI with `pnpm --dir web build` to serve it on the same origin. Set `CHUNKYARD_HTTP__UI_DIR=` for API-only development. Use `--data-dir` or `CHUNKYARD_DATA_DIR` to choose storage. Commands print JSON to stdout and diagnostics to stderr.

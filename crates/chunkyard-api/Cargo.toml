@@ -1,0 +1,23 @@
+[package]
+name = "chunkyard-api"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+chunkyard-core.workspace = true
+chunkyard-auth.workspace = true
+chunkyard-config.workspace = true
+axum = {workspace=true, features=["ws"]}
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+futures-util.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+url.workspace = true

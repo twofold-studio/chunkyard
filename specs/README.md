@@ -58,8 +58,8 @@ Each phase is independently shippable: after it, the product is releasable and t
 | 6 | [06-backups-scheduler-worlds](phases/06-backups-scheduler-worlds/README.md) | Backups (local/S3, retention, restore), cron schedules, world upload/download/reset | backup, scheduler, worlds | 2, 5 |
 | 7 | [07-network-exposure](phases/07-network-exposure/README.md) | Hostname router + PROXY v2, UPnP/NAT-PMP/PCP port mapping | router, portmap, protocol | 1, 2 |
 | 8 | [08-users-audit-notifications](phases/08-users-audit-notifications/README.md) | Multi-user, roles, per-server grants (native single-trust rules), audit UI, Discord/webhook notifications | auth, notify | 0–7 |
-| 9 | [09-relay](phases/09-relay/README.md) | Self-hostable `mcm-relay` with TLS tunnel; alternatives (frp, playit.gg, WireGuard) documented | relay, tunnel, tunnel-proto | 7 |
-| 10 | [10-isolation-limits](phases/10-isolation-limits/README.md) | Docker runtime, `mcm-shim` runtime (servers survive mcm restarts), delegated cgroup v2 limits | process, shim | 1, 3, 8 |
+| 9 | [09-relay](phases/09-relay/README.md) | Self-hostable `chunkyard-relay` with TLS tunnel; alternatives (frp, playit.gg, WireGuard) documented | relay, tunnel, tunnel-proto | 7 |
+| 10 | [10-isolation-limits](phases/10-isolation-limits/README.md) | Docker runtime, `chunkyard-shim` runtime (servers survive mcm restarts), delegated cgroup v2 limits | process, shim | 1, 3, 8 |
 | 11 | [11-multi-node](phases/11-multi-node/README.md) | **Post-1.0.** Remote nodes running `mcm agent`, controlled by a primary | node, server, api | 0–10 |
 
 ## Glossary
@@ -78,7 +78,7 @@ Each phase is independently shippable: after it, the product is releasable and t
 | **SLP** | Server List Ping (status protocol over the game port) |
 | **RCON** | Remote console protocol (TCP, Source-style) |
 | **Router** | mcm's Minecraft-protocol hostname router (P7) |
-| **Relay** | `mcm-relay`, public server that accepts agent tunnels (P9) |
+| **Relay** | `chunkyard-relay`, public server that accepts agent tunnels (P9) |
 | **Agent** | An `mcm` instance connected to a relay (P9) or primary (P11) |
 | **Runtime** | How a server process is hosted: `native` (P1), `shim` or `docker` (P10) |
 | **Epoch** | Per-run id of the mcm process; console `seq` numbers are only comparable within one epoch |

@@ -119,7 +119,7 @@ Client algorithm (`features/files/upload.svelte.ts`): create → PUT chunks of `
 
 No new topics. `server:<id>` status payload gains `restartRequired: boolean`. Job progress over `jobs` (phase 0).
 
-## Events (`mcm_core::events::Event`)
+## Events (`chunkyard_core::events::Event`)
 
 `ServerSettingsChanged { server_id, fields: Vec<String> }`, `ServerPlayersListChanged { server_id, list }`, `FilesChanged { server_id, paths }` (used later for cache invalidation; not exposed on WS in this phase).
 

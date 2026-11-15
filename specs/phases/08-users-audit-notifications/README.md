@@ -24,7 +24,7 @@ Authoritative rule: [security.md § Native runtime is single-trust](../../archit
 | 2FA policy | Owner-enforced 2FA for admins (`security.require_2fa_for_admins`). TOTP enrolment, recovery codes and the login step already ship in [phase 0](../00-foundation/README.md) |
 | Admin session control | Admins list/revoke other users' sessions (own-session management is phase 0) |
 | Audit | Audit UI with filters, per-server activity view, CSV export, configurable retention |
-| Notifications | `mcm-notify`: Discord + signed generic webhook channels, event catalog, filters, retries, delivery log, test-send, in-app notifications. All outbound HTTP via `mcm_download::SafeHttp` |
+| Notifications | `chunkyard-notify`: Discord + signed generic webhook channels, event catalog, filters, retries, delivery log, test-send, in-app notifications. All outbound HTTP via `chunkyard_download::SafeHttp` |
 | Security review | Rate-limit review, `no_secrets_in_logs` in every API suite, blocking dependency audit, threat-model walkthrough (T1–T13) |
 
 ## Non-goals
@@ -57,7 +57,7 @@ Authoritative rule: [security.md § Native runtime is single-trust](../../archit
 | Phase | Needed for |
 |---|---|
 | [00-foundation](../00-foundation/README.md) | users/sessions/api_tokens/audit_log tables, TOTP, own sessions, security headers, `AuthService::authorize`, audit catalog |
-| [01-lifecycle-console](../01-lifecycle-console/README.md) | Server events, console WS subscriptions to revoke, `SafeHttp` (`mcm-download`) |
+| [01-lifecycle-console](../01-lifecycle-console/README.md) | Server events, console WS subscriptions to revoke, `SafeHttp` (`chunkyard-download`) |
 | [05-monitoring](../05-monitoring/README.md) | Player join/leave events, disk usage for `disk.low` |
 | [06-backups-scheduler-worlds](../06-backups-scheduler-worlds/README.md) | Backup and schedule events |
 | Phases 2–4, 7 | Their endpoints are covered by the permission matrix test |
@@ -78,8 +78,8 @@ Authoritative rule: [security.md § Native runtime is single-trust](../../archit
 - [ ] Discord 429 handling and webhook HMAC verified against wiremock fixtures; notifications use `SafeHttp` only.
 - [ ] Per-server activity view hides `console.command` rows from users without `console.read`.
 - [ ] Audit retention configurable and batched.
-- [ ] `no_secrets_in_logs` runs at the end of every `mcm-api-tests` binary.
+- [ ] `no_secrets_in_logs` runs at the end of every `chunkyard-api-tests` binary.
 - [ ] `cargo deny` + `cargo audit` + `pnpm audit --prod` blocking in CI (high/critical).
 - [ ] Threat-model walkthrough (T1–T13 in [security.md](../../architecture/security.md)) recorded in [requirements.md](requirements.md#threat-model-walkthrough) with each mitigation linked to a test.
-- [ ] Coverage gates met; `mcm-auth` ≥ 95 %.
+- [ ] Coverage gates met; `chunkyard-auth` ≥ 95 %.
 - [ ] SFTP (8b) explicitly **not** required.

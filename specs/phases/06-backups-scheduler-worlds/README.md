@@ -8,9 +8,9 @@ Protect player data and automate routine operations: consistent hot backups to l
 
 | Area | Included |
 |---|---|
-| `mcm-backup` | `BackupService`, streaming `.tar.zst` writer with in-archive manifest, include/exclude globs, hot-backup consistency protocol (`save-off` / `save-all flush` / `save-on`), sha256, `StorageTarget` trait with `LocalStorage` and `S3Storage` (object_store, multipart), GFS retention, restore with rollback, import of external archives, streamed download |
-| `mcm-scheduler` | Cron engine (croner + chrono-tz), per-schedule timezone, step sequences, countdown announcements, conditions on player count, misfire policy, overlap prevention, run-now, run history, next-run preview |
-| `mcm-worlds` (new crate: core, fs) | World discovery (vanilla and Bukkit layouts), download as zip (consistent when running), upload zip, reset/regenerate with optional seed, set active world (`level-name`) |
+| `chunkyard-backup` | `BackupService`, streaming `.tar.zst` writer with in-archive manifest, include/exclude globs, hot-backup consistency protocol (`save-off` / `save-all flush` / `save-on`), sha256, `StorageTarget` trait with `LocalStorage` and `S3Storage` (object_store, multipart), GFS retention, restore with rollback, import of external archives, streamed download |
+| `chunkyard-scheduler` | Cron engine (croner + chrono-tz), per-schedule timezone, step sequences, countdown announcements, conditions on player count, misfire policy, overlap prevention, run-now, run history, next-run preview |
+| `chunkyard-worlds` (new crate: core, fs) | World discovery (vanilla and Bukkit layouts), download as zip (consistent when running), upload zip, reset/regenerate with optional seed, set active world (`level-name`) |
 | API/UI | Backups tab, Schedules tab, Worlds tab, admin Storage targets page |
 
 ## Non-goals
@@ -43,8 +43,8 @@ Protect player data and automate routine operations: consistent hot backups to l
 | Phase | Needed |
 |---|---|
 | [0](../00-foundation/README.md) | Jobs, audit, settings table, secrets encryption, problem+json |
-| [1](../01-lifecycle-console/README.md) | Core traits `ServerService` (status, start/stop/restart, maintenance flag) and `ServerCommandSink` (`send_command`, `expect_line`) implemented by `mcm-process` |
-| [2](../02-settings-files/README.md) | `mcm-fs` `SandboxRoot`, archive extraction limits, streaming zip writer, `uploadId` chunked uploads, properties service (`level-name`, `level-seed`) |
+| [1](../01-lifecycle-console/README.md) | Core traits `ServerService` (status, start/stop/restart, maintenance flag) and `ServerCommandSink` (`send_command`, `expect_line`) implemented by `chunkyard-process` |
+| [2](../02-settings-files/README.md) | `chunkyard-fs` `SandboxRoot`, archive extraction limits, streaming zip writer, `uploadId` chunked uploads, properties service (`level-name`, `level-seed`) |
 | [5](../05-monitoring/README.md) | `PlayerCountSource` core trait (online count, `player_sessions`) for player conditions; without it the conditions fall back to `list` via stdin (P6-FR-33) |
 
 ## Files in this phase

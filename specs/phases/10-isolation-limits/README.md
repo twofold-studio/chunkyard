@@ -2,19 +2,19 @@
 
 ## Goal
 
-Lift the two big native-runtime limitations: servers stopping when mcm restarts, and the absence of any boundary between servers and the host. Phase 10 adds two runtimes — **shim** (a tiny per-server `mcm-shim` process that keeps the server's stdio alive across mcm restarts) and **Docker** (one hardened container per server) — plus **delegated cgroup v2 limits** and global/per-server resource guards. All runtimes implement the single `ProcessSpawner` trait defined in [process-model.md](../../architecture/process-model.md#spawner-trait-single-definition); this phase does not redefine it.
+Lift the two big native-runtime limitations: servers stopping when mcm restarts, and the absence of any boundary between servers and the host. Phase 10 adds two runtimes — **shim** (a tiny per-server `chunkyard-shim` process that keeps the server's stdio alive across mcm restarts) and **Docker** (one hardened container per server) — plus **delegated cgroup v2 limits** and global/per-server resource guards. All runtimes implement the single `ProcessSpawner` trait defined in [process-model.md](../../architecture/process-model.md#spawner-trait-single-definition); this phase does not redefine it.
 
 ## Scope
 
 | Area | In scope |
 |---|---|
 | Runtime selection | `runtime: native | shim | docker` per server, switchable while stopped; interacts with phase 8 grants ([P8-FR-14](../08-users-audit-notifications/requirements.md#per-server-permissions)) |
-| Shim runtime | `mcm-shim` binary + client lib: owns java's stdio, unix socket `<data>/state/<id>/shim.sock`, bounded replay log, survives mcm restarts, re-adopted via `ProcessSpawner::adopt()` |
-| Docker runtime | `DockerSpawner` (`mcm-process`, feature `docker`) via `bollard`; hardened container per server; attach console; re-adopt after mcm restart with log replay; stats |
+| Shim runtime | `chunkyard-shim` binary + client lib: owns java's stdio, unix socket `<data>/state/<id>/shim.sock`, bounded replay log, survives mcm restarts, re-adopted via `ProcessSpawner::adopt()` |
+| Docker runtime | `DockerSpawner` (`chunkyard-process`, feature `docker`) via `bollard`; hardened container per server; attach console; re-adopt after mcm restart with log replay; stats |
 | Native/shim limits | cgroup v2 **only via a delegated subtree** (`Delegate=yes`); memory/CPU/PIDs; OOM detection; otherwise no limits + UI warning |
 | Global limits | `limits.max_total_memory_mb` (0 = unlimited) guard on start |
 | Disk | Per-server soft quota with alerts and optional write blocking |
-| mcm-in-Docker | Host path translation for bind mounts |
+| chunkyard-in-Docker | Host path translation for bind mounts |
 
 ## Non-goals
 
@@ -38,7 +38,7 @@ Lift the two big native-runtime limitations: servers stopping when mcm restarts,
 
 | Option | Pros | Cons |
 |---|---|---|
-| **A. mcm-managed JRE (phase 3) bind-mounted read-only at `/opt/java` into `ghcr.io/<org>/mcm-runtime:<mcm-version>`** (debian-slim + ca-certificates + fontconfig) — **chosen** | Same JRE in every runtime; one small image; offline after first pull; tests mount a FakeJre | mcm publishes the runtime image; glibc JREs only |
+| **A. chunkyard-managed JRE (phase 3) bind-mounted read-only at `/opt/java` into `ghcr.io/<org>/chunkyard-runtime:<chunkyard-version>`** (debian-slim + ca-certificates + fontconfig) — **chosen** | Same JRE in every runtime; one small image; offline after first pull; tests mount a FakeJre | mcm publishes the runtime image; glibc JREs only |
 | B. `eclipse-temurin:<major>-jre` per major | Zero image work | Large pulls per major; JRE drift vs native; FakeJre impossible in CI |
 
 Admin override per server: `dockerImage` (any image with `java` on PATH); the JRE mount is then skipped.
@@ -79,6 +79,6 @@ Admin override per server: `dockerImage` (any image with `java` on PATH); the JR
 - [ ] Docker suite (`CHUNKYARD_TEST_DOCKER=1`) green in the **`docker-integration` merge-queue job** ([ci.md](../../testing/ci.md#merge-queue)): lifecycle, console, re-adopt, OOM, limits, hardening via `docker inspect`.
 - [ ] Delegated cgroup suite green on a runner with `Delegate=yes` (`CHUNKYARD_TEST_CGROUPS=1`); `none` mode degradation tested everywhere.
 - [ ] Switching native → shim → docker → native preserves files; switching to native/shim with conflicting user grants returns 409.
-- [ ] mcm-in-Docker compose example (`docker/compose.yml`) documented and smoke-tested.
+- [ ] chunkyard-in-Docker compose example (`docker/compose.yml`) documented and smoke-tested.
 - [ ] Container config reviewed against [security.md](../../architecture/security.md#process-isolation-stance).
-- [ ] Coverage gates met; `mcm-process::docker` and `mcm-shim` ≥ 85 %.
+- [ ] Coverage gates met; `chunkyard-process::docker` and `chunkyard-shim` ≥ 85 %.

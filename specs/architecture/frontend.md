@@ -46,9 +46,9 @@ Conventions are in [patterns.md §11](patterns.md#11-frontend-conventions); this
 
 ## Embedding and dev loop
 
-- `pnpm --dir web build` → `web/build/`; `mcm-server` embeds it via `rust-embed` (feature `embed-ui`).
+- `pnpm --dir web build` → `web/build/`; `chunkyard-server` embeds it via `rust-embed` (feature `embed-ui`).
 - Static handler: exact file match → serve with long cache for `/_app/immutable/*`; otherwise `index.html` with `Cache-Control: no-cache`. `/api/*` never falls through to the SPA.
-- **Dev loop (the only one):** run `cargo run -p mcm-server --no-default-features --features test-hooks` (API on `127.0.0.1:8420`, no embedded UI) and `pnpm --dir web dev`; open Vite on `:5173`, which proxies `/api` (incl. WS upgrade) to mcm. mcm never proxies to Vite.
+- **Dev loop (the only one):** run `cargo run -p chunkyard-server --no-default-features --features test-hooks` (API on `127.0.0.1:8420`, no embedded UI) and `pnpm --dir web dev`; open Vite on `:5173`, which proxies `/api` (incl. WS upgrade) to mcm. mcm never proxies to Vite.
 - CSP: `kit.csp = { mode: "hash" }`; theme bootstrap via static `/theme-init.js` (see [security.md](security.md#http-security-headers-and-csp-p0)).
 
 ## Accessibility and UX baselines

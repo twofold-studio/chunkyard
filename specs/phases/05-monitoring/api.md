@@ -1,6 +1,6 @@
 # Phase 5 — API, WebSocket, migration
 
-Conventions: [api-conventions.md](../../architecture/api-conventions.md). Handlers in `mcm-api/src/routes/{metrics,players,host,prometheus}.rs`.
+Conventions: [api-conventions.md](../../architecture/api-conventions.md). Handlers in `chunkyard-api/src/routes/{metrics,players,host,prometheus}.rs`.
 
 ## DTOs
 
@@ -55,11 +55,11 @@ Validation: `from < to`, range ≤ 400 days, `maxPoints` 10–2000 → `422 vali
 
 Subscribing to `metrics:<id>` immediately sends the latest snapshot (no wait for next tick).
 
-## Events (`mcm_core::events::Event`)
+## Events (`chunkyard_core::events::Event`)
 
 `MetricsSampled { server_id, sample }` (internal, high-frequency, not forwarded to notifier), `PlayersChanged { server_id, online }`, `PlayerJoined { server_id, name, uuid }`, `PlayerLeft { server_id, name, session_s }`, `RconStateChanged { server_id, state }`, `RconAuthFailed { server_id }`, `ManagementStateChanged { server_id, state }`.
 
-## Config additions (`[metrics]`, `mcm_metrics::MetricsConfig`, composed by `mcm-config`)
+## Config additions (`[metrics]`, `mcm_metrics::MetricsConfig`, composed by `chunkyard-config`)
 
 ```toml
 [metrics]
@@ -75,9 +75,9 @@ max_concurrent_probes = 16
 
 Uses the global token scope `metrics.read` defined in [auth.md](../../architecture/auth.md#permission-catalog-per-server) (allows only `GET /metrics`). Before P8, an admin's `["*"]` token is also accepted; from P8, `*` must be combined with `admin`.
 
-## Migration `crates/mcm-db/migrations/<NNNN>_p5_metrics.sql`
+## Migration `crates/chunkyard-db/migrations/<NNNN>_p5_metrics.sql`
 
-Number assigned at merge time. Extends the [data-model.md](../../architecture/data-model.md#phase-5--metrics) sketch with max columns, state history and management-protocol columns. Repos: `MetricRepo`, `PlayerSessionRepo`, `StateHistoryRepo` (traits in `mcm-core`, impls in `mcm-db`).
+Number assigned at merge time. Extends the [data-model.md](../../architecture/data-model.md#phase-5--metrics) sketch with max columns, state history and management-protocol columns. Repos: `MetricRepo`, `PlayerSessionRepo`, `StateHistoryRepo` (traits in `chunkyard-core`, impls in `chunkyard-db`).
 
 ```sql
 CREATE TABLE metric_samples (
@@ -114,7 +114,7 @@ ALTER TABLE servers ADD COLUMN management_port INTEGER;
 ALTER TABLE servers ADD COLUMN management_secret_enc BLOB;   -- AAD "servers.management_secret_enc:<id>"
 ```
 
-`server_state_history` is written by a subscriber to `ServerStatusChanged` (in `mcm-metrics`, via `StateHistoryRepo`), not by `mcm-process`, preserving the crate graph. Retention: 400 days.
+`server_state_history` is written by a subscriber to `ServerStatusChanged` (in `chunkyard-metrics`, via `StateHistoryRepo`), not by `chunkyard-process`, preserving the crate graph. Retention: 400 days.
 
 ## Error codes
 

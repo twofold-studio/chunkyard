@@ -8,7 +8,7 @@ Show, live and historically, how each server and the host are doing: CPU, memory
 
 | In | Detail |
 |---|---|
-| `mcm-metrics` crate | `MetricsCollector` actor, process-tree sampler (`/proc`, `sysinfo` fallback), disk walker, `TpsProbe` per flavor, rollups, retention |
+| `chunkyard-metrics` crate | `MetricsCollector` actor, process-tree sampler (`/proc`, `sysinfo` fallback), disk walker, `TpsProbe` per flavor, rollups, retention |
 | RCON | **First enabled in this phase** (managed keys appended to the P2 registry); one `RconActor` per running server; exposure check + warning; per-server `rconDisabled` |
 | Management protocol | Vanilla 1.21.9+ JSON-RPC/WebSocket API on loopback: preferred source for players, sessions and allowlist |
 | Players | Online list via management protocol → RCON `list` → SLP → Query; sessions from management notifications or flavour-aware anchored console matchers |

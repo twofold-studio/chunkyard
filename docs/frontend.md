@@ -39,7 +39,7 @@ Build the SPA, then start the Rust service from the repository root:
 ```sh
 pnpm --dir web install --frozen-lockfile
 pnpm --dir web build
-cargo run -p mcm-server -- serve
+cargo run -p chunkyard-server -- serve
 ```
 
 Open `http://127.0.0.1:8420`. Rust serves the UI and API on the same origin, including direct navigation and refreshes on `/servers` and `/integrations`. The Docker image builds and includes the UI automatically; no Node runtime or separate web server is needed at runtime.
@@ -59,7 +59,7 @@ For a reverse proxy, preserve the original `Host` and set `CHUNKYARD_HTTP__PUBLI
 
 `node scripts/smoke-properties-console.mjs` additionally checks the contextual header, Properties Enter/debounce autosave, running/saved revision separation, restart application, history restoration, real WebSocket console output and the metrics preference. Build the Rust binary/UI and the disposable `mcm-manager-test-runtime:local` image (`docker build -t mcm-manager-test-runtime:local testdata/docker-runtime`) first. It uses temporary data and a shell console fixture, not Minecraft; it removes its container afterward. Use `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` for an installed Chrome as needed.
 
-After building the UI and `cargo build -p mcm-server --locked`, run `node scripts/smoke-ui.mjs`. It uses Playwright Chromium to check the real Rust service in both auth modes, owner setup, session persistence, navigation, refreshes and CSP violations. Install Chromium with `pnpm --dir web exec playwright install chromium`, or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an installed Chrome executable. The test uses temporary data and disables Docker operations. CI runs it after frontend validation, component/unit tests and the production build.
+After building the UI and `cargo build -p chunkyard-server --locked`, run `node scripts/smoke-ui.mjs`. It uses Playwright Chromium to check the real Rust service in both auth modes, owner setup, session persistence, navigation, refreshes and CSP violations. Install Chromium with `pnpm --dir web exec playwright install chromium`, or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an installed Chrome executable. The test uses temporary data and disables Docker operations. CI runs it after frontend validation, component/unit tests and the production build.
 
 ## Vanilla/Paper creation
 

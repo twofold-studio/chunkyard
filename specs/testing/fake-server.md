@@ -1,6 +1,6 @@
 # Fake Minecraft server (`fake-mc-server`)
 
-A small Rust binary in `crates/fake-mc-server` (depends only on `mcm-protocol`, `tokio`, `clap`). It behaves enough like a Minecraft server that the manager cannot tell the difference in tests, so CI needs neither Java nor Mojang downloads.
+A small Rust binary in `crates/fake-mc-server` (depends only on `chunkyard-protocol`, `tokio`, `clap`). It behaves enough like a Minecraft server that the manager cannot tell the difference in tests, so CI needs neither Java nor Mojang downloads.
 
 ## Invocation modes
 

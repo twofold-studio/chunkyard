@@ -56,7 +56,7 @@ All of phases 0–9: every service trait introduced there gets a remote implemen
 
 ## New crate
 
-`crates/mcm-node` — node protocol DTOs, `NodeClient` (reqwest + tokio-tungstenite), and `Remote*Service` implementations of the `mcm-core` service traits. Depends on `mcm-core` only (+ external). Agent-side axum routes live in `mcm-api::node` (the HTTP-layer rule holds). **Requires adding the crate to [workspace-layout.md](../../architecture/workspace-layout.md).**
+`crates/chunkyard-node` — node protocol DTOs, `NodeClient` (reqwest + tokio-tungstenite), and `Remote*Service` implementations of the `chunkyard-core` service traits. Depends on `chunkyard-core` only (+ external). Agent-side axum routes live in `chunkyard-api::node` (the HTTP-layer rule holds). **Requires adding the crate to [workspace-layout.md](../../architecture/workspace-layout.md).**
 
 ## Documents
 

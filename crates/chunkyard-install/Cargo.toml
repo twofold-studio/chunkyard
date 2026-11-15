@@ -1,0 +1,21 @@
+[package]
+name = "chunkyard-install"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+[lints]
+workspace = true
+[dependencies]
+chunkyard-core.workspace = true
+chunkyard-download.workspace = true
+async-trait.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+url.workspace = true
+chunkyard-fs.workspace = true
+sha2.workspace = true
+serde.workspace = true
+futures-util.workspace = true
+zip.workspace = true
+[dev-dependencies]
+tempfile.workspace = true

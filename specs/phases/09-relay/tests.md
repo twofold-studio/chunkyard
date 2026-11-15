@@ -1,8 +1,8 @@
 # Phase 9 — Test plan
 
-Kinds: U unit, P property, I crate integration, A API integration (`mcm-api-tests`, `TestApp`), C component, E E2E, F fuzz, S soak. Backends are `fake-mc-server` instances ([fake-server.md](../../testing/fake-server.md)); relay integration tests start an in-process relay built from the `mcm-relay` crate's library target on `127.0.0.1:0` ports. Pure-logic tests (backoff math, frame codec) may use paused time/`FakeClock`; socket tests use real time with short configured timeouts (e.g. 200 ms heartbeat, 300 ms Hello timeout via test config).
+Kinds: U unit, P property, I crate integration, A API integration (`chunkyard-api-tests`, `TestApp`), C component, E E2E, F fuzz, S soak. Backends are `fake-mc-server` instances ([fake-server.md](../../testing/fake-server.md)); relay integration tests start an in-process relay built from the `chunkyard-relay` crate's library target on `127.0.0.1:0` ports. Pure-logic tests (backoff math, frame codec) may use paused time/`FakeClock`; socket tests use real time with short configured timeouts (e.g. 200 ms heartbeat, 300 ms Hello timeout via test config).
 
-## mcm-tunnel-proto
+## chunkyard-tunnel-proto
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
@@ -15,7 +15,7 @@ Kinds: U unit, P property, I crate integration, A API integration (`mcm-api-test
 | `pairing_string_parse_valid_and_invalid` (scheme, host, fp format, token prefix, missing fp = CA mode) | `src/pairing.rs` | 02, 10 | U |
 | `pairing_string_roundtrip` | `src/pairing.rs` | 02, 10 | P |
 
-## mcm-relay
+## chunkyard-relay
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
@@ -51,7 +51,7 @@ Kinds: U unit, P property, I crate integration, A API integration (`mcm-api-test
 | `probe_rate_limited_per_agent` | `tests/probe.rs` | 14 | I |
 | `relay_soak_500_players_10min` | `benches/soak.rs` (nightly) | 06 | S |
 
-## mcm-tunnel (agent; against an in-process relay)
+## chunkyard-tunnel (agent; against an in-process relay)
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
@@ -65,14 +65,14 @@ Kinds: U unit, P property, I crate integration, A API integration (`mcm-api-test
 | `tunnel_rejected_announce_sets_route_state` | `tests/tunnel.rs` | 13 | I |
 | `tunnel_route_without_proxy_reports_real_ip_hidden` | `tests/tunnel.rs` | 15 | I |
 
-## mcm-router (P9 additions)
+## chunkyard-router (P9 additions)
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
 | `exposure_includes_relay_entry_with_health` | `src/exposure.rs` | 15 | U |
 | `router_only_route_valid_with_relay_and_no_listener` | `src/validate.rs` | 13 | U |
 
-## mcm-api-tests (`crates/mcm-api-tests/tests/p9_relays.rs`)
+## chunkyard-api-tests (`crates/chunkyard-api-tests/tests/p9_relays.rs`)
 
 | Test | FR | Kind |
 |---|---|---|
@@ -104,9 +104,9 @@ Kinds: U unit, P property, I crate integration, A API integration (`mcm-api-test
 
 | Spec › test | US / FR |
 |---|---|
-| `p9-relay.spec.ts › start mcm-relay binary, add agent via CLI, paste pairing, status-ping and join through relay hostname` | US-01, US-03 / 01–06, 10–13 |
+| `p9-relay.spec.ts › start chunkyard-relay binary, add agent via CLI, paste pairing, status-ping and join through relay hostname` | US-01, US-03 / 01–06, 10–13 |
 | `p9-relay.spec.ts › revoke agent shows error status in UI` | US-02 / 07, 11 |
 | `p9-relay.spec.ts › exposure card lists relay address` | US-03 / 15 |
 | `p9-relay.spec.ts › relays empty state links to alternatives docs` | US-05 / 16 |
 
-US-04 (probe) is covered by `mcm-relay` and `mcm-api-tests` probe tests; no real gateway exists in CI.
+US-04 (probe) is covered by `chunkyard-relay` and `chunkyard-api-tests` probe tests; no real gateway exists in CI.

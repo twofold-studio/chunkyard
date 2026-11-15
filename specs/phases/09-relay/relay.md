@@ -1,11 +1,11 @@
-# Phase 9 — Relay design (`mcm-relay`, `mcm-tunnel`)
+# Phase 9 — Relay design (`chunkyard-relay`, `chunkyard-tunnel`)
 
 ## Topology
 
 ```mermaid
 sequenceDiagram
   participant P as Player
-  participant R as mcm-relay (VPS)
+  participant R as chunkyard-relay (VPS)
   participant A as mcm (agent, home)
   participant B as Backend (127.0.0.1:25566)
   A->>R: TCP+TLS 1.3 (pinned cert) to :7835, yamux
@@ -31,13 +31,13 @@ Yamux settings: initial stream window 256 KiB, max 2 048 streams per agent, keep
 ## Relay binary
 
 ```
-mcm-relay init --public-host relay.example.com [--data-dir /var/lib/mcm-relay]
+chunkyard-relay init --public-host relay.example.com [--data-dir /var/lib/chunkyard-relay]
     # creates relay.toml, relay.db, self-signed ECDSA P-256 cert (rcgen, SAN=public host, 10y), admin token
-mcm-relay serve
-mcm-relay agent add --name alice --hostnames 'alice.play.example.com,*.alice.play.example.com' [--ports 25570,25571] [--max-streams 256] [--bandwidth-mbps 50]
+chunkyard-relay serve
+chunkyard-relay agent add --name alice --hostnames 'alice.play.example.com,*.alice.play.example.com' [--ports 25570,25571] [--max-streams 256] [--bandwidth-mbps 50]
     # prints pairing string once
-mcm-relay agent list | agent revoke <name> | agent rotate-token <name> | agent set <name> --hostnames … --ports …
-mcm-relay status            # queries the running relay's admin socket
+chunkyard-relay agent list | agent revoke <name> | agent rotate-token <name> | agent set <name> --hostnames … --ports …
+chunkyard-relay status            # queries the running relay's admin socket
 ```
 
 Pairing string (parsed by `mcm_tunnel_proto::pairing`): `mcmrelay://relay.example.com:7835?fp=sha256:<64 hex of DER leaf cert>&token=mcr_<32 base62>&name=alice`. If the operator configures a CA-issued cert (`tls.cert`/`tls.key` in relay.toml), `fp` is omitted and mcm validates with webpki roots + hostname.
@@ -45,11 +45,11 @@ Pairing string (parsed by `mcm_tunnel_proto::pairing`): `mcmrelay://relay.exampl
 ### `relay.toml`
 
 ```toml
-data_dir = "/var/lib/mcm-relay"
+data_dir = "/var/lib/chunkyard-relay"
 tunnel_listen = "0.0.0.0:7835"
 public_listen = ["0.0.0.0:25565", "[::]:25565"]   # shared hostname-routed listeners
 dedicated_port_range = [25570, 25670]           # ports assignable to agents (listened on demand)
-admin_socket = "/run/mcm-relay/admin.sock"       # CLI ↔ daemon (mode 0600)
+admin_socket = "/run/chunkyard-relay/admin.sock"       # CLI ↔ daemon (mode 0600)
 admin_http = ""                                  # optional "127.0.0.1:7836", bearer admin token, GET /status, GET /metrics
 offline_motd = "§7This server is offline"
 [tls]  # optional CA cert; default self-signed from init
@@ -60,7 +60,7 @@ conn_rate_per_ip_per_min = 30
 max_agents = 100
 ```
 
-### State: SQLite `relay.db` (own sqlx migrations in `crates/mcm-relay/migrations/`)
+### State: SQLite `relay.db` (own sqlx migrations in `crates/chunkyard-relay/migrations/`)
 
 ```sql
 CREATE TABLE agents (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, token_hash BLOB NOT NULL UNIQUE,
@@ -91,9 +91,9 @@ No live agent/route: status → `offline_motd` with client's protocol echoed; lo
 
 Per-player: relay opens a yamux stream to the agent, writes `StreamOpen` then the buffered bytes, then splices. Relay-side limits: per-IP concurrent and rate limits, per-agent `max_streams` (excess → disconnect "Server is full"), optional per-agent bandwidth token bucket.
 
-## Agent side (`mcm-tunnel`)
+## Agent side (`chunkyard-tunnel`)
 
-- `TunnelClient` actor (crate `mcm-tunnel`, depends on `mcm-core`, `mcm-tunnel-proto`, `mcm-router`) per enabled `relay_connections` row: connect → Hello → Announce routes (from `proxy_routes` where `relay_id` = this relay) → serve streams. Re-announces on route changes.
+- `TunnelClient` actor (crate `chunkyard-tunnel`, depends on `chunkyard-core`, `chunkyard-tunnel-proto`, `chunkyard-router`) per enabled `relay_connections` row: connect → Hello → Announce routes (from `proxy_routes` where `relay_id` = this relay) → serve streams. Re-announces on route changes.
 - Reconnect backoff 1 s → 60 s with jitter; reset after 60 s connected. Status published on bus (`RelayStatusChanged`).
 - Each incoming stream → `IncomingConn { peer: StreamOpen.client_addr, hostname_hint, prebuffered }` → `mcm_router::ConnectionHandler` ([P7 router](../07-network-exposure/router.md); route lookup by `route_key`, wake-on-join, PROXY v2 to backend with the real client address if the route wants it, splice). The router listener itself need not be enabled.
 - Heartbeat: `Ping` every `[relay_client] heartbeat_s` (15 s); no `Pong` within 3 × heartbeat → reconnect.
@@ -110,13 +110,13 @@ Per-player: relay opens a yamux stream to the agent, writes `StreamOpen` then th
 
 Firewall on VPS: open TCP 7835, 25565, and the dedicated range.
 
-## Alternatives to `mcm-relay`
+## Alternatives to `chunkyard-relay`
 
 mcm documents these in the "Behind CGNAT" docs page and links to them from the Relays empty state. They work with mcm today because they forward plain TCP to the router port or a server port.
 
 | Option | Self-hosted? | Real client IP to backend | UDP / Bedrock | Cost | Setup complexity |
 |---|---|---|---|---|---|
-| **mcm-relay** (this phase) | Yes (any VPS) | Yes (PROXY v2 from agent) | No (future QUIC) | VPS (~€4/mo) | Low: `init`, `agent add`, paste pairing string |
+| **chunkyard-relay** (this phase) | Yes (any VPS) | Yes (PROXY v2 from agent) | No (future QUIC) | VPS (~€4/mo) | Low: `init`, `agent add`, paste pairing string |
 | **frp** (`frps` on VPS, `frpc` at home) | Yes | Yes, `proxy_protocol_version = "v2"` on the TCP proxy | Yes (UDP proxies) | VPS | Medium: two config files, token, ports per server; no hostname routing for Minecraft (point frp at the mcm router port to get it) |
 | **playit.gg** | No (hosted; agent at home) | Supported via PROXY protocol option (to verify current plan limits) | Yes (Bedrock supported) | Free tier / paid for custom domains & dedicated IPs | Low: agent + web dashboard; third party sees all traffic metadata |
 | **WireGuard to a VPS** + DNAT (`iptables`/`nftables`) or the mcm router running on the VPS | Yes | With DNAT, the backend sees the real IP only if the VPS routes return traffic through the tunnel (policy routing); else use PROXY from an HAProxy/mcm router on the VPS | Yes (DNAT any port) | VPS | High: kernel networking, routing tables, firewall |

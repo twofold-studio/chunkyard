@@ -1,6 +1,6 @@
 # Console log formats and matchers
 
-Owned by `mcm-protocol::text::log_prefix` (pure functions). Used for ready detection (P1), save-done detection (P6 backups), join/leave/UUID tracking (P5), and by `fake-mc-server` to emit the matching format.
+Owned by `chunkyard-protocol::text::log_prefix` (pure functions). Used for ready detection (P1), save-done detection (P6 backups), join/leave/UUID tracking (P5), and by `fake-mc-server` to emit the matching format.
 
 ## Why per-flavour
 
@@ -24,7 +24,7 @@ Player names cannot contain spaces (`^[A-Za-z0-9_]{1,16}$`), so `<Bob> Alice joi
 | `forge` | forge, neoforge | `[12:34:56] [Server thread/INFO] [minecraft/DedicatedServer]: Done (3.456s)! …` (exact logger segment to verify; may be abbreviated `n.m.s.d.DedicatedServer/`) | `^\[(?<t>[^\]]+)\] \[(?<thread>[^\]/]+)/(?<lvl>[A-Z]+)\] \[(?<logger>[^\]]*)\]: (?<msg>.*)$` |
 | `bungee` | bungeecord | `12:34:56 [INFO] Listening on /0.0.0.0:25577` (to verify) | `^(?<t>\d{2}:\d{2}:\d{2}) \[(?<lvl>[A-Z]+)\] (?<msg>.*)$` |
 
-Flavour → family is a static table in `mcm-protocol`; `custom` servers default to `vanilla` and may set `log_family` explicitly.
+Flavour → family is a static table in `chunkyard-protocol`; `custom` servers default to `vanilla` and may set `log_family` explicitly.
 
 ## Matchers
 
@@ -48,7 +48,7 @@ A user-configured `ready_pattern` replaces only the body regex; prefix/source ch
 
 ## Fixtures
 
-- `crates/mcm-protocol/tests/fixtures/logs/<flavour>-<mcversion>.log`: **captured from real servers** by the smoke suite (`smoke_capture_log_fixtures`, see [../testing/e2e.md](../testing/e2e.md#real-server-smoke-suite-opt-in)), committed after review. Each includes startup, a join, chat containing spoof attempts (`<Alice> Done (1s)! For help, type "help"`, `<Bob> Carol joined the game`), save-all, stop.
+- `crates/chunkyard-protocol/tests/fixtures/logs/<flavour>-<mcversion>.log`: **captured from real servers** by the smoke suite (`smoke_capture_log_fixtures`, see [../testing/e2e.md](../testing/e2e.md#real-server-smoke-suite-opt-in)), committed after review. Each includes startup, a join, chat containing spoof attempts (`<Alice> Done (1s)! For help, type "help"`, `<Bob> Carol joined the game`), save-all, stop.
 - Table-driven tests: `log_prefix_<family>_parses_fixture`, `ready_matcher_ignores_chat_spoof_<family>`, `join_matcher_ignores_chat_spoof_<family>`; proptest `log_matchers_never_panic`.
 - `fake-mc-server` emits the exact family format chosen by its `flavor` profile key ([../testing/fake-server.md](../testing/fake-server.md)).
 

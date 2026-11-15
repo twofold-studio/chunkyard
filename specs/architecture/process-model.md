@@ -1,6 +1,6 @@
 # Process model
 
-Owned by `mcm-process`. This file holds the **single definition** of the `ProcessSpawner` trait; P1 (native), P10 (Docker, shim) and P11 (remote) reference it.
+Owned by `chunkyard-process`. This file holds the **single definition** of the `ProcessSpawner` trait; P1 (native), P10 (Docker, shim) and P11 (remote) reference it.
 
 > **Limitation (P1–P9, native runtime): servers stop when mcm stops or restarts.** Native children are tied to mcm's stdio pipes and receive `SIGTERM` via `PR_SET_PDEATHSIG` if mcm dies; mcm cannot re-attach to them. Upgrading mcm therefore restarts all servers. P10 adds the `shim` and `docker` runtimes, which survive mcm restarts and are re-adopted via `ProcessSpawner::adopt()`.
 
@@ -34,7 +34,7 @@ stateDiagram-v2
 ## Spawner trait (single definition)
 
 ```rust
-// mcm-core::process — trait; impls: NativeSpawner (P1), ShimSpawner + DockerSpawner (P10), RemoteSpawner (P11)
+// chunkyard-core::process — trait; impls: NativeSpawner (P1), ShimSpawner + DockerSpawner (P10), RemoteSpawner (P11)
 #[async_trait]
 pub trait ProcessSpawner: Send + Sync {
     async fn spawn(&self, spec: &SpawnSpec) -> Result<Box<dyn ChildProcess>, ProcessError>;
@@ -60,7 +60,7 @@ pub struct AdoptHint { pub state_dir: PathBuf, pub last_epoch: Option<Epoch>, pu
 
 ## State directory (not inside the server dir)
 
-mcm-owned state lives in `<data>/state/<server-id>/`, **outside** the user-writable server directory: `pid`, `console.log[.1-5]`, `crash-<ts>.log`, `install.log`, trash metadata, shim socket (P10). Nothing a user can write via the file manager, an upload, a pack, or a restored backup is ever read back as trusted mcm state. See [filesystem-layout.md](filesystem-layout.md) and [security.md](security.md#untrusted-server-directory).
+chunkyard-owned state lives in `<data>/state/<server-id>/`, **outside** the user-writable server directory: `pid`, `console.log[.1-5]`, `crash-<ts>.log`, `install.log`, trash metadata, shim socket (P10). Nothing a user can write via the file manager, an upload, a pack, or a restored backup is ever read back as trusted mcm state. See [filesystem-layout.md](filesystem-layout.md) and [security.md](security.md#untrusted-server-directory).
 
 ## Spawning (native)
 
@@ -75,7 +75,7 @@ mcm-owned state lives in `<data>/state/<server-id>/`, **outside** the user-writa
 
 ### Dedicated spawner thread
 
-`PR_SET_PDEATHSIG` fires when the **thread** that forked the child exits, not the process. Spawning from a tokio worker or a `spawn_blocking` thread (which is reaped after the blocking pool's 10 s keep-alive) would SIGTERM healthy servers. Therefore all native spawns go through **one dedicated, long-lived OS thread** (`mcm-spawner`, started at boot, lives for the process lifetime) that receives `SpawnRequest`s over a channel, performs `Command::spawn`, and returns the `Child` handles. Required test: `native_spawn_survives_blocking_pool_thread_reaping` (spawn via the API path from inside `spawn_blocking`, idle 15 s, assert child alive).
+`PR_SET_PDEATHSIG` fires when the **thread** that forked the child exits, not the process. Spawning from a tokio worker or a `spawn_blocking` thread (which is reaped after the blocking pool's 10 s keep-alive) would SIGTERM healthy servers. Therefore all native spawns go through **one dedicated, long-lived OS thread** (`chunkyard-spawner`, started at boot, lives for the process lifetime) that receives `SpawnRequest`s over a channel, performs `Command::spawn`, and returns the `Child` handles. Required test: `native_spawn_survives_blocking_pool_thread_reaping` (spawn via the API path from inside `spawn_blocking`, idle 15 s, assert child alive).
 
 ### Launch target
 

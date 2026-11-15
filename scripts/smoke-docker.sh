@@ -10,4 +10,4 @@ if [[ "${1:-}" == "--java" ]]; then
 else
   docker build -t mcm-manager-test-runtime:local testdata/docker-runtime
 fi
-cargo test -p mcm-api-tests --test docker_live --locked -- --ignored --nocapture
+cargo test -p chunkyard-api-tests --test docker_live --locked -- --ignored --nocapture

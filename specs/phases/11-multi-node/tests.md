@@ -4,43 +4,43 @@ Kinds: U unit, P property, I integration, A API (`TestApp`/`TestCluster`), C com
 
 ## Test infrastructure
 
-- `mcm-testkit::TestCluster::spawn(n_agents)` — one primary `TestApp` + N in-process agents (`mcm agent` composition root with temp data dirs, `127.0.0.1:0`, generated certs), already paired. Helpers: `cluster.partition(node)` / `heal(node)` via a TCP proxy (`toxiproxy`-like in-process proxy in testkit) placed between primary and each agent; `cluster.restart_agent(node)`.
+- `chunkyard-testkit::TestCluster::spawn(n_agents)` — one primary `TestApp` + N in-process agents (`mcm agent` composition root with temp data dirs, `127.0.0.1:0`, generated certs), already paired. Helpers: `cluster.partition(node)` / `heal(node)` via a TCP proxy (`toxiproxy`-like in-process proxy in testkit) placed between primary and each agent; `cluster.restart_agent(node)`.
 - Parameterised suites: phase 1 lifecycle, phase 2 files, phase 6 backup API tests are written against `trait ServerTarget { async fn create(&self, app) -> ServerId }` with impls `Local` and `Remote(node)`; macro `local_and_remote!` generates both variants.
 
-## mcm-node
+## chunkyard-node
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
-| `pairing_string_parse_valid_and_invalid` | `mcm-node/src/pairing.rs` | 05 | U |
-| `pairing_string_parse_never_panics` | `mcm-node/src/pairing.rs` | 05 | P |
-| `fingerprint_verifier_accepts_pinned_rejects_other` | `mcm-node/src/tls.rs` | 05 | U |
-| `proto_version_window_accepts_p_and_p_minus_1` | `mcm-node/src/version.rs` | 08 | U |
-| `router_dispatches_by_node_id` (fake local + fake remote services) | `mcm-node/src/router.rs` | 09 | U |
-| `remote_error_problem_passthrough_preserves_code` | `mcm-node/tests/client.rs` (wiremock agent) | 13 | I |
-| `node_supervisor_marks_offline_after_30s_no_pong` (paused time) | `mcm-node/src/supervisor.rs` | 07 | U |
-| `node_supervisor_reconnect_backoff` | `mcm-node/src/supervisor.rs` | 07 | U |
-| `reconcile_pushes_newer_specs_and_reports_orphans_missing` | `mcm-node/src/reconcile.rs` | 11 | U |
-| `stream_frame_roundtrip` (serde snapshot of each message) | `mcm-node/src/stream.rs` | 14 | U |
-| `mirror_ring_serves_since_seq_locally` | `mcm-node/src/console.rs` | 15 | U |
-| `console_upstream_unsubscribes_30s_after_last_subscriber` | `mcm-node/src/console.rs` | 15 | U |
-| `migration_state_machine_rolls_back_before_commit` (each failure point) | `mcm-node/src/migrate.rs` | 20 | U |
-| `port_allocation_respects_node_ranges_and_probe` | `mcm-node/src/ports.rs` | 22 | U |
+| `pairing_string_parse_valid_and_invalid` | `chunkyard-node/src/pairing.rs` | 05 | U |
+| `pairing_string_parse_never_panics` | `chunkyard-node/src/pairing.rs` | 05 | P |
+| `fingerprint_verifier_accepts_pinned_rejects_other` | `chunkyard-node/src/tls.rs` | 05 | U |
+| `proto_version_window_accepts_p_and_p_minus_1` | `chunkyard-node/src/version.rs` | 08 | U |
+| `router_dispatches_by_node_id` (fake local + fake remote services) | `chunkyard-node/src/router.rs` | 09 | U |
+| `remote_error_problem_passthrough_preserves_code` | `chunkyard-node/tests/client.rs` (wiremock agent) | 13 | I |
+| `node_supervisor_marks_offline_after_30s_no_pong` (paused time) | `chunkyard-node/src/supervisor.rs` | 07 | U |
+| `node_supervisor_reconnect_backoff` | `chunkyard-node/src/supervisor.rs` | 07 | U |
+| `reconcile_pushes_newer_specs_and_reports_orphans_missing` | `chunkyard-node/src/reconcile.rs` | 11 | U |
+| `stream_frame_roundtrip` (serde snapshot of each message) | `chunkyard-node/src/stream.rs` | 14 | U |
+| `mirror_ring_serves_since_seq_locally` | `chunkyard-node/src/console.rs` | 15 | U |
+| `console_upstream_unsubscribes_30s_after_last_subscriber` | `chunkyard-node/src/console.rs` | 15 | U |
+| `migration_state_machine_rolls_back_before_commit` (each failure point) | `chunkyard-node/src/migrate.rs` | 20 | U |
+| `port_allocation_respects_node_ranges_and_probe` | `chunkyard-node/src/ports.rs` | 22 | U |
 
-## mcm-api::node / mcm-server (agent side)
+## chunkyard-api::node / chunkyard-server (agent side)
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
-| `agent_init_writes_cert_token_and_prints_pairing` | `mcm-server/tests/agent_cli.rs` | 01 | I |
-| `agent_rotate_token_invalidates_old` | `mcm-server/tests/agent_cli.rs` | 01 | I |
-| `agent_serves_no_spa_no_api_v1` | `mcm-api/tests/node_agent.rs` | 02 | A |
-| `agent_rejects_missing_or_wrong_token_401` | `mcm-api/tests/node_agent.rs` | 02 | A |
-| `agent_binds_first_primary_rejects_second_403` | `mcm-api/tests/node_agent.rs` | 03 | A |
-| `agent_rejects_stale_spec_rev_409` | `mcm-api/tests/node_agent.rs` | 10 | A |
-| `agent_revalidates_sandbox_paths` (bypass primary, send `../` directly) | `mcm-api/tests/node_agent.rs` | 18, security | A |
-| `agent_autostarts_from_local_specs_without_primary` | `mcm-server/tests/agent_autostart.rs` | 12 | I |
-| `agent_secrets_not_persisted` (scan agent DB + logs for S3 secret after backup job) | `mcm-api/tests/node_agent.rs` | 24 | A |
+| `agent_init_writes_cert_token_and_prints_pairing` | `chunkyard-server/tests/agent_cli.rs` | 01 | I |
+| `agent_rotate_token_invalidates_old` | `chunkyard-server/tests/agent_cli.rs` | 01 | I |
+| `agent_serves_no_spa_no_api_v1` | `chunkyard-api/tests/node_agent.rs` | 02 | A |
+| `agent_rejects_missing_or_wrong_token_401` | `chunkyard-api/tests/node_agent.rs` | 02 | A |
+| `agent_binds_first_primary_rejects_second_403` | `chunkyard-api/tests/node_agent.rs` | 03 | A |
+| `agent_rejects_stale_spec_rev_409` | `chunkyard-api/tests/node_agent.rs` | 10 | A |
+| `agent_revalidates_sandbox_paths` (bypass primary, send `../` directly) | `chunkyard-api/tests/node_agent.rs` | 18, security | A |
+| `agent_autostarts_from_local_specs_without_primary` | `chunkyard-server/tests/agent_autostart.rs` | 12 | I |
+| `agent_secrets_not_persisted` (scan agent DB + logs for S3 secret after backup job) | `chunkyard-api/tests/node_agent.rs` | 24 | A |
 
-## Cluster API (`mcm-api/tests/cluster_*.rs`, `TestCluster`)
+## Cluster API (`chunkyard-api/tests/cluster_*.rs`, `TestCluster`)
 
 | Test | FR | Kind |
 |---|---|---|
@@ -63,14 +63,14 @@ Kinds: U unit, P property, I integration, A API (`TestApp`/`TestCluster`), C com
 | `create_server_on_node_port_unique_per_node` (same port on two nodes OK; same node 409) | 22, 26 | A |
 | `router_routes_hostname_to_remote_server` (phase 7 router + fake-mc login disconnect reason) | 25 | A |
 | `version_matrix_agents_n_n1_n2` (agents built with `NODE_PROTO` override via test feature) | 08 | A |
-| `migration_p10_null_node_port_uniqueness_enforced` | 22 | I (`mcm-db/tests/migrate.rs`) |
+| `migration_p10_null_node_port_uniqueness_enforced` | 22 | I (`chunkyard-db/tests/migrate.rs`) |
 
 ## Fuzz
 
 | Target | Crate | FR |
 |---|---|---|
-| `pairing_parse` | mcm-node | 05 |
-| `node_stream_frame_decode` | mcm-node | 14 |
+| `pairing_parse` | chunkyard-node | 05 |
+| `node_stream_frame_decode` | chunkyard-node | 14 |
 
 ## Frontend
 

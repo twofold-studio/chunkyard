@@ -1,6 +1,6 @@
 # Phase 8 — Requirements
 
-Conventions: [patterns.md](../../architecture/patterns.md). "Crates" lists crates touched (short names, `mcm-` prefix omitted; `db` = repo impls of `mcm-core` traits). "Perm" is the permission/role checked by `AuthService::authorize`. "Audit" names come only from [audit.md](../../architecture/audit.md); detail fields follow its per-action allow-list. "Events" are `mcm_core::events::Event` variants.
+Conventions: [patterns.md](../../architecture/patterns.md). "Crates" lists crates touched (short names, `mcm-` prefix omitted; `db` = repo impls of `chunkyard-core` traits). "Perm" is the permission/role checked by `AuthService::authorize`. "Audit" names come only from [audit.md](../../architecture/audit.md); detail fields follow its per-action allow-list. "Events" are `chunkyard_core::events::Event` variants.
 
 ## Users
 
@@ -20,8 +20,8 @@ Conventions: [patterns.md](../../architecture/patterns.md). "Crates" lists crate
 | ID | Requirement | Crates | Perm | Audit | Events |
 |---|---|---|---|---|---|
 | P8-FR-09 | Grants: `PUT /servers/{id}/permissions/{userId} {permissions}` replaces the set; `DELETE` removes. Only `user`-role targets (admins/owners already have everything → `422 permission.redundant`); unknown strings → `422 permission.unknown`. | auth, db, api | admin | `permission.grant`, `permission.revoke` | `PermissionsChanged { user_id, server_id }` |
-| P8-FR-10 | **Single-trust rule (D1).** `mcm_auth::trust::requires_admin_trust(perm, runtime)` returns true for `files.write`, `content.manage`, `server.settings` when the server's runtime is `native` or `shim` (both run as the mcm OS user). Granting such a permission to a `user` (directly, via preset, via invite, or via implication) → `422 permission.requires_admin_trust` with `errors[]` naming each offending permission. `authorize()` also checks it at decision time (defence in depth: a stale grant on a native server is denied and logged `warn`). | auth, api | admin | failure recorded as `permission.grant` | — |
-| P8-FR-11 | Presets (`mcm-auth::presets`, exposed via API): **Viewer** = `server.view, console.read`; **Operator** = Viewer + `server.power, console.write`; **Moderator** = Operator + `players.manage, files.read, backups.read`; **Manager** = all per-server permissions except `server.delete`. Manager contains admin-trust permissions, so for `user` targets it is **only grantable on Docker-runtime servers**; the catalog response marks each preset `grantable` per server. Presets are templates; stored grants are explicit lists. | auth, api | — | — | — |
+| P8-FR-10 | **Single-trust rule (D1).** `chunkyard_auth::trust::requires_admin_trust(perm, runtime)` returns true for `files.write`, `content.manage`, `server.settings` when the server's runtime is `native` or `shim` (both run as the mcm OS user). Granting such a permission to a `user` (directly, via preset, via invite, or via implication) → `422 permission.requires_admin_trust` with `errors[]` naming each offending permission. `authorize()` also checks it at decision time (defence in depth: a stale grant on a native server is denied and logged `warn`). | auth, api | admin | failure recorded as `permission.grant` | — |
+| P8-FR-11 | Presets (`chunkyard-auth::presets`, exposed via API): **Viewer** = `server.view, console.read`; **Operator** = Viewer + `server.power, console.write`; **Moderator** = Operator + `players.manage, files.read, backups.read`; **Manager** = all per-server permissions except `server.delete`. Manager contains admin-trust permissions, so for `user` targets it is **only grantable on Docker-runtime servers**; the catalog response marks each preset `grantable` per server. Presets are templates; stored grants are explicit lists. | auth, api | — | — | — |
 | P8-FR-12 | Implications: every permission implies `server.view`; `console.write` ⇒ `console.read`; `files.write` ⇒ `files.read`; `backups.manage` ⇒ `backups.read`. Normalised on save before P8-FR-10 is checked. | auth | — | — | — |
 | P8-FR-13 | `server.create` is a global flag `users.can_create_servers`. For a `user` it permits creating/cloning **Docker-runtime** servers only (`runtime: "native"`/`"shim"` → `422 permission.requires_admin_trust`; if Docker is unavailable the flag is shown disabled). The creator receives the Manager preset on the new server. | auth, api | `server.create` | `permission.grant` (`trigger = "creator"`) | `PermissionsChanged` |
 | P8-FR-14 | **Runtime changes vs grants.** Changing a server's runtime to `native`/`shim` (phase 10 `PATCH /servers/{id}` `runtime`) while `user`s hold admin-trust permissions on it is **blocked** with `409 server.runtime_grants_conflict` whose body lists `{userId, username, permissions[]}`. The admin either revokes those grants first or repeats the request with `revokeConflictingGrants=true`, which revokes them in the same transaction (one `permission.revoke` row each, `trigger = "runtime_change"`). Rationale: no silent privilege loss and no silent escalation. Before phase 10 ships, the check is a no-op (all servers native, grants already blocked). | auth, api, process | admin | `server.runtime.change`, `permission.revoke` | `PermissionsChanged` |
@@ -33,7 +33,7 @@ Conventions: [patterns.md](../../architecture/patterns.md). "Crates" lists crate
 | ID | Requirement | Crates | Perm | Audit |
 |---|---|---|---|---|
 | P8-FR-17 | Effective token permission = `role/grants(owner user) ∩ scopes ∩ serverIds`; `"*"` = all **server** permissions the user holds. Admin-only areas require scope `admin` **and** an admin/owner user ([auth.md](../../architecture/auth.md#api-tokens)). Token creation offers `admin` only to admins/owners. | auth | — | — |
-| P8-FR-18 | Every OpenAPI operation declares `x-mcm-permission` (`"server.power"`, `"admin"`, `"owner"`, `"self"`, `"public"`), attached by the `RequirePerm<…>` extractor macro. The matrix test fails for any operation without it. | api | — | — |
+| P8-FR-18 | Every OpenAPI operation declares `x-chunkyard-permission` (`"server.power"`, `"admin"`, `"owner"`, `"self"`, `"public"`), attached by the `RequirePerm<…>` extractor macro. The matrix test fails for any operation without it. | api | — | — |
 | P8-FR-19 | **Upgrade semantics:** the P8 migration rewrites `scopes` of every token equal to `["*"]` whose owner has role `owner`/`admin` to `["*","admin"]`; tokens of `user`s are unchanged. Tokens created afterwards include `admin` only when requested. | db | — | — |
 
 ## Admin 2FA enforcement and sessions
@@ -52,7 +52,7 @@ Conventions: [patterns.md](../../architecture/patterns.md). "Crates" lists crate
 | P8-FR-24 | Retention: setting `audit.retention_days` (30–3650, default 365) replaces phase 0's fixed value; hourly sweeper deletes in batches of 5 000. | db, server | admin (`settings.update`) | — |
 | P8-FR-25 | Completeness: every mutating operation writes exactly one audit row (success or failure; failures for 403/409/422; 401 only for `auth.login`), with an action from the catalog. Verified by the matrix harness. | api, core | — | — |
 
-## Notifications (`mcm-notify`)
+## Notifications (`chunkyard-notify`)
 
 | ID | Requirement | Crates | Perm | Audit |
 |---|---|---|---|---|
@@ -64,7 +64,7 @@ Conventions: [patterns.md](../../architecture/patterns.md). "Crates" lists crate
 | P8-FR-31 | Generic webhook: JSON `{id, event, ts, instance, server?, data}`; headers `X-MCM-Event`, `X-MCM-Delivery`, `X-MCM-Timestamp`, `X-MCM-Signature: sha256=<hex(HMAC-SHA256(secret, timestamp + "." + body))>`; secret auto-generated (32 bytes) if absent. | notify | — | — |
 | P8-FR-32 | Retries: 3 attempts, backoff 10 s then 60 s (`NotifyConfig.retry_backoff` overridable in tests), 2xx success, 4xx except 408/429 permanent, 10 s timeout; each attempt in `notification_deliveries`. | notify, db | — | — |
 | P8-FR-33 | Test send `POST /notifications/channels/{id}/test` → synchronous synthetic `test` event, `{ok, status, latencyMs, error?}`. | notify, api | admin | `notify.channel.test` |
-| P8-FR-34 | Outbound HTTP exclusively through `mcm_download::SafeHttp` ([security.md § Outbound HTTP](../../architecture/security.md#outbound-http-ssrf)): shared resolver with private-range rejection and IP pinning, honouring `security.allow_private_targets`. Notifications set `redirects: none` (a 3xx is a delivery failure). Discord URLs must match `https://discord.com/api/webhooks/…` or `https://discordapp.com/api/webhooks/…`. Channel create/update validates the URL eagerly (`422 notify.target_forbidden`). No notifier-specific resolver exists. | notify, download | — | — |
+| P8-FR-34 | Outbound HTTP exclusively through `chunkyard_download::SafeHttp` ([security.md § Outbound HTTP](../../architecture/security.md#outbound-http-ssrf)): shared resolver with private-range rejection and IP pinning, honouring `security.allow_private_targets`. Notifications set `redirects: none` (a 3xx is a delivery failure). Discord URLs must match `https://discord.com/api/webhooks/…` or `https://discordapp.com/api/webhooks/…`. Channel create/update validates the URL eagerly (`422 notify.target_forbidden`). No notifier-specific resolver exists. | notify, download | — | — |
 | P8-FR-35 | Delivery log `GET /notifications/channels/{id}/deliveries` (cursor), 30-day retention; auto-disable after 50 consecutive permanent failures (`NotifyChannelDisabled` → in-app notification to admins). | notify, db, api | admin | — |
 | P8-FR-36 | In-app notifications: WS topic `notifications` per user `{type:"notification", …}` for events on servers the user can `server.view` plus admin system events; stored in `user_notifications` (last 200/user); `GET /account/notifications`, `POST /account/notifications/read`. | notify, api | self | — |
 | P8-FR-37 | Account security events (login failure burst, password change, 2FA disable, token create) surfaced to the affected user as in-app notifications. | auth, notify | — | — |
@@ -74,7 +74,7 @@ Conventions: [patterns.md](../../architecture/patterns.md). "Crates" lists crate
 | ID | Requirement | Crates |
 |---|---|---|
 | P8-FR-38 | Rate-limit table per route group committed in [api.md](api.md#rate-limits); invite accept 5/min/IP. | api |
-| P8-FR-39 | `no_secrets_in_logs`: `mcm-testkit` installs the capture subscriber for every `TestApp`; on drop asserts no registered secret (passwords, tokens, webhook URLs, TOTP secrets, CF key, RCON/management secrets) appears. | testkit |
+| P8-FR-39 | `no_secrets_in_logs`: `chunkyard-testkit` installs the capture subscriber for every `TestApp`; on drop asserts no registered secret (passwords, tokens, webhook URLs, TOTP secrets, CF key, RCON/management secrets) appears. | testkit |
 | P8-FR-40 | Supply chain: CI `audit` job becomes blocking on PRs for high/critical (`cargo deny check advisories`, `pnpm audit --prod --audit-level high`). | CI |
 | P8-FR-41 | Threat-model walkthrough below completed; each row links ≥ 1 passing test. | — |
 

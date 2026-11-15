@@ -8,9 +8,9 @@ The backend has no CORS support and checks `Host`, `Origin` and `X-MCM-CSRF` aga
 
 ```sh
 # terminal 1: backend (from the repository root)
-CHUNKYARD_HTTP__PUBLIC_URL=http://localhost:5173 cargo run -p mcm-server -- serve
+CHUNKYARD_HTTP__PUBLIC_URL=http://localhost:5173 cargo run -p chunkyard-server -- serve
 # optional: trusted local use without login
-CHUNKYARD_AUTH__ENABLED=false CHUNKYARD_HTTP__PUBLIC_URL=http://localhost:5173 cargo run -p mcm-server -- serve
+CHUNKYARD_AUTH__ENABLED=false CHUNKYARD_HTTP__PUBLIC_URL=http://localhost:5173 cargo run -p chunkyard-server -- serve
 
 # terminal 2: frontend
 cd web

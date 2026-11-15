@@ -8,8 +8,8 @@ Run real Minecraft servers: create a server from a jar (downloaded from a URL or
 
 ## Scope
 
-- New crates: `mcm-process` (supervisor, dedicated spawner thread, stdio, log ring, platform), `mcm-protocol` (VarInt, framing, handshake, SLP, RCON codec + client, `text::log_prefix` matchers), `mcm-download` (`SafeHttp` SSRF-safe client, `HttpDownloader`), `mcm-fs` (initial modules: `properties`, `copy`, `trash`, `eula`), `fake-mc-server` (test fixture).
-- `servers` table; `ServerService`, `ServerRepo`, `ProcessSpawner` traits in `mcm-core`; implementations wired in `mcm-server`.
+- New crates: `chunkyard-process` (supervisor, dedicated spawner thread, stdio, log ring, platform), `chunkyard-protocol` (VarInt, framing, handshake, SLP, RCON codec + client, `text::log_prefix` matchers), `chunkyard-download` (`SafeHttp` SSRF-safe client, `HttpDownloader`), `chunkyard-fs` (initial modules: `properties`, `copy`, `trash`, `eula`), `fake-mc-server` (test fixture).
+- `servers` table; `ServerService`, `ServerRepo`, `ProcessSpawner` traits in `chunkyard-core`; implementations wired in `chunkyard-server`.
 - Flavor `custom` only: `source.kind` `url` (admin) or `import` from an allow-listed directory (admin); `javaPath` from a detected system Java or an explicit path (admin). Request/response contract per [server-api.md](../../architecture/server-api.md).
 - Game-port allocation with conflict detection. **RCON is not enabled or managed** (P5).
 - Supervisor actor: state machine, flavour-aware chat-spoof-proof ready detection + SLP, stop sequence, kill, restart, crash detection with backoff budget, crash logs, `adopt()`-based orphan cleanup, auto-start with stagger, manager shutdown. mcm state in `<data>/state/<id>/`, server files in `<data>/servers/<id>/`.
@@ -45,12 +45,12 @@ Run real Minecraft servers: create a server from a jar (downloaded from a URL or
 
 ## Dependencies
 
-Phase 0 (auth, jobs, audit catalog, WS hub, AppState, testkit, `mcm-api-tests`).
+Phase 0 (auth, jobs, audit catalog, WS hub, AppState, testkit, `chunkyard-api-tests`).
 
 ## Exit checklist
 
 - [ ] All P1 FRs implemented; all tests in [tests.md](tests.md) pass in CI without Java.
-- [ ] `mcm-protocol` and `mcm-download::safe_http` ≥ 95 % line coverage; fuzz targets `varint_decode`, `handshake_parse`, `slp_response_parse`, `rcon_packet_decode`, `log_prefix_parse` in `fuzz-smoke`.
+- [ ] `chunkyard-protocol` and `chunkyard-download::safe_http` ≥ 95 % line coverage; fuzz targets `varint_decode`, `handshake_parse`, `slp_response_parse`, `rcon_packet_decode`, `log_prefix_parse` in `fuzz-smoke`.
 - [ ] Nightly smoke `smoke_p1_custom_jar_lifecycle` passes (URL source of the Mojang server jar; Java from `actions/setup-java` — the documented exception in [testing/e2e.md](../../testing/e2e.md#real-server-smoke-suite-opt-in) until P3 managed JREs).
 - [ ] `native_spawn_survives_blocking_pool_thread_reaping` and `console_resume_after_manager_restart_resets` green.
 - [ ] Backpressure test: 50k lines/s flood for 10 s with a stalled WS client → mcm RSS growth < 50 MiB, fake server never blocks on stdout.

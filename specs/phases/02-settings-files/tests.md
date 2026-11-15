@@ -1,8 +1,8 @@
 # Phase 2 — Test plan
 
-Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust) and [testing/strategy.md](../../testing/strategy.md). Kinds: **U** unit, **P** proptest, **F** fuzz, **I** crate integration, **A** API integration (`mcm-api-tests`, `TestApp` + fake-mc, real time), **C** frontend component/unit, **E** Playwright. `FakeClock` is used only in pure-logic tests (GC policies, caches).
+Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust) and [testing/strategy.md](../../testing/strategy.md). Kinds: **U** unit, **P** proptest, **F** fuzz, **I** crate integration, **A** API integration (`chunkyard-api-tests`, `TestApp` + fake-mc, real time), **C** frontend component/unit, **E** Playwright. `FakeClock` is used only in pure-logic tests (GC policies, caches).
 
-## mcm-fs — sandbox (`crates/mcm-fs/src/sandbox.rs`, `tests/sandbox.rs`)
+## chunkyard-fs — sandbox (`crates/chunkyard-fs/src/sandbox.rs`, `tests/sandbox.rs`)
 
 | Test | Kind | FR |
 |---|---|---|
@@ -24,7 +24,7 @@ Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust
 | `list_reports_symlink_target` | I | 02, 18 |
 | fuzz `sandbox_resolve` (asserts result is inside root or error; never panics) | F | 01 |
 
-## mcm-fs — archives (`src/archive/*.rs`, `tests/archive.rs`)
+## chunkyard-fs — archives (`src/archive/*.rs`, `tests/archive.rs`)
 
 | Test | Kind | FR |
 |---|---|---|
@@ -52,7 +52,7 @@ Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust
 | `prop_extract_never_writes_outside_dest` (random entry names) | P | 03 |
 | fuzz `zip_extract`, `tar_extract` | F | 03 |
 
-## mcm-fs — properties (`src/properties/*.rs`)
+## chunkyard-fs — properties (`src/properties/*.rs`)
 
 | Test | Kind | FR |
 |---|---|---|
@@ -79,20 +79,20 @@ Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust
 | `schema_management_keys_marked_secret_and_since_1_21_9` | U | 10, 32 |
 | fuzz `properties_parse` (parse → serialize → parse equality) | F | 06 |
 
-## mcm-fs — players (`src/players/*.rs`)
+## chunkyard-fs — players (`src/players/*.rs`)
 
 | Test | Kind | FR |
 |---|---|---|
 | `offline_uuid_matches_java_nameuuidfrombytes` (vectors: `Notch` → known value computed by Java, stored in fixture) | U | 17 |
-| `mojang_lookup_parses_undashed_id` / `mojang_lookup_204_and_404_are_unknown` / `mojang_lookup_429_is_upstream_error` (`crates/mcm-download/tests/mojang.rs`, wiremock via `test-hooks` base URL) | I | 17 |
-| `mojang_lookup_uses_safe_http_and_rejects_private_target` (`mcm-download`) | I | 17 |
+| `mojang_lookup_parses_undashed_id` / `mojang_lookup_204_and_404_are_unknown` / `mojang_lookup_429_is_upstream_error` (`crates/chunkyard-download/tests/mojang.rs`, wiremock via `test-hooks` base URL) | I | 17 |
+| `mojang_lookup_uses_safe_http_and_rejects_private_target` (`chunkyard-download`) | I | 17 |
 | `lookup_cache_hits_and_negative_cache_expires` (FakeClock) | U | 17 |
 | `ban_entry_serialises_vanilla_date_format` | U | 15 |
 | `ban_ip_guard_rejects_loopback_unspecified_and_trusted_proxies` (table: `127.0.0.1`, `127.8.8.8`, `::1`, `0.0.0.0`, `::`, a trusted CIDR address; `203.0.113.7` allowed) | U | 15 |
 | `list_files_roundtrip_preserve_unknown_fields` | U | 14, 15 |
 | `malformed_list_file_reports_line` | U | 14 |
 
-## mcm-core
+## chunkyard-core
 
 | Test | Kind | FR |
 |---|---|---|
@@ -100,13 +100,13 @@ Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust
 | `jvm_allowlist_rejects_xmx_xms_for_everyone` | U | 08 |
 | `prop_jvm_allowlist_never_panics` | P | 08 |
 
-## mcm-process
+## chunkyard-process
 
 | Test | Kind | FR |
 |---|---|---|
-| `restart_required_set_on_settings_change_while_running_cleared_on_start` (`crates/mcm-process/tests/supervisor.rs`) | I | 09 |
+| `restart_required_set_on_settings_change_while_running_cleared_on_start` (`crates/chunkyard-process/tests/supervisor.rs`) | I | 09 |
 
-## mcm-api-tests (`crates/mcm-api-tests/tests/p2_*.rs`, fake-mc)
+## chunkyard-api-tests (`crates/chunkyard-api-tests/tests/p2_*.rs`, fake-mc)
 
 | Test | Kind | FR |
 |---|---|---|
@@ -147,9 +147,9 @@ Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust
 | `files_copy_job_progress_and_result` | A | 22 |
 | `files_delete_moves_to_state_dir_trash_and_restore` (payload + `trash.json` under `<data>/state/<id>/trash`, nothing under the server dir) / `files_restore_conflict_409` / `files_delete_permanent` | A | 23, 24 |
 | `forged_trash_metadata_in_server_dir_is_ignored` | A | 23, 24 |
-| `trash_gc_never_removes_entries_younger_than_24h_even_when_disk_low` (FakeClock + `DiskSpace` fake) | U (`mcm-fs`) | 23 |
-| `trash_gc_removes_oldest_first_while_free_below_threshold` | U (`mcm-fs`) | 23 |
-| `trash_gc_removes_all_entries_older_than_7_days` | U (`mcm-fs`) | 23 |
+| `trash_gc_never_removes_entries_younger_than_24h_even_when_disk_low` (FakeClock + `DiskSpace` fake) | U (`chunkyard-fs`) | 23 |
+| `trash_gc_removes_oldest_first_while_free_below_threshold` | U (`chunkyard-fs`) | 23 |
+| `trash_gc_removes_all_entries_older_than_7_days` | U (`chunkyard-fs`) | 23 |
 | `files_download_range_206` / `files_download_multirange_200` / `files_download_416` / `files_download_head` | A | 25 |
 | `files_download_sets_nosniff_and_octet_stream_for_html` | A | 25 |
 | `files_download_zip_streams_valid_zip` | A | 26 |
@@ -158,7 +158,7 @@ Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust
 | `upload_session_resume_after_disconnect` (drop connection mid-chunk; status shows last durable offset) | A | 28 |
 | `upload_offset_mismatch_409_returns_received` / `upload_hash_mismatch_422` / `upload_other_principal_404` | A | 28 |
 | `upload_insufficient_space_507` (small tmpfs via `CHUNKYARD_TEST_DOCKER` or injected `DiskSpace` fake) | A | 28 |
-| `upload_session_gc_after_24h` (FakeClock) | U (`mcm-fs`) | 28 |
+| `upload_session_gc_after_24h` (FakeClock) | U (`chunkyard-fs`) | 28 |
 | `archive_and_extract_jobs_end_to_end` / `extract_job_zip_slip_fails_with_code` | A | 29, 03 |
 | `extract_job_insufficient_space_fails_fs_no_space` (injected `DiskSpace`) | A | 29, 03 |
 | `files_job_conflicts_with_running_install_job_409` | A | 31 |

@@ -1,20 +1,20 @@
 # Phase 9 — Requirements
 
-Details: [relay.md](relay.md), [tunnel-protocol.md](tunnel-protocol.md). Audit names from [audit.md](../../architecture/audit.md). `mcm-tunnel` depends on `mcm-core`, `mcm-tunnel-proto`, `mcm-router` only; persistence via the `RelayConnectionRepo` core trait (impl `mcm-db`). The relay binary has its own DB and depends only on `mcm-protocol` and `mcm-tunnel-proto`.
+Details: [relay.md](relay.md), [tunnel-protocol.md](tunnel-protocol.md). Audit names from [audit.md](../../architecture/audit.md). `chunkyard-tunnel` depends on `chunkyard-core`, `chunkyard-tunnel-proto`, `chunkyard-router` only; persistence via the `RelayConnectionRepo` core trait (impl `chunkyard-db`). The relay binary has its own DB and depends only on `chunkyard-protocol` and `chunkyard-tunnel-proto`.
 
-## Relay binary (`mcm-relay`)
+## Relay binary (`chunkyard-relay`)
 
 | ID | Requirement | Crates | Perm | Audit / Event |
 |---|---|---|---|---|
-| P9-FR-01 | `mcm-relay init` creates `relay.toml`, `relay.db`, self-signed cert (ECDSA P-256, SAN = public host), admin token; refuses if already initialised (unless `--force`). | relay | (CLI) | — |
+| P9-FR-01 | `chunkyard-relay init` creates `relay.toml`, `relay.db`, self-signed cert (ECDSA P-256, SAN = public host), admin token; refuses if already initialised (unless `--force`). | relay | (CLI) | — |
 | P9-FR-02 | Agent management CLI (`add`, `list`, `revoke`, `rotate-token`, `set`); `add`/`rotate-token` print a pairing string once; tokens stored as sha256; changes applied live via the admin socket. | relay, tunnel-proto | (CLI) | relay log |
-| P9-FR-03 | Tunnel listener: TLS 1.3 only, ALPN `mcm-tunnel/1`, yamux; `Hello` within 10 s; auth per [relay.md § Agent authentication](relay.md#agent-authentication); single session per agent (new session replaces old with `GoAway{replaced}`). | relay, tunnel-proto | — | — |
+| P9-FR-03 | Tunnel listener: TLS 1.3 only, ALPN `chunkyard-tunnel/1`, yamux; `Hello` within 10 s; auth per [relay.md § Agent authentication](relay.md#agent-authentication); single session per agent (new session replaces old with `GoAway{replaced}`). | relay, tunnel-proto | — | — |
 | P9-FR-04 | Control protocol exactly per [tunnel-protocol.md](tunnel-protocol.md): version negotiation, `Announce` validated against `Assignment`, heartbeat, `GoAway`. | tunnel-proto, relay, tunnel | — | — |
 | P9-FR-05 | Public listeners: shared hostname-routed (`public_listen`, handshake parsed with `mcm_protocol::handshake::normalize_host`) and dedicated ports (listening only while the assigned agent announces them); offline status/disconnect when no agent/route. | relay, protocol | — | — |
 | P9-FR-06 | Data streams: `StreamOpen` + prebuffered bytes + splice; relay limits per IP, per-agent `max_streams`, optional bandwidth token bucket; idle timeout 120 s. | relay, tunnel-proto | — | — |
 | P9-FR-07 | Revocation / rotation: affected agent receives `GoAway{revoked}` and is disconnected within 10 s; its listeners and player streams closed. | relay | (CLI) | — |
 | P9-FR-08 | Hardening: handshake timeout, per-IP connection and rate limits, auth-failure IP block (5/min → 10 min), never dials outbound except the probe (P9-FR-14); logs never contain tokens. | relay | — | — |
-| P9-FR-09 | Status: `mcm-relay status` (admin socket) and optional `admin_http` `GET /status` (JSON: agents, connected, streams, bytes) and `GET /metrics` (Prometheus text), bearer admin token. | relay | (admin token) | — |
+| P9-FR-09 | Status: `chunkyard-relay status` (admin socket) and optional `admin_http` `GET /status` (JSON: agents, connected, streams, bytes) and `GET /metrics` (Prometheus text), bearer admin token. | relay | (admin token) | — |
 
 ## Agent side (mcm)
 
@@ -26,7 +26,7 @@ Details: [relay.md](relay.md), [tunnel-protocol.md](tunnel-protocol.md). Audit n
 | P9-FR-13 | Route ↔ relay binding: P7 routes gain `relayId` and `relayTarget` (`hostname` or `port` from the assignment); announces `Hostname(hostname)` / `Port(port)`; rejected announcements shown on the route (`relayState = rejected`, reason). A `router_only` route is valid without a local router listener when it has a relay binding (relaxes P7 `proxy.router_disabled`). P7-FR-18 (PROXY ⇒ router-only) applies unchanged. | router, tunnel, api | `proxy.manage` (+ admin to pick a relay) | `proxy.route.update` |
 | P9-FR-14 | Reachability probe for a P7 port mapping: `ProbeRequest{port}` → relay performs an SLP status request to **the agent's own tunnel source IP** on that port (never another address) and returns `ProbeResult`; 1 probe per agent per 30 s. | tunnel, relay, tunnel-proto, api | admin | `portmap.probe` |
 | P9-FR-15 | Exposure and real-IP: exposure summary gains `relay` entries (`hostname` or `relay-host:port`, health from relay status + route state); relay routes without PROXY carry the P7 `real_ip_hidden` warning and drive the same banner on the Network tab and players page. | router, tunnel, api | `server.view` | — |
-| P9-FR-16 | Alternatives guidance: the "Behind CGNAT" docs page documents frp, playit.gg, WireGuard + VPS, Tailscale Funnel caveats with the comparison from [relay.md](relay.md#alternatives-to-mcm-relay); the Relays empty state and the P7 CGNAT alert link to it. | web, docs | — | — |
+| P9-FR-16 | Alternatives guidance: the "Behind CGNAT" docs page documents frp, playit.gg, WireGuard + VPS, Tailscale Funnel caveats with the comparison from [relay.md](relay.md#alternatives-to-chunkyard-relay); the Relays empty state and the P7 CGNAT alert link to it. | web, docs | — | — |
 
 ## Edge cases and failure modes
 

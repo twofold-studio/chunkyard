@@ -1,11 +1,11 @@
-# Phase 9 — Tunnel wire protocol (`mcm-tunnel-proto`)
+# Phase 9 — Tunnel wire protocol (`chunkyard-tunnel-proto`)
 
-Leaf crate (no `mcm-*` dependencies): types + codec + pairing-string parser, used by `mcm-relay` and `mcm-tunnel`. Its `ProtocolError` is not `Classify`-ed; `mcm-tunnel` maps it into `TunnelError`. Protocol version **1**.
+Leaf crate (no `mcm-*` dependencies): types + codec + pairing-string parser, used by `chunkyard-relay` and `chunkyard-tunnel`. Its `ProtocolError` is not `Classify`-ed; `chunkyard-tunnel` maps it into `TunnelError`. Protocol version **1**.
 
 ## Layers
 
 ```
-TCP ─ TLS 1.3 (rustls, ALPN "mcm-tunnel/1") ─ yamux
+TCP ─ TLS 1.3 (rustls, ALPN "chunkyard-tunnel/1") ─ yamux
    ├── stream opened by agent first  = CONTROL stream (exactly one)
    └── streams opened by relay       = DATA streams (one per player connection)
 ```
@@ -84,4 +84,4 @@ Stream close: FIN on yamux stream = half-close (mirrors TCP); RST = abort.
 
 ## Test vectors
 
-`crates/mcm-tunnel-proto/tests/vectors/*.bin` with JSON descriptions: one per message variant, plus invalid cases (len 0, len > 65 536, trailing bytes, unknown variant, truncated). Snapshot-tested with `insta` (hex dump) so any accidental wire change fails CI.
+`crates/chunkyard-tunnel-proto/tests/vectors/*.bin` with JSON descriptions: one per message variant, plus invalid cases (len 0, len > 65 536, trailing bytes, unknown variant, truncated). Snapshot-tested with `insta` (hex dump) so any accidental wire change fails CI.

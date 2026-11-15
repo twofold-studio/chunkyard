@@ -1,6 +1,6 @@
 # API conventions
 
-Owned by `mcm-api`. Applies to every endpoint in every phase.
+Owned by `chunkyard-api`. Applies to every endpoint in every phase.
 
 ## REST
 

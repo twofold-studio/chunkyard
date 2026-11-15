@@ -70,7 +70,7 @@ export function validateResources(v: ResourceValues): ResourceErrors {
 }
 
 /**
- * Mirrors crates/mcm-process/src/validation.rs so most mistakes are caught before
+ * Mirrors crates/chunkyard-process/src/validation.rs so most mistakes are caught before
  * a request is sent. The backend remains authoritative.
  */
 export function validateServerForm(

@@ -6,7 +6,7 @@ Read [AGENTS.md](AGENTS.md) for project scope, changelog fragments, and the mile
 
 The README cover is composed from real app captures using the HTML/CSS in `assets/screenshots/source/`. Raw captures live in the ignored `assets/screenshots/source/shots/` directory. The capture script creates temporary server records and does not start Minecraft containers.
 
-After building the frontend and `cargo build -p mcm-server --locked`:
+After building the frontend and `cargo build -p chunkyard-server --locked`:
 
 ```sh
 node scripts/capture-readme.mjs

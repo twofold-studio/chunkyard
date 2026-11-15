@@ -1,5 +1,5 @@
 // Production UI smoke: real Rust static hosting + the built SPA, no Vite.
-// Run after pnpm --dir web build and cargo build -p mcm-server.
+// Run after pnpm --dir web build and cargo build -p chunkyard-server.
 import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";

@@ -8,12 +8,12 @@ Let players reach servers from outside the host with minimal setup: many servers
 
 | Milestone | Delivers | Crates | Spec |
 |---|---|---|---|
-| **Router** | Minecraft-protocol hostname router on one port (e.g. `:25565`), per-server routes, fallback route, unknown-host MOTD/disconnect, wake-on-join, PROXY protocol v2 to backends (and `LOCAL` headers on mcm's own probes), inbound PROXY v2 from trusted sources, loopback-only exposure, limits, per-route counters, real-IP warnings | `mcm-router`, `mcm-protocol` (handshake, PROXY v2), `mcm-api` | [router.md](router.md) |
-| **Port mapping** | UPnP IGD and NAT-PMP mappings for the router port or per-server ports, lease renewal, external IP display, CGNAT/double-NAT detection with tunnelling guidance | `mcm-portmap`, `mcm-api` | [upnp.md](upnp.md) |
+| **Router** | Minecraft-protocol hostname router on one port (e.g. `:25565`), per-server routes, fallback route, unknown-host MOTD/disconnect, wake-on-join, PROXY protocol v2 to backends (and `LOCAL` headers on mcm's own probes), inbound PROXY v2 from trusted sources, loopback-only exposure, limits, per-route counters, real-IP warnings | `chunkyard-router`, `chunkyard-protocol` (handshake, PROXY v2), `chunkyard-api` | [router.md](router.md) |
+| **Port mapping** | UPnP IGD and NAT-PMP mappings for the router port or per-server ports, lease renewal, external IP display, CGNAT/double-NAT detection with tunnelling guidance | `chunkyard-portmap`, `chunkyard-api` | [upnp.md](upnp.md) |
 
 ## Non-goals
 
-- **Relay / tunnelling** — phase 9 (`mcm-relay`, `mcm-tunnel`). P7 only leaves the seams: the router's connection handler accepts any `IncomingConn`, and `ExposureEntry.kind` is an additive enum.
+- **Relay / tunnelling** — phase 9 (`chunkyard-relay`, `chunkyard-tunnel`). P7 only leaves the seams: the router's connection handler accepts any `IncomingConn`, and `ExposureEntry.kind` is an additive enum.
 - **Bedrock / UDP** (19132, RakNet), including Geyser's UDP listener. Only Java TCP is routed.
 - Being a full Minecraft proxy (Velocity/BungeeCord): no login handling, server switching, encryption termination or forwarding secrets. The router reads the handshake, then splices bytes.
 - Reverse-proxying the mcm web UI.
@@ -53,7 +53,7 @@ Router:
 - [ ] PROXY v2 encoder byte-exact against spec vectors; fake-mc echoes the real client address; mcm's own probes send `LOCAL` and succeed against PROXY-enabled backends.
 - [ ] `sendProxyProtocol` + `direct_and_router` rejected with `proxy.proxy_protocol_requires_router_only`.
 - [ ] Real-IP warning shown on Network tab and players page for routes without PROXY.
-- [ ] Fuzz targets `handshake_parse`, `proxy_v2_roundtrip` in CI; coverage of `mcm-router` and `mcm-protocol::proxy_v2` ≥ 95 %.
+- [ ] Fuzz targets `handshake_parse`, `proxy_v2_roundtrip` in CI; coverage of `chunkyard-router` and `chunkyard-protocol::proxy_v2` ≥ 95 %.
 - [ ] Load test: 1 000 concurrent spliced connections, router RSS < 100 MiB (nightly).
 
 Port mapping:

@@ -1,6 +1,6 @@
 # Phase 6 — Retention algorithm (GFS)
 
-Pure function in `mcm-backup/src/retention.rs`:
+Pure function in `chunkyard-backup/src/retention.rs`:
 
 ```rust
 pub struct RetentionPolicy { keep_last: Option<u32>, keep_daily: Option<u32>, keep_weekly: Option<u32>, keep_monthly: Option<u32>, tz: chrono_tz::Tz }
@@ -46,7 +46,7 @@ Locked: `keep_last=1`, backups `x (locked, newest)`, `y`, `z` → keep `x, y`; d
 
 Timezone: backup at `2026-03-29T23:30Z` with tz `Europe/Berlin` falls in bucket `2026-03-30` (UTC+2 after DST).
 
-## Properties (proptest, `mcm-backup/src/retention.rs` tests)
+## Properties (proptest, `chunkyard-backup/src/retention.rs` tests)
 
 | Property | Test name |
 |---|---|

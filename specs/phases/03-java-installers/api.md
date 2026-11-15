@@ -86,7 +86,7 @@ type SoftwareDto = { flavor: Flavor|"custom"; mcVersion?: string; loaderVersion?
 
 `JavaRuntimeInstalled`, `JavaRuntimeRemoved`, `ServerPortMismatch` (proxies), `JavaRuntimeMissing`, `ServerJavaSelected`, `ServerJavaMismatch`, `ServerInstallStarted`, `ServerInstallFinished`, `ServerInstallFailed`.
 
-## Migration `crates/mcm-db/migrations/<NNNN>_p3_java_installers.sql`
+## Migration `crates/chunkyard-db/migrations/<NNNN>_p3_java_installers.sql`
 
 (Phase 2 adds no migration.)
 

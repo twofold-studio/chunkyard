@@ -9,14 +9,14 @@ Everything is tested. A feature is not done until its tests in the phase `tests.
 | Rust unit | `cargo nextest` | inline `#[cfg(test)]` | every push | no |
 | Rust property | `proptest` | inline or `tests/prop_*.rs` | every push (256 cases), nightly (10k) | no |
 | Rust integration (crate) | `cargo nextest` | `crates/<c>/tests/*.rs` | every push | no |
-| API integration | `mcm-testkit::TestApp` + reqwest/tungstenite | `crates/mcm-api-tests/tests/*.rs` | every push | no (fake-mc + wiremock) |
+| API integration | `chunkyard-testkit::TestApp` + reqwest/tungstenite | `crates/chunkyard-api-tests/tests/*.rs` | every push | no (fake-mc + wiremock) |
 | Snapshot | `insta` | alongside tests | every push | no |
 | Fuzz | `cargo-fuzz` (libFuzzer) | `fuzz/fuzz_targets/*.rs` | PR: 60 s/target smoke; nightly: 15 min/target | no |
 | Frontend unit | Vitest | `web/src/**/*.test.ts` | every push | no |
 | Frontend component | Vitest + `@testing-library/svelte` + jsdom | co-located | every push | no |
 | E2E | Playwright against the real `mcm` binary + fake-mc | `e2e/tests/*.spec.ts` | every push (Chromium), nightly (Chromium+Firefox+WebKit) | no |
-| Real-server smoke | `cargo nextest -p mcm-server --features smoke` | `crates/mcm-server/tests/smoke_*.rs` | nightly + manual; opt-in locally `CHUNKYARD_SMOKE=1` | **yes** (downloads JRE + real jars) |
-| Relay soak | custom bin | `crates/mcm-relay/benches/` | nightly (phase 7+) | no |
+| Real-server smoke | `cargo nextest -p chunkyard-server --features smoke` | `crates/chunkyard-server/tests/smoke_*.rs` | nightly + manual; opt-in locally `CHUNKYARD_SMOKE=1` | **yes** (downloads JRE + real jars) |
+| Relay soak | custom bin | `crates/chunkyard-relay/benches/` | nightly (phase 7+) | no |
 
 ## Principles
 
@@ -29,11 +29,11 @@ Everything is tested. A feature is not done until its tests in the phase `tests.
 7. **Every FR maps to ≥ 1 named test**, and every documented error code is produced by ≥ 1 test.
 8. **Security-critical code** (sandbox, archive extraction, auth decisions, protocol parsers, PROXY header, relay auth) must have unit + property tests + a fuzz target.
 
-## `mcm-testkit` (crate)
+## `chunkyard-testkit` (crate)
 
 | Helper | Purpose |
 |---|---|
-| `TestApp::spawn(opts)` | Builds `AppState` via the real composition root (`mcm-server` built with `test-hooks`) with temp data dir, binds `127.0.0.1:0`, returns base URL, typed client, and handles to fakes |
+| `TestApp::spawn(opts)` | Builds `AppState` via the real composition root (`chunkyard-server` built with `test-hooks`) with temp data dir, binds `127.0.0.1:0`, returns base URL, typed client, and handles to fakes |
 | `TestApp::login_owner()` | Runs setup + login; returns an authenticated `reqwest::Client` (cookie jar + CSRF header) |
 | `TestApp::token(scopes)` | Creates an API token |
 | `TestApp::ws()` | Connects to `/api/v1/ws`, helpers `subscribe`, `next_event_matching(pred, timeout)` |
@@ -47,13 +47,13 @@ Everything is tested. A feature is not done until its tests in the phase `tests.
 
 ## Coverage
 
-Measured with `cargo llvm-cov nextest --workspace` (excludes `fake-mc-server`, `mcm-testkit`, `mcm-api-tests`, `xtask`) and Vitest `--coverage` (v8).
+Measured with `cargo llvm-cov nextest --workspace` (excludes `fake-mc-server`, `chunkyard-testkit`, `chunkyard-api-tests`, `xtask`) and Vitest `--coverage` (v8).
 
 | Scope | Line coverage gate |
 |---|---|
 | Workspace overall | ≥ 85 % |
-| `mcm-fs::sandbox`, `mcm-fs::archive`, `mcm-auth`, `mcm-protocol` (incl. `text::log_prefix`), `mcm-download::safe_http`, `mcm-router`, `mcm-tunnel-proto` | ≥ 95 % |
-| `mcm-api` handlers (measured via `mcm-api-tests`) | ≥ 90 % |
+| `chunkyard-fs::sandbox`, `chunkyard-fs::archive`, `chunkyard-auth`, `chunkyard-protocol` (incl. `text::log_prefix`), `chunkyard-download::safe_http`, `chunkyard-router`, `chunkyard-tunnel-proto` | ≥ 95 % |
+| `chunkyard-api` handlers (measured via `chunkyard-api-tests`) | ≥ 90 % |
 | `web/src/lib/**` (excluding `components/ui`, generated api) | ≥ 80 % |
 
 CI fails if coverage drops below gate or decreases > 1 % vs `main`.

@@ -1,0 +1,30 @@
+[package]
+name = "chunkyard-process"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+[lints]
+workspace = true
+[dependencies]
+chunkyard-core.workspace = true
+chunkyard-download.workspace = true
+chunkyard-fs.workspace = true
+sha2.workspace = true
+md-5 = "0.10"
+tempfile.workspace = true
+async-trait.workspace = true
+bollard = { version = "0.21", features = ["ssl"] }
+futures-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+time = { workspace = true, features = ["parsing"] }
+tracing.workspace = true
+uuid.workspace = true
+reqwest.workspace = true
+url.workspace = true
+tokio-util = { workspace = true, features = ["rt"] }
+rusty-s3 = { version = "0.8", default-features = false }
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1", features = ["process"] }

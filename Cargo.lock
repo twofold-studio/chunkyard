@@ -392,6 +392,240 @@ dependencies = [
 ]
 
 [[package]]
+name = "chunkyard-api"
+version = "0.14.1"
+dependencies = [
+ "axum",
+ "chunkyard-auth",
+ "chunkyard-config",
+ "chunkyard-core",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "chunkyard-api-tests"
+version = "0.14.1"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64 0.22.1",
+ "chunkyard-api",
+ "chunkyard-auth",
+ "chunkyard-config",
+ "chunkyard-core",
+ "chunkyard-db",
+ "chunkyard-jobs",
+ "chunkyard-process",
+ "chunkyard-server",
+ "flate2",
+ "futures-util",
+ "image",
+ "reqwest",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "tar",
+ "tempfile",
+ "tokio",
+ "tokio-tungstenite",
+ "uuid",
+]
+
+[[package]]
+name = "chunkyard-auth"
+version = "0.14.1"
+dependencies = [
+ "argon2",
+ "base64 0.22.1",
+ "chunkyard-core",
+ "email_address",
+ "rand 0.8.8",
+ "sha2",
+ "subtle",
+ "thiserror",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "chunkyard-config"
+version = "0.14.1"
+dependencies = [
+ "chunkyard-process",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "toml",
+ "url",
+]
+
+[[package]]
+name = "chunkyard-core"
+version = "0.14.1"
+dependencies = [
+ "async-trait",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "uuid",
+]
+
+[[package]]
+name = "chunkyard-db"
+version = "0.14.1"
+dependencies = [
+ "async-trait",
+ "chunkyard-core",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tempfile",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "chunkyard-download"
+version = "0.14.1"
+dependencies = [
+ "futures-util",
+ "image",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha1",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "chunkyard-fs"
+version = "0.14.1"
+dependencies = [
+ "cap-fs-ext",
+ "cap-std",
+ "chunkyard-core",
+ "flate2",
+ "sha2",
+ "tar",
+ "tempfile",
+ "thiserror",
+ "time",
+ "uuid",
+ "zip",
+]
+
+[[package]]
+name = "chunkyard-install"
+version = "0.14.1"
+dependencies = [
+ "async-trait",
+ "chunkyard-core",
+ "chunkyard-download",
+ "chunkyard-fs",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tokio",
+ "url",
+ "zip",
+]
+
+[[package]]
+name = "chunkyard-jobs"
+version = "0.14.1"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "chunkyard-core",
+ "futures-util",
+ "serde_json",
+ "thiserror",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "chunkyard-process"
+version = "0.14.1"
+dependencies = [
+ "async-trait",
+ "bollard",
+ "chunkyard-core",
+ "chunkyard-download",
+ "chunkyard-fs",
+ "futures-util",
+ "md-5",
+ "reqwest",
+ "rustix",
+ "rusty-s3",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "chunkyard-server"
+version = "0.14.1"
+dependencies = [
+ "anyhow",
+ "axum",
+ "base64 0.22.1",
+ "bytes",
+ "chunkyard-api",
+ "chunkyard-auth",
+ "chunkyard-config",
+ "chunkyard-core",
+ "chunkyard-db",
+ "chunkyard-download",
+ "chunkyard-install",
+ "chunkyard-jobs",
+ "chunkyard-process",
+ "clap",
+ "fs2",
+ "mime_guess",
+ "percent-encoding",
+ "scraper",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uuid",
+ "walkdir",
+]
+
+[[package]]
 name = "clap"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1557,240 +1791,6 @@ name = "maybe-owned"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4facc753ae494aeb6e3c22f839b158aebd4f9270f55cd3c79906c45476c47ab4"
-
-[[package]]
-name = "mcm-api"
-version = "0.14.0"
-dependencies = [
- "axum",
- "futures-util",
- "mcm-auth",
- "mcm-config",
- "mcm-core",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tokio-util",
- "tracing",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "mcm-api-tests"
-version = "0.14.0"
-dependencies = [
- "async-trait",
- "axum",
- "base64 0.22.1",
- "flate2",
- "futures-util",
- "image",
- "mcm-api",
- "mcm-auth",
- "mcm-config",
- "mcm-core",
- "mcm-db",
- "mcm-jobs",
- "mcm-process",
- "mcm-server",
- "reqwest",
- "serde_json",
- "sha2",
- "sqlx",
- "tar",
- "tempfile",
- "tokio",
- "tokio-tungstenite",
- "uuid",
-]
-
-[[package]]
-name = "mcm-auth"
-version = "0.14.0"
-dependencies = [
- "argon2",
- "base64 0.22.1",
- "email_address",
- "mcm-core",
- "rand 0.8.8",
- "sha2",
- "subtle",
- "thiserror",
- "time",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "mcm-config"
-version = "0.14.0"
-dependencies = [
- "mcm-process",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "toml",
- "url",
-]
-
-[[package]]
-name = "mcm-core"
-version = "0.14.0"
-dependencies = [
- "async-trait",
- "futures-util",
- "serde",
- "serde_json",
- "thiserror",
- "uuid",
-]
-
-[[package]]
-name = "mcm-db"
-version = "0.14.0"
-dependencies = [
- "async-trait",
- "mcm-core",
- "serde",
- "serde_json",
- "sqlx",
- "tempfile",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "mcm-download"
-version = "0.14.0"
-dependencies = [
- "futures-util",
- "image",
- "reqwest",
- "serde",
- "serde_json",
- "sha1",
- "sha2",
- "tempfile",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "mcm-fs"
-version = "0.14.0"
-dependencies = [
- "cap-fs-ext",
- "cap-std",
- "flate2",
- "mcm-core",
- "sha2",
- "tar",
- "tempfile",
- "thiserror",
- "time",
- "uuid",
- "zip",
-]
-
-[[package]]
-name = "mcm-install"
-version = "0.14.0"
-dependencies = [
- "async-trait",
- "futures-util",
- "mcm-core",
- "mcm-download",
- "mcm-fs",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "tokio",
- "url",
- "zip",
-]
-
-[[package]]
-name = "mcm-jobs"
-version = "0.14.0"
-dependencies = [
- "async-trait",
- "base64 0.22.1",
- "futures-util",
- "mcm-core",
- "serde_json",
- "thiserror",
- "time",
- "tokio",
- "tokio-util",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "mcm-process"
-version = "0.14.0"
-dependencies = [
- "async-trait",
- "bollard",
- "futures-util",
- "mcm-core",
- "mcm-download",
- "mcm-fs",
- "md-5",
- "reqwest",
- "rustix",
- "rusty-s3",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "thiserror",
- "time",
- "tokio",
- "tokio-util",
- "tracing",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "mcm-server"
-version = "0.14.0"
-dependencies = [
- "anyhow",
- "axum",
- "base64 0.22.1",
- "bytes",
- "clap",
- "fs2",
- "mcm-api",
- "mcm-auth",
- "mcm-config",
- "mcm-core",
- "mcm-db",
- "mcm-download",
- "mcm-install",
- "mcm-jobs",
- "mcm-process",
- "mime_guess",
- "percent-encoding",
- "scraper",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "url",
- "uuid",
- "walkdir",
-]
 
 [[package]]
 name = "md-5"
