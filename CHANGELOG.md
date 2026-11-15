@@ -4,6 +4,17 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## 0.13.0 - 2026-11-15
+
+
+### Changed
+
+- Web UI: sub-second metrics require an explicit High frequency choice for each server visit and a visible chart in a focused window. Unattended charts use five-second standby, respecting slower preferences. Visible server cards sample at five seconds or slower; off-screen cards and hidden pages release their streams. The selected and effective cadences are displayed separately.
+
+### Fixed
+
+- Metrics WebSocket delivery reacts to fresh samples with a per-viewer rate limit, avoiding skipped updates when slow collection and delivery timers drift apart. Latest-value backpressure, authentication and socket limits remain enforced.
+- Browser metrics transports are released on pagehide, including pages entering the back/forward cache, and resume only after pageshow. Switching servers cannot inherit even a brief fast subscription from the previous server.
 ## 0.12.0 - 2026-11-15
 
 

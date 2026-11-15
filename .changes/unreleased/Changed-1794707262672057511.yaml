@@ -1,3 +1,0 @@
-kind: Changed
-body: 'Web UI: sub-second server metrics now need an explicit, session-only High frequency switch on the server Usage chart (off on every visit and server switch, even with a saved sub-second rate; capped at 1s until enabled). Faster-than-5s sampling runs only while the chart is in view in a visible, focused window; otherwise the shared page sampler drops to a 5s standby (slower preferences kept) and the panel shows Standby/active cadence and the reason. Server list cards sample at 5s or slower and release their metrics stream while off-screen. No REST API change.'
-time: 2026-11-15T03:47:42.672057511+02:00

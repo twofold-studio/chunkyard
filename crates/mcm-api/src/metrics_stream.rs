@@ -224,22 +224,25 @@ async fn serve(
 ) {
     let (mut writer, mut reader) = socket.split();
     let mut samples = feed.feed.receiver.clone();
-    let mut ticks = tokio::time::interval(Duration::from_millis(interval));
-    ticks.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut pending = samples.borrow().is_some();
+    let mut next_delivery = tokio::time::Instant::now();
     let mut heartbeat = tokio::time::interval(Duration::from_secs(5));
     heartbeat.tick().await;
     let mut last_pong = tokio::time::Instant::now();
     loop {
         tokio::select! {
-            _=ticks.tick()=>{
-                let changed=samples.has_changed();
-                if changed.as_ref().is_ok_and(|changed|!*changed){continue;}
+            changed=samples.changed(), if !pending=>{
+                if changed.is_err(){break;}
+                pending=true;
+            },
+            _=tokio::time::sleep_until(next_delivery), if pending=>{
                 let frame=samples.borrow_and_update().clone();
+                pending=false;
                 if let Some(frame)=frame {
                     if !matches!(tokio::time::timeout(Duration::from_secs(5),writer.send(Message::Text(frame.to_string().into()))).await,Ok(Ok(()))) {break;}
                     if frame["type"]!="sample"{break;}
-                }
-                if changed.is_err(){break;}
+                    next_delivery=tokio::time::Instant::now()+Duration::from_millis(interval);
+                } else {break;}
             },
             incoming=reader.next()=>match incoming {
                 Some(Ok(Message::Pong(_)))=>last_pong=tokio::time::Instant::now(),

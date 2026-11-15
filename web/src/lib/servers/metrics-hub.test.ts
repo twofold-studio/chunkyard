@@ -65,6 +65,21 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('metrics stream frames', () => {
+	it('releases cached-page transports and waits for pageshow before resuming', () => {
+		const h = hub();
+		const first = h.watch('a', 100);
+		expect(h.streams).toBe(1);
+		h.pageHidden();
+		expect(sockets[0].closed).toBe(true);
+		first.setInterval(5000);
+		const second = h.watch('b', 5000);
+		expect(h.streams).toBe(0);
+		h.pageShown();
+		expect(h.streams).toBe(2);
+		first.release();
+		second.release();
+		expect(h.streams).toBe(0);
+	});
 	it('validates frames and clamps the requested interval', () => {
 		expect(parseMetricsFrame(JSON.stringify({ type: 'sample', sample: at('a', 1) }))).toEqual({
 			type: 'sample',

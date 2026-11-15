@@ -157,6 +157,7 @@ export class MetricsHub {
 	#streams = 0;
 	#gate = new Gate(this.#options.pollConcurrency);
 	#listening = false;
+	#pageActive = true;
 
 	/** Replaces options (tests) and drops every channel. */
 	configure(options: Partial<MetricsHubOptions>) {
@@ -231,6 +232,19 @@ export class MetricsHub {
 		if (this.#listening || typeof document === 'undefined') return;
 		this.#listening = true;
 		document.addEventListener('visibilitychange', () => this.visibilityChanged());
+		window.addEventListener('pagehide', () => this.pageHidden());
+		window.addEventListener('pageshow', () => this.pageShown());
+	}
+
+	/** Full navigation/BFCache must release transports even before visibility updates. */
+	pageHidden() {
+		this.#pageActive = false;
+		this.visibilityChanged();
+	}
+
+	pageShown() {
+		this.#pageActive = true;
+		this.visibilityChanged();
 	}
 
 	/** Stops every transport while hidden and resumes subscriptions when visible. */
@@ -255,7 +269,7 @@ export class MetricsHub {
 	}
 
 	#reconcile(channel: MetricsChannel) {
-		const ms = this.#options.isVisible() ? this.#desired(channel) : 0;
+		const ms = this.#pageActive && this.#options.isVisible() ? this.#desired(channel) : 0;
 		if (ms === 0) return this.#stop(channel);
 		if (channel.stopTransport && channel.intervalMs === ms) return;
 		this.#stop(channel);

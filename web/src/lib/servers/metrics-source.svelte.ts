@@ -156,6 +156,9 @@ export class MetricsSource {
 			// High frequency is a per-server choice: returning to a server does not restore it.
 			this.#highFrequencyFor = null;
 			this.#slower = null;
+			// The incoming cadence may still describe the previous server's choice.
+			// Apply this visit's default before opening even the first transport.
+			ms = pageCadence(preferredMs, false, this.attentive).ms;
 		} else if (ms > 0 && this.ms > ms) {
 			// Speeding up (standby → active): samples already charted at the slower spacing are
 			// not gaps. Remember it until they scroll out of the history window.

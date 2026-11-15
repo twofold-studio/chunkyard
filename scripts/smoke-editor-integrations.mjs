@@ -51,7 +51,7 @@ const imageGuard = execFileSync(
 const port = await freePort(),
   base = `http://127.0.0.1:${port}`;
 const manager = spawn(
-  resolve("target/debug/mcm"),
+  resolve(process.env.CHUNKYARD_TEST_BINARY ?? "target/debug/mcm"),
   ["--data-dir", directory, "serve", "--listen", `127.0.0.1:${port}`],
   {
     env: {
@@ -70,15 +70,33 @@ manager.stderr.on("data", (b) => {
   stderr = (stderr + b).slice(-3000);
 });
 const exited = new Promise((r) => manager.once("exit", r));
-const browser = await chromium.launch({
-  executablePath:
-    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
-    "/run/current-system/sw/bin/google-chrome-stable",
-});
-const context = await browser.newContext({
-  viewport: { width: 1440, height: 960 },
-});
+const nativeVisibility = process.env.CHUNKYARD_TEST_HEADED === "true";
+const debugPort = nativeVisibility ? await freePort() : null;
+const chromeExecutable = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
+  "/run/current-system/sw/bin/google-chrome-stable";
+// Start native Chrome ourselves so no second automation client can force the
+// default context permanently visible. The profile and debug port are disposable.
+const chromeProcess = nativeVisibility ? spawn(chromeExecutable, [
+  `--remote-debugging-port=${debugPort}`, `--user-data-dir=${directory}/browser`,
+  "--no-first-run", "--no-default-browser-check", "--ozone-platform=x11", "about:blank",
+], { stdio: "ignore" }) : null;
+const chromeExited = chromeProcess ? new Promise((r) => chromeProcess.once("exit", r)) : null;
+let browser;
+if (nativeVisibility) {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    try {
+      browser = await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`, { noDefaults: true });
+      break;
+    } catch (error) {
+      if (attempt === 49) { chromeProcess.kill("SIGTERM"); throw error; }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+} else browser = await chromium.launch({ executablePath: chromeExecutable });
+const context = nativeVisibility ? browser.contexts()[0]
+  : await browser.newContext({ viewport: { width: 1440, height: 960 } });
 const page = await context.newPage();
+if (nativeVisibility) await page.setViewportSize({ width: 1440, height: 960 });
 page.setDefaultTimeout(12000);
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
@@ -107,7 +125,7 @@ async function tab(name) {
 }
 async function shot(name) {
   await page.screenshot({
-    path: `/tmp/chunkyard-011-${name}.png`,
+    path: `/tmp/chunkyard-013-${name}.png`,
     fullPage: !["properties-diff", "public-docs"].includes(name),
     animations: "disabled",
   });
@@ -327,39 +345,113 @@ try {
     localStorage.setItem("chunkyard.metrics.intervalMs", "100"),
   );
   const metricFrames = [];
+  const metricSockets = new Set();
+  page.on("framenavigated", (frame) => {
+    if (frame === page.mainFrame()) metricSockets.clear();
+  });
   page.on("websocket", (ws) => {
-    if (ws.url().includes("/metrics/stream"))
+    if (ws.url().includes("/metrics/stream")) {
+      ws.on("close", () => metricSockets.delete(ws));
       ws.on("framereceived", (f) => {
         try {
           const v = JSON.parse(String(f.payload));
-          if (v.type === "sample") metricFrames.push(v.sample);
+          if (v.type === "sample") {
+            metricSockets.add(ws);
+            metricFrames.push(v.sample);
+          }
         } catch {}
       });
+    }
   });
+  async function sampledCadence(label, count, minimum, maximum) {
+    await page.waitForTimeout(350);
+    metricFrames.length = 0;
+    for (let i = 0; i < 160 && metricFrames.length < count; i++)
+      await page.waitForTimeout(100);
+    assert(metricFrames.length >= count, `${label}: insufficient fresh readings`);
+    const times = metricFrames.map((s) => Date.parse(s.sampledAt));
+    assert.equal(new Set(times).size, times.length, `${label}: duplicate samples`);
+    const average = (times.at(-1) - times[0]) / (times.length - 1);
+    assert(average >= minimum && average <= maximum, `${label}: ${average} ms; times=${JSON.stringify(times)}; sockets=${JSON.stringify([...metricSockets].map((s) => s.url()))}`);
+    assert.equal(metricFrames[0].serverId, fixture.id);
+    assert.equal(metricSockets.size, 1, `${label}: parallel transports ${JSON.stringify([...metricSockets].map((s) => s.url()))}`);
+    console.log(JSON.stringify({ attentionPhase: label, averageSourceMs: average, samples: times.length }));
+  }
+  async function noMetricStream(label) {
+    await page.waitForTimeout(350);
+    for (let i = 0; i < 100 && metricSockets.size; i++)
+      await page.waitForTimeout(100);
+    assert.equal(metricSockets.size, 0, label);
+  }
   await page.goto(base + "/servers");
   await page.getByTestId("card-cpu").first().waitFor();
-  for (let i = 0; i < 100 && metricFrames.length < 20; i++)
-    await new Promise((r) => setTimeout(r, 100));
-  assert(metricFrames.length >= 2, "Real Docker metrics did not reach card");
-  assert.equal(
-    new Set(metricFrames.map((s) => s.sampledAt)).size,
-    metricFrames.length,
-    "Duplicate metrics were emitted",
-  );
-  assert.equal(metricFrames[0].serverId, fixture.id);
-  const metricTimes = metricFrames.map((s) => Date.parse(s.sampledAt));
-  assert(metricTimes.length >= 20, "Insufficient fresh one-shot samples");
-  const cadence = (metricTimes.at(-1) - metricTimes[0]) / (metricTimes.length - 1);
-  assert(cadence < 200, `Docker sampling was not sub-second: ${cadence} ms`);
-  assert(metricFrames.slice(1).some((s) => s.cpuPercent !== null), "CPU deltas missing");
-  console.log(`Real Docker metrics: ${cadence.toFixed(1)} ms average source cadence`);
+  await sampledCadence("visible card capped", 2, 4500, 6500);
   await shot("server-cards");
+  await page.setViewportSize({ width: 1440, height: 400 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await noMetricStream("Off-screen card retained a stream");
+  await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto(base + `/servers/${fixture.id}`);
   await page
     .getByRole("heading", { name: "Adventure workshop", exact: true })
     .waitFor();
   await page.getByText("Recent activity", { exact: true }).waitFor();
+  await page.bringToFront();
+  const highFrequency = page.getByRole("switch", { name: "High frequency" });
+  assert.equal(await highFrequency.getAttribute("aria-checked"), "false");
+  await sampledCadence("saved fast choice remains disarmed", 3, 850, 1400);
+  await highFrequency.click();
+  await sampledCadence("explicit high frequency", 20, 80, 200);
+  await shot("metrics-fast");
+  await tab("Console");
+  await sampledCadence("chart unmounted", 2, 4500, 6500);
+  await tab("Overview");
+  await sampledCadence("chart restored", 20, 80, 200);
+  await page.setViewportSize({ width: 1440, height: 400 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await sampledCadence("chart off-screen", 2, 4500, 6500);
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.getByRole("heading", { name: "Usage", exact: true }).scrollIntoViewIfNeeded();
+  await sampledCadence("chart returned to viewport", 20, 80, 200);
+  const nativeFocus = await context.newCDPSession(page);
+  await nativeFocus.send("Emulation.setFocusEmulationEnabled", { enabled: false });
+  const otherWindow = process.env.CHUNKYARD_TEST_HEADED === "true"
+    ? await browser.newContext() : context;
+  const otherPage = await otherWindow.newPage();
+  const otherFocus = await otherWindow.newCDPSession(otherPage);
+  await otherFocus.send("Emulation.setFocusEmulationEnabled", { enabled: false });
+  await otherPage.goto("about:blank");
+  await otherPage.bringToFront();
+  const attention = await page.evaluate(() => ({ focused: document.hasFocus(), visibility: document.visibilityState }));
+  console.log(JSON.stringify({ realBrowserAttention: attention }));
+  assert.equal(attention.focused, false, "Other browser window did not take focus");
+  if (attention.visibility === "hidden") await noMetricStream("Hidden page retained metrics");
+  else await sampledCadence("window blurred", 2, 4500, 6500);
+  if (otherWindow === context) await otherPage.close();
+  else await otherWindow.close();
+  await page.bringToFront();
+  await sampledCadence("window focused again", 20, 80, 200);
+  if (process.env.CHUNKYARD_TEST_HEADED === "true") {
+    const { targetInfo } = await nativeFocus.send("Target.getTargetInfo");
+    const { windowId } = await nativeFocus.send("Browser.getWindowForTarget", { targetId: targetInfo.targetId });
+    await nativeFocus.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "minimized" } });
+    await page.waitForFunction(() => document.visibilityState === "hidden");
+    await noMetricStream("Hidden window retained a metrics stream");
+    console.log(JSON.stringify({ attentionPhase: "window hidden", openStreams: metricSockets.size }));
+    await nativeFocus.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "normal" } });
+    await page.bringToFront();
+    await sampledCadence("hidden window restored", 20, 80, 200);
+  }
+  await highFrequency.click();
+  await sampledCadence("high frequency switched off", 3, 850, 1400);
   await shot("overview");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("heading", { name: "Usage", exact: true }).scrollIntoViewIfNeeded();
+  await shot("metrics-mobile");
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "Mobile metrics panel overflow");
+  await page.getByRole("combobox", { name: "Metrics refresh interval" }).click();
+  await page.getByRole("option", { name: "Off", exact: true }).click();
+  await noMetricStream("Off retained a metrics stream");
   await page.setViewportSize({ width: 390, height: 844 });
   await tab("Console");
   assert(
@@ -408,6 +500,7 @@ try {
   throw error;
 } finally {
   await browser.close();
+  if (chromeProcess) { chromeProcess.kill("SIGTERM"); await chromeExited; }
   if (fixture) {
     // API service owns container names; resolve only containers carrying our disposable server label.
     try {

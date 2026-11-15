@@ -262,6 +262,12 @@ try {
     );
     await page.goto(base + `/servers/${server.id}`);
     await page.getByRole("tab", { name: "Overview", exact: true }).waitFor();
+    await page.bringToFront();
+    if (intervalMs > 0 && intervalMs < 1000) {
+      const highFrequency = page.getByRole("switch", { name: "High frequency" });
+      assert.equal(await highFrequency.getAttribute("aria-checked"), "false", "High frequency unexpectedly survived navigation");
+      await highFrequency.click();
+    }
     // Fill the bounded 180-point chart before measuring fast-mode rendering cost.
     await page.waitForTimeout(intervalMs === 100 ? 20000 : 2500);
     const captureStart = performance.now();

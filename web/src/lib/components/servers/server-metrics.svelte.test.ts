@@ -522,6 +522,10 @@ describe('attention-gated cadence (simulated focus and viewport)', () => {
 		await rerender({ serverId: 's2', serverState: 'running' });
 		await expect.element(hf()).toHaveAttribute('aria-checked', 'false');
 		await vi.waitFor(() => expect(open().map((s) => s.url)).toEqual(['ws://x/s2?intervalMs=1000']));
+		// Even a briefly opened stream must not inherit another server's fast choice.
+		expect(sockets.filter((s) => s.url.startsWith('ws://x/s2?')).map((s) => s.url)).toEqual([
+			'ws://x/s2?intervalMs=1000'
+		]);
 		// Returning to the first server does not restore its earlier choice.
 		await rerender({ serverId: 's1', serverState: 'running' });
 		await expect.element(hf()).toHaveAttribute('aria-checked', 'false');

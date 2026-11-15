@@ -7,6 +7,28 @@ use tokio_tungstenite::{
     tungstenite::{Error, Message, client::IntoClientRequest},
 };
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
+#[tokio::test]
+async fn first_fresh_sample_does_not_wait_for_a_slow_delivery_timer() -> Result {
+    let app = TestApp::with_auth(false).await?;
+    let server = app
+        .backend
+        .state
+        .servers
+        .create(serde_json::from_value(
+            json!({"name":"slow metrics","acceptEula":true}),
+        )?)
+        .await?;
+    std::fs::write(server.directory.join("server.jar"), "fixture")?;
+    app.backend.state.servers.start(&server.server.id).await?;
+    let (mut socket, _) = connect_async(request(&app, &server.server.id, 5000, true)?).await?;
+    let frame = tokio::time::timeout(std::time::Duration::from_millis(800), socket.next())
+        .await?
+        .ok_or("closed")??;
+    let frame: Value = serde_json::from_str(frame.to_text()?)?;
+    assert_eq!(frame["type"], "sample");
+    socket.send(Message::Close(None)).await?;
+    app.close().await
+}
 fn request(
     app: &TestApp,
     id: &str,
