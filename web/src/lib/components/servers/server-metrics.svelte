@@ -5,8 +5,10 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import {
 		formatMetricsInterval,
+		isHighFrequency,
 		METRICS_INTERVALS,
 		metricsInterval,
 		type MetricsIntervalMs
@@ -16,7 +18,6 @@
 	import { formatBytes, formatCount, formatCpu, formatUptime } from '#lib/metrics.js';
 	import { cn } from '#lib/utils.js';
 	import {
-		gapThresholdMs,
 		latestMemoryLimit,
 		MAX_HISTORY_POINTS,
 		segments,
@@ -37,7 +38,12 @@
 	const metrics = $derived(source.metrics);
 	const history = $derived(source.history);
 	const live = $derived(source.running);
+	/** What the admin selected (saved in this browser). */
+	const preferred = $derived(source.preferredMs);
+	/** What is collected right now. */
 	const ms = $derived(source.ms);
+	const cadence = $derived(source.cadence);
+	const highFrequencyChoice = $derived(isHighFrequency(preferred));
 	const transport = $derived(source.transport);
 	const paused = $derived(source.paused);
 	const error = $derived(source.error);
@@ -49,7 +55,20 @@
 		return Number.isNaN(date.getTime()) ? null : date;
 	});
 
-	const gapMs = $derived(gapThresholdMs(ms));
+	const gapMs = $derived(source.gapMs);
+	/** Why collection is slowed to standby, for the status line. */
+	const standbyReason = $derived.by(() => {
+		if (source.chartUnobservable) return 'chart visibility unavailable in this browser';
+		if (!source.chartVisible) return 'chart out of view';
+		return 'window not focused';
+	});
+
+	function choose(next: MetricsIntervalMs) {
+		metricsInterval.set(next);
+		// Picking a sub-second rate is an explicit request for high frequency on this visit.
+		// A rate saved earlier never turns it on by itself.
+		source.highFrequency = isHighFrequency(next);
+	}
 	const windowStart = $derived(history[0]?.t ?? 0);
 	const windowEnd = $derived(history.at(-1)?.t ?? 0);
 	const cpuStats = $derived(seriesStats(history, 'cpu'));
@@ -73,6 +92,7 @@
 <section
 	class="flex flex-col gap-4 rounded-lg border border-border bg-card/40 p-4"
 	aria-labelledby="metrics-heading"
+	{@attach source.observeChart}
 >
 	<div class="flex flex-wrap items-center justify-between gap-2">
 		<h2 id="metrics-heading" class="flex items-center gap-2 text-sm font-medium">
@@ -80,21 +100,32 @@
 			Usage
 		</h2>
 		<div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-			<span data-testid="metrics-state">
+			<span data-testid="metrics-state" data-mode={live ? cadence.mode : 'stopped'}>
 				{#if !live}
 					Not running
 				{:else if paused}
 					Paused{#if sampledAt}&nbsp;· sampled {formatTime(sampledAt)}{/if}
-				{:else if sampledAt}
-					<span
-						title={ms < 1000
-							? 'Requests fresh Docker measurements at this interval. Slow responses may reduce the actual rate.'
-							: undefined}
-						>Sampled {formatTime(sampledAt)} · {transport === 'stream' ? 'live' : 'polling'}, up to
-						every {formatMetricsInterval(ms)}</span
-					>
 				{:else}
-					Waiting for first sample
+					{#if sampledAt}Sampled {formatTime(sampledAt)} ·
+					{:else}Waiting for first sample ·
+					{/if}
+					{#if cadence.mode === 'standby'}
+						<span
+							title="Faster refresh resumes while this chart is visible in a focused window."
+							data-testid="metrics-cadence"
+							>Standby, every {formatMetricsInterval(ms as MetricsIntervalMs)} ({standbyReason})</span
+						>
+					{:else}
+						<span
+							title={ms < 1000
+								? 'Requests fresh Docker measurements at this interval. Slow responses may reduce the actual rate.'
+								: undefined}
+							data-testid="metrics-cadence"
+							>{transport === 'poll' ? 'polling' : 'live'}, up to every {formatMetricsInterval(
+								ms as MetricsIntervalMs
+							)}{#if cadence.capped}&nbsp;(High frequency off){/if}</span
+						>
+					{/if}
 				{/if}
 			</span>
 			{#if live && metrics?.uptimeSeconds != null}
@@ -104,23 +135,44 @@
 					>
 				</span>
 			{/if}
+			{#if highFrequencyChoice}
+				<label
+					class="flex items-center gap-1.5"
+					title="Allows the selected sub-second interval while this chart is visible in a focused window. Not saved: off on every visit."
+				>
+					<Switch
+						size="sm"
+						checked={source.highFrequency}
+						onCheckedChange={(on) => (source.highFrequency = on)}
+						aria-describedby="metrics-hf-help"
+					/>
+					High frequency
+				</label>
+				<span id="metrics-hf-help" class="sr-only">
+					Allows sampling every {formatMetricsInterval(preferred)} while this chart is visible in a focused
+					window; otherwise at most every second. Off on every visit.
+				</span>
+			{/if}
 			<Select.Root
 				type="single"
-				value={String(ms)}
-				onValueChange={(next) => metricsInterval.set(Number(next) as MetricsIntervalMs)}
+				value={String(preferred)}
+				onValueChange={(next) => choose(Number(next) as MetricsIntervalMs)}
 			>
 				<Select.Trigger
 					size="sm"
 					class="h-7! gap-1 px-2 text-xs"
 					aria-label="Metrics refresh interval"
-					title="Automatic refresh (saved in this browser)"
+					title="Requested automatic refresh (saved in this browser). Faster than 5s only while this chart is visible in a focused window."
 				>
-					{formatMetricsInterval(ms)}
+					{formatMetricsInterval(preferred)}
 				</Select.Trigger>
 				<Select.Content>
 					{#each METRICS_INTERVALS as option (option)}
 						<Select.Item value={String(option)} label={formatMetricsInterval(option)}>
 							{option === 0 ? 'Off' : `Every ${formatMetricsInterval(option)}`}
+							{#if isHighFrequency(option)}<span class="text-muted-foreground">
+									· high frequency</span
+								>{/if}
 						</Select.Item>
 					{/each}
 				</Select.Content>

@@ -4,6 +4,14 @@ import { render } from 'vitest-browser-svelte';
 import ServerMetrics from '../../../tests/metrics-harness.svelte';
 import { METRICS_INTERVAL_KEY, metricsInterval } from '#lib/metrics-interval.svelte.js';
 import { metricsHub } from '#lib/servers/metrics-hub.svelte.js';
+import type { SocketLike } from '#lib/console/console-stream.js';
+import {
+	FakeIntersectionObserver,
+	focusWindow,
+	installFakeIntersectionObserver,
+	setIntersecting,
+	setWindowFocus
+} from '../../../tests/fake-intersection-observer.js';
 
 const GiB = 1024 ** 3;
 
@@ -49,8 +57,13 @@ function json(body: unknown, status = 200) {
 	});
 }
 
-// These cases cover the REST path (no WebSocket); the stream has its own tests.
-beforeEach(() => metricsHub.configure({ createSocket: null }));
+// These cases cover the REST path (no WebSocket); the stream has its own tests. Chart
+// visibility and window focus are simulated (headless frames cannot be scrolled or focused).
+beforeEach(() => {
+	metricsHub.configure({ createSocket: null });
+	installFakeIntersectionObserver();
+	focusWindow();
+});
 
 afterEach(() => {
 	metricsHub.reset();
@@ -226,9 +239,17 @@ describe('ServerMetrics', () => {
 				timeout: 4000
 			});
 			const cpu = page.getByRole('img', { name: /^CPU over/ });
+			// The first request may be aborted when the visible chart lifts the 5s standby
+			// cadence to 1s, so the lowest charted value is the first or second response.
 			await expect
 				.element(cpu)
-				.toHaveAttribute('aria-label', expect.stringMatching(/lowest 10\.0%/));
+				.toHaveAttribute('aria-label', expect.stringMatching(/lowest (10|20)\.0%/));
+			await vi.waitFor(
+				() => expect(cpu.element().getAttribute('aria-label')).toMatch(/\d+ samples/),
+				{
+					timeout: 3000
+				}
+			);
 			expect(cpu.element().getAttribute('data-runs')).toBe('1');
 			unmount();
 		});
@@ -270,7 +291,7 @@ describe('ServerMetrics', () => {
 	});
 
 	describe('single shared source', () => {
-		it('keeps one polling loop for the header when the charts panel unmounts', async () => {
+		it('keeps one polling loop for the header, slowed to standby, when the charts panel unmounts', async () => {
 			metricsInterval.set(1000);
 			const fetch = vi.fn().mockImplementation(async () => json(sample()));
 			vi.stubGlobal('fetch', fetch);
@@ -280,15 +301,16 @@ describe('ServerMetrics', () => {
 				showPanel: true
 			});
 			await expect.element(page.getByTestId('header-usage')).toHaveTextContent('CPU 12.5%');
-			// Another tab: the panel goes away, the header keeps updating from the same loop.
+			await expect.element(page.getByText(/every 1s/)).toBeVisible();
+			// Another tab: the panel goes away; the header keeps its reading from the same loop,
+			// which drops to the 5s standby cadence.
 			await rerender({ serverId: 's1', serverState: 'running', showPanel: false });
 			await expect.element(page.getByTestId('metric-cpu')).not.toBeInTheDocument();
 			const before = fetch.mock.calls.length;
 			await new Promise((r) => setTimeout(r, 2300));
 			const during = fetch.mock.calls.length - before;
-			// One request per second at most: a second loop would double this.
-			expect(during).toBeGreaterThanOrEqual(1);
-			expect(during).toBeLessThanOrEqual(3);
+			// A 1s loop (or a second loop) would make 2+ requests here.
+			expect(during).toBeLessThanOrEqual(1);
 			await expect.element(page.getByTestId('header-usage')).toHaveTextContent('CPU 12.5%');
 			unmount();
 		});
@@ -355,5 +377,220 @@ describe('ServerMetrics', () => {
 			expect(fetch.mock.calls.length).toBe(calls);
 			unmount();
 		});
+	});
+});
+
+class FakeSocket implements SocketLike {
+	onopen: SocketLike['onopen'] = null;
+	onmessage: SocketLike['onmessage'] = null;
+	onclose: SocketLike['onclose'] = null;
+	onerror: SocketLike['onerror'] = null;
+	closed = false;
+	constructor(readonly url: string) {}
+	close() {
+		this.closed = true;
+	}
+}
+
+describe('attention-gated cadence (simulated focus and viewport)', () => {
+	let sockets: FakeSocket[];
+	const open = () => sockets.filter((s) => !s.closed);
+	/** Interval of the only open stream; fails if two transports run at once. */
+	const streaming = () => {
+		const live = open();
+		expect(live).toHaveLength(1);
+		expect(metricsHub.streams).toBe(1);
+		return Number(new URL(live[0].url).searchParams.get('intervalMs'));
+	};
+	const expectStream = (ms: number) => vi.waitFor(() => expect(streaming()).toBe(ms));
+	const hf = () => page.getByRole('switch', { name: 'High frequency' });
+	const cadence = () => page.getByTestId('metrics-cadence');
+
+	beforeEach(() => {
+		sockets = [];
+		metricsHub.configure({
+			createSocket: (url) => {
+				const socket = new FakeSocket(url);
+				sockets.push(socket);
+				return socket;
+			},
+			streamUrl: (id, ms) => `ws://x/${id}?intervalMs=${ms}`
+		});
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => json(sample()))
+		);
+	});
+
+	it('starts with High frequency off despite a saved 100 ms preference', async () => {
+		metricsInterval.set(100);
+		const { unmount } = render(ServerMetrics, { serverId: 's1', serverState: 'running' });
+		await expect.element(hf()).toHaveAttribute('aria-checked', 'false');
+		await expectStream(1000);
+		await expect.element(cadence()).toHaveTextContent('up to every 1s (High frequency off)');
+		// The selection still shows what was asked for.
+		await expect
+			.element(page.getByRole('combobox', { name: 'Metrics refresh interval' }))
+			.toHaveTextContent('100 ms');
+
+		await hf().click();
+		await expectStream(100);
+		await expect.element(cadence()).toHaveTextContent('up to every 100 ms');
+		expect(cadence().element().textContent).not.toMatch(/High frequency off/);
+		unmount();
+		expect(metricsHub.streams).toBe(0);
+	});
+
+	it('picking a sub-second rate in this visit turns High frequency on', async () => {
+		const { unmount } = render(ServerMetrics, { serverId: 's1', serverState: 'running' });
+		await expectStream(5000);
+		await expect.element(hf()).not.toBeInTheDocument();
+		await page.getByRole('combobox', { name: 'Metrics refresh interval' }).click();
+		await page.getByRole('option', { name: /250 ms/ }).click();
+		await expect.element(hf()).toHaveAttribute('aria-checked', 'true');
+		await expectStream(250);
+		unmount();
+	});
+
+	it('drops to standby on window blur and resumes on focus', async () => {
+		metricsInterval.set(100);
+		const { unmount } = render(ServerMetrics, { serverId: 's1', serverState: 'running' });
+		await hf().click();
+		await expectStream(100);
+		setWindowFocus(false);
+		await expectStream(5000);
+		await expect.element(cadence()).toHaveTextContent('Standby, every 5s (window not focused)');
+		await expect.element(page.getByTestId('metrics-state')).toHaveAttribute('data-mode', 'standby');
+		setWindowFocus(true);
+		await expectStream(100);
+		await expect.element(page.getByTestId('metrics-state')).toHaveAttribute('data-mode', 'active');
+		unmount();
+	});
+
+	it('drops to standby when the chart leaves the viewport and resumes when it returns', async () => {
+		metricsInterval.set(250);
+		const { unmount } = render(ServerMetrics, { serverId: 's1', serverState: 'running' });
+		await hf().click();
+		await expectStream(250);
+		setIntersecting(false);
+		await expectStream(5000);
+		await expect.element(cadence()).toHaveTextContent('(chart out of view)');
+		setIntersecting(true);
+		await expectStream(250);
+		unmount();
+	});
+
+	it('keeps one shared transport for the header when the chart unmounts, and resumes on return', async () => {
+		metricsInterval.set(100);
+		const { rerender, unmount } = render(ServerMetrics, {
+			serverId: 's1',
+			serverState: 'running',
+			showPanel: true
+		});
+		await hf().click();
+		await expectStream(100);
+		const observer = FakeIntersectionObserver.instances.at(-1)!;
+		const chart = [...observer.elements][0];
+		// Another tab (Console, Files…): the header stays live at standby on the same stream.
+		await rerender({ serverId: 's1', serverState: 'running', showPanel: false });
+		await expectStream(5000);
+		expect(observer.disconnected).toBe(true);
+		// A late observer entry after disposal must not bring back fast sampling.
+		observer.emit(chart, true);
+		await new Promise((r) => setTimeout(r, 50));
+		expect(streaming()).toBe(5000);
+		// Back to Overview: the session choice is still on, so fast sampling resumes.
+		await rerender({ serverId: 's1', serverState: 'running', showPanel: true });
+		await expect.element(hf()).toHaveAttribute('aria-checked', 'true');
+		await expectStream(100);
+		unmount();
+		expect(metricsHub.streams).toBe(0);
+	});
+
+	it('switching High frequency off falls back to 1s; switching servers resets it', async () => {
+		metricsInterval.set(500);
+		const { rerender, unmount } = render(ServerMetrics, {
+			serverId: 's1',
+			serverState: 'running'
+		});
+		await hf().click();
+		await expectStream(500);
+		await hf().click();
+		await expectStream(1000);
+		await hf().click();
+		await expectStream(500);
+		await rerender({ serverId: 's2', serverState: 'running' });
+		await expect.element(hf()).toHaveAttribute('aria-checked', 'false');
+		await vi.waitFor(() => expect(open().map((s) => s.url)).toEqual(['ws://x/s2?intervalMs=1000']));
+		// Returning to the first server does not restore its earlier choice.
+		await rerender({ serverId: 's1', serverState: 'running' });
+		await expect.element(hf()).toHaveAttribute('aria-checked', 'false');
+		await vi.waitFor(() => expect(open().map((s) => s.url)).toEqual(['ws://x/s1?intervalMs=1000']));
+		unmount();
+	});
+
+	it('never speeds up or reconnects slower preferences on focus changes', async () => {
+		metricsInterval.set(10000);
+		const { unmount } = render(ServerMetrics, { serverId: 's1', serverState: 'running' });
+		await expectStream(10000);
+		setWindowFocus(false);
+		setIntersecting(false);
+		setWindowFocus(true);
+		setIntersecting(true);
+		await new Promise((r) => setTimeout(r, 50));
+		expect(sockets).toHaveLength(1);
+		expect(streaming()).toBe(10000);
+		unmount();
+	});
+
+	it('Off stays off through focus and viewport changes, without extra snapshots', async () => {
+		metricsInterval.set(100);
+		const fetch = vi.fn(async () => json(sample()));
+		vi.stubGlobal('fetch', fetch);
+		const { unmount } = render(ServerMetrics, { serverId: 's1', serverState: 'running' });
+		await hf().click();
+		await expectStream(100);
+		await page.getByRole('combobox', { name: 'Metrics refresh interval' }).click();
+		await page.getByRole('option', { name: 'Off' }).click();
+		await vi.waitFor(() => expect(metricsHub.streams).toBe(0));
+		await expect.element(page.getByTestId('metrics-state')).toHaveTextContent(/^Paused/);
+		const calls = fetch.mock.calls.length;
+		setWindowFocus(false);
+		setIntersecting(false);
+		setWindowFocus(true);
+		setIntersecting(true);
+		await new Promise((r) => setTimeout(r, 100));
+		expect(metricsHub.streams).toBe(0);
+		expect(fetch.mock.calls.length).toBe(calls);
+		expect(open()).toHaveLength(0);
+		unmount();
+	});
+
+	it('releases everything while the page is hidden', async () => {
+		metricsInterval.set(100);
+		const { unmount } = render(ServerMetrics, { serverId: 's1', serverState: 'running' });
+		await hf().click();
+		await expectStream(100);
+		const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+		document.dispatchEvent(new Event('visibilitychange'));
+		await vi.waitFor(() => expect(metricsHub.streams).toBe(0));
+		hidden.mockRestore();
+		document.dispatchEvent(new Event('visibilitychange'));
+		setWindowFocus(true);
+		await expectStream(100);
+		unmount();
+	});
+
+	it('without IntersectionObserver never samples faster than standby', async () => {
+		vi.stubGlobal('IntersectionObserver', undefined);
+		metricsInterval.set(100);
+		const { unmount } = render(ServerMetrics, { serverId: 's1', serverState: 'running' });
+		await hf().click();
+		await expect.element(hf()).toHaveAttribute('aria-checked', 'true');
+		await expectStream(5000);
+		await expect
+			.element(cadence())
+			.toHaveTextContent('(chart visibility unavailable in this browser)');
+		unmount();
 	});
 });

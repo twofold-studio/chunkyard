@@ -7,8 +7,9 @@
 		segments,
 		seriesStats
 	} from '#lib/metrics-history.js';
-	import { metricsInterval } from '#lib/metrics-interval.svelte.js';
+	import { cardCadence, metricsInterval } from '#lib/metrics-interval.svelte.js';
 	import { metricsHub, type MetricsHub } from '#lib/servers/metrics-hub.svelte.js';
+	import { viewportVisibility } from '#lib/attention.svelte.js';
 
 	interface Props {
 		serverId: string;
@@ -20,12 +21,18 @@
 
 	let { serverId, cpus, hub = metricsHub }: Props = $props();
 
-	const ms = $derived(metricsInterval.ms);
+	// Cards never sample faster than standby (5s), whatever the saved preference: sub-second
+	// rates are reserved for a server page chart the admin is looking at.
+	const ms = $derived(cardCadence(metricsInterval.ms));
+	/** On screen. Without IntersectionObserver the card counts as visible (5s at most). */
+	let visible = $state(false);
+	const observe = viewportVisibility((next) => (visible = next), true);
 	// The card only exists for running local servers; the hub shares the stream with the
-	// server page and stops it while the browser tab is hidden.
+	// server page and stops it while the browser tab is hidden. Off-screen cards release
+	// their subscription entirely; the history collected so far stays on the channel.
 	const channel = $derived(hub.channel(serverId));
 	$effect(() => {
-		if (ms === 0) return;
+		if (ms === 0 || !visible) return;
 		const subscription = hub.watch(serverId, ms);
 		return () => subscription.release();
 	});
@@ -44,7 +51,13 @@
 {#if ms === 0}
 	<p class="text-xs text-muted-foreground" data-testid="card-usage">Live usage off</p>
 {:else}
-	<div class="grid grid-cols-2 gap-3" data-testid="card-usage">
+	<div
+		class="grid grid-cols-2 gap-3"
+		data-testid="card-usage"
+		data-live={visible ? 'true' : 'false'}
+		title={`Live while visible, up to every ${ms / 1000}s`}
+		{@attach observe}
+	>
 		<HistorySparkline
 			compact
 			label="CPU"

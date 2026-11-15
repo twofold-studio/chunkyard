@@ -18,6 +18,50 @@ export const LEGACY_METRICS_INTERVAL_KEY = 'chunkyard.metrics.intervalSeconds';
 /** Minimum interval for REST fallback. */
 export const MIN_POLL_MS = 1000;
 
+/**
+ * Slowest cadence used while nobody is looking: the detail chart is out of view, another tab
+ * is open or the window is not focused, and for server list cards. Slower preferences win.
+ */
+export const STANDBY_METRICS_MS = 5000;
+/** Fastest cadence without the session-only High frequency choice. */
+export const NORMAL_FLOOR_MS = 1000;
+
+/** Whether an interval needs the explicit High frequency choice (sub-second). */
+export const isHighFrequency = (ms: number) => ms > 0 && ms < NORMAL_FLOOR_MS;
+
+export type MetricsMode = 'off' | 'standby' | 'active';
+
+export interface MetricsCadence {
+	mode: MetricsMode;
+	/** Interval actually requested from the hub (0 = no automatic refresh). */
+	ms: number;
+	/** A sub-second preference is limited to 1s because High frequency is off. */
+	capped: boolean;
+}
+
+/**
+ * Effective cadence of the server page sampler. `attentive` means the detail chart intersects
+ * the viewport in a visible, focused window. Faster than 5s needs attention; sub-second
+ * additionally needs High frequency. Off stays off.
+ */
+export function pageCadence(
+	preferred: MetricsIntervalMs,
+	highFrequency: boolean,
+	attentive: boolean
+): MetricsCadence {
+	if (preferred === 0) return { mode: 'off', ms: 0, capped: false };
+	if (preferred >= STANDBY_METRICS_MS) return { mode: 'active', ms: preferred, capped: false };
+	if (!attentive) return { mode: 'standby', ms: STANDBY_METRICS_MS, capped: false };
+	if (isHighFrequency(preferred) && !highFrequency)
+		return { mode: 'active', ms: NORMAL_FLOOR_MS, capped: true };
+	return { mode: 'active', ms: preferred, capped: false };
+}
+
+/** Server list cards never sample faster than standby, whatever the saved preference. */
+export function cardCadence(preferred: MetricsIntervalMs): number {
+	return preferred === 0 ? 0 : Math.max(preferred, STANDBY_METRICS_MS);
+}
+
 export function parseMetricsInterval(raw: string | null): MetricsIntervalMs {
 	const value = Number(raw);
 	return raw !== null && raw.trim() !== '' && METRICS_INTERVALS.includes(value as never)
