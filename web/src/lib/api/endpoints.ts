@@ -40,7 +40,14 @@ import type {
 	SoftwareCatalogItem,
 	SoftwareVersion,
 	VersionedSoftwareKind,
-	VersionInfo
+	VersionInfo,
+	GameStatus,
+	PlayerLists,
+	PlayerChange,
+	AutomationState,
+	RecoveryPolicy,
+	BackupScheduleRequest,
+	MetricsHistory
 } from './types';
 
 interface Opts {
@@ -161,6 +168,46 @@ export const resetServerIcon = (id: string, o: Opts = {}) =>
 	request<{ server: ServerView }>(`/api/v1/servers/${enc(id)}/icon`, { ...o, method: 'DELETE' });
 
 export const getIsolation = (o: Opts = {}) => request<Isolation>('/api/v1/system/isolation', o);
+
+// Readiness, players and automation ------------------------------------------------
+
+/** Server List Ping readiness. Poll at most every 5 s from one place per page. */
+export const getServerStatus = (id: string, o: Opts = {}) =>
+	request<GameStatus>(`/api/v1/servers/${enc(id)}/status`, o);
+
+export const getPlayers = (id: string, o: Opts = {}) =>
+	request<PlayerLists>(`/api/v1/servers/${enc(id)}/players`, o);
+
+/** 202 `{job}` (kind `server.players`); the successful result is `{players}`. */
+export const changePlayer = (id: string, body: PlayerChange, o: Opts = {}) =>
+	request<{ job: Job }>(`/api/v1/servers/${enc(id)}/players`, { ...o, method: 'POST', body });
+
+export const getAutomation = (id: string, o: Opts = {}) =>
+	request<AutomationState>(`/api/v1/servers/${enc(id)}/automation`, o);
+
+/** Full recovery policy; returns the full automation state. */
+export const setRecoveryPolicy = (id: string, body: RecoveryPolicy, o: Opts = {}) =>
+	request<AutomationState>(`/api/v1/servers/${enc(id)}/recovery`, { ...o, method: 'PUT', body });
+
+/** Stopped-only scheduled full S3 backups; returns the full automation state. */
+export const setBackupSchedule = (id: string, body: BackupScheduleRequest, o: Opts = {}) =>
+	request<AutomationState>(`/api/v1/servers/${enc(id)}/backup-schedule`, {
+		...o,
+		method: 'PUT',
+		body
+	});
+
+/** Background history collection only; independent of live refresh. */
+export const setHistorySettings = (id: string, enabled: boolean, o: Opts = {}) =>
+	request<AutomationState>(`/api/v1/servers/${enc(id)}/metrics/history-settings`, {
+		...o,
+		method: 'PUT',
+		body: { enabled }
+	});
+
+/** `hours` 1–168. Timestamps are Unix seconds. */
+export const getMetricsHistory = (id: string, hours: number, o: Opts = {}) =>
+	request<MetricsHistory>(`/api/v1/servers/${enc(id)}/metrics/history?hours=${hours}`, o);
 
 // Software catalog & modpacks ----------------------------------------------------
 

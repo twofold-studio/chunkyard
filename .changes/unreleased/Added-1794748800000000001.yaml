@@ -1,0 +1,3 @@
+kind: Added
+body: 'Web UI: show Minecraft readiness (Server List Ping state, player count, advertised sample, version, latency and suggested address) in the server header and Overview from one shared five-second poll that runs only while the page is visible and focused; add a Players tab for whitelist, operator and ban changes with known-player suggestions, confirmations, live-op level omission and Files links for malformed lists.'
+time: 2026-11-15T15:20:00.000000001Z

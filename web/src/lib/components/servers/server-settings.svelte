@@ -12,6 +12,7 @@
 	import ServerLaunch from './server-launch.svelte';
 	import ServerIconSettings from './server-icon-settings.svelte';
 	import ServerDiagnostics from './server-diagnostics.svelte';
+	import ServerAutomation, { type AutomationApi } from './server-automation.svelte';
 	import type { ServerView } from '#lib/api/index.js';
 
 	interface Props {
@@ -36,6 +37,8 @@
 		archived?: boolean;
 		/** Destructive actions (Delete), shown last in their own section. */
 		danger?: Snippet;
+		/** Injected in tests. */
+		automationApi?: AutomationApi;
 	}
 
 	let {
@@ -52,7 +55,8 @@
 		resourcesFocus = 0,
 		onResourcesFocused,
 		archived = false,
-		danger
+		danger,
+		automationApi
 	}: Props = $props();
 
 	const stopped = $derived(server.status.state === 'stopped');
@@ -179,6 +183,17 @@
 					/>
 				</div>
 			</div>
+		</section>
+	{/if}
+
+	{#if !archived}
+		<section
+			aria-label="Automation"
+			class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card"
+		>
+			{#key server.id}
+				<ServerAutomation serverId={server.id} api={automationApi} />
+			{/key}
 		</section>
 	{/if}
 

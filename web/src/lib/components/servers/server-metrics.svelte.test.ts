@@ -597,4 +597,53 @@ describe('attention-gated cadence (simulated focus and viewport)', () => {
 			.toHaveTextContent('(chart visibility unavailable in this browser)');
 		unmount();
 	});
+
+	it('a stored-history view detaches the live chart: standby, never 100 ms, one history read', async () => {
+		const history = {
+			enabled: true,
+			intervalSeconds: 60,
+			retentionDays: 7,
+			resolutionSeconds: 120,
+			items: [
+				{
+					sampledAt: Math.floor(Date.now() / 1000) - 600,
+					cpuPercent: 4,
+					memoryWorkingSetBytes: GiB,
+					memoryLimitBytes: 2 * GiB
+				}
+			]
+		};
+		const fetch = vi.fn(async (path: string) =>
+			path.includes('/metrics/history') ? json(history) : json(sample())
+		);
+		vi.stubGlobal('fetch', fetch);
+		metricsInterval.set(100);
+		const { unmount } = render(ServerMetrics, { serverId: 's1', serverState: 'running' });
+		await hf().click();
+		await expectStream(100);
+
+		await page.getByRole('button', { name: '24h' }).click();
+		await expect.element(page.getByTestId('stored-history-charts')).toBeVisible();
+		// The live observer is gone: the shared sampler drops to standby for the header.
+		await expectStream(5000);
+		await expect.element(page.getByTestId('metrics-state')).toHaveAttribute('data-mode', 'history');
+		await expect.element(page.getByTestId('stored-history-note')).toHaveTextContent('kept 7 days');
+		const historyCalls = () =>
+			fetch.mock.calls.filter(([path]) => String(path).includes('/metrics/history'));
+		await new Promise((r) => setTimeout(r, 300));
+		expect(historyCalls().map(([path]) => path)).toEqual([
+			'/api/v1/servers/s1/metrics/history?hours=24'
+		]);
+		expect(open().every((s) => !s.url.endsWith('intervalMs=100'))).toBe(true);
+
+		await page.getByRole('button', { name: '7d' }).click();
+		await vi.waitFor(() => expect(historyCalls()).toHaveLength(2));
+		expect(historyCalls()[1][0]).toBe('/api/v1/servers/s1/metrics/history?hours=168');
+
+		// Back to Live: the session High frequency choice applies again while attended.
+		await page.getByRole('button', { name: 'Live' }).click();
+		await expectStream(100);
+		unmount();
+		expect(metricsHub.streams).toBe(0);
+	});
 });

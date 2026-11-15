@@ -575,3 +575,127 @@ export interface ExportRecord {
 	/** Object key in the bucket for S3 exports; `null` for local archives. */
 	objectKey: string | null;
 }
+
+// Readiness, players and automation (`/api/v1/servers/{id}/…`) -------------------------
+
+/**
+ * Game readiness from a Java Edition Server List Ping. `ready` means Minecraft answered;
+ * a running container alone is `starting` (then `unreachable` after five minutes).
+ */
+export type GameState =
+	'starting' | 'ready' | 'unreachable' | 'stopped' | 'failed' | 'archived' | 'paused' | 'unknown';
+
+export interface PlayerIdentity {
+	name: string;
+	uuid: string;
+}
+
+/** `GET /api/v1/servers/{id}/status`. Counts, latency, version and address can be null. */
+export interface GameStatus {
+	state: GameState;
+	/** RFC 3339 time of the observation. */
+	observedAt: string;
+	latencyMs: number | null;
+	onlinePlayers: number | null;
+	maxPlayers: number | null;
+	/** Only the sample the server advertises; never a complete online roster. */
+	playerSample: PlayerIdentity[];
+	version: string | null;
+	/** Suggested address; does not establish external firewall/VPN reachability. */
+	connectAddress: string | null;
+	detail: string;
+}
+
+export type PlayerListName = 'whitelist' | 'operators' | 'bans';
+
+/** A native Minecraft list entry. Unknown fields are preserved by the backend. */
+export interface PlayerEntry {
+	uuid?: string;
+	name?: string;
+	level?: number;
+	reason?: string;
+	created?: string;
+	expires?: string;
+	source?: string;
+	[key: string]: unknown;
+}
+
+/** `GET /api/v1/servers/{id}/players`. Flags describe the saved (desired) properties. */
+export interface PlayerLists {
+	whitelist: PlayerEntry[];
+	operators: PlayerEntry[];
+	bans: PlayerEntry[];
+	knownPlayers: PlayerIdentity[];
+	running: boolean;
+	onlineMode: boolean;
+	whitelistEnabled: boolean;
+}
+
+/** `POST /api/v1/servers/{id}/players` (202 `{job}`, kind `server.players`). */
+export interface PlayerChange {
+	list: PlayerListName;
+	action: 'add' | 'remove';
+	name: string;
+	uuid?: string | null;
+	/** Stopped operator adds only; omit while running (server default applies). */
+	level?: number | null;
+	reason?: string | null;
+}
+
+export interface RecoveryPolicy {
+	autoStart: boolean;
+	restartOnCrash: boolean;
+	maxAttempts: number;
+	retryDelaySeconds: number;
+}
+
+export interface BackupPolicy {
+	enabled: boolean;
+	intervalMinutes: number;
+	/** `null` keeps every scheduled backup. */
+	keepLast: number | null;
+}
+
+/** `PUT /api/v1/servers/{id}/backup-schedule`. */
+export interface BackupScheduleRequest extends BackupPolicy {
+	/** Required when setting or changing a numeric `keepLast`. */
+	confirmRetentionDeletion: boolean;
+}
+
+/**
+ * `GET /api/v1/servers/{id}/automation`. Every `*At` value is **Unix seconds**.
+ * `lastHistoryAt` is the last collection attempt, not proof that a sample exists.
+ */
+export interface AutomationState {
+	recovery: RecoveryPolicy;
+	backup: BackupPolicy;
+	historyEnabled: boolean;
+	desiredRunning: boolean;
+	restartAttempts: number;
+	nextRetryAt: number | null;
+	stableSince: number | null;
+	nextBackupAt: number | null;
+	lastBackupAt: number | null;
+	lastBackupJob: string | null;
+	lastBackupExportId: string | null;
+	lastBackupResult: string | null;
+	lastBackupError: string | null;
+	lastHistoryAt: number | null;
+}
+
+/** One averaged bucket of observed snapshots. `sampledAt` is **Unix seconds**. */
+export interface MetricsHistoryPoint {
+	sampledAt: number;
+	cpuPercent: number | null;
+	memoryWorkingSetBytes: number | null;
+	memoryLimitBytes: number | null;
+}
+
+/** `GET /api/v1/servers/{id}/metrics/history?hours=1..168`. At most 720 buckets. */
+export interface MetricsHistory {
+	enabled: boolean;
+	intervalSeconds: number;
+	retentionDays: number;
+	resolutionSeconds: number;
+	items: MetricsHistoryPoint[];
+}

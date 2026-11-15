@@ -55,6 +55,10 @@
 	import { poll } from '#lib/polling.js';
 	import { formatBytes, formatCpu } from '#lib/metrics.js';
 	import { useServerMetrics } from '#lib/servers/metrics-source.svelte.js';
+	import { useGameStatus } from '#lib/servers/game-status.svelte.js';
+	import ReadinessBadge from '#lib/components/servers/readiness-badge.svelte';
+	import ServerPlayers from '#lib/components/players/server-players.svelte';
+	import UsersIcon from '@lucide/svelte/icons/users';
 	import { usePackMetadata } from '#lib/servers/pack-metadata.svelte.js';
 	import { afterNavigate, beforeNavigate, goto } from '$app/navigation';
 	import { LeaveGuard } from '#lib/navigation/leave-guard.svelte.js';
@@ -120,10 +124,18 @@
 		active: !removed && !deleting && !archived
 	}));
 	const liveUsage = $derived(metrics.live);
+	// The page's only readiness poll: the header badge and the Overview panel share it. Nothing
+	// is probed while the container is stopped, archived or being deleted.
+	const game = useGameStatus(() => ({
+		serverId: server.id,
+		active: !removed && !deleting && !archived && server.status.state !== 'stopped'
+	}));
+	const readiness = $derived(game.readiness);
 
 	const TABS = [
 		{ value: 'overview', label: 'Overview', icon: LayoutDashboardIcon },
 		{ value: 'console', label: 'Console', icon: TerminalIcon },
+		{ value: 'players', label: 'Players', icon: UsersIcon },
 		{ value: 'properties', label: 'Properties', icon: FileCogIcon },
 		{ value: 'files', label: 'Files', icon: FolderTreeIcon },
 		{ value: 'exports', label: 'Exports', icon: ArchiveIcon },
@@ -133,7 +145,7 @@
 	type TabValue = (typeof TABS)[number]['value'];
 	const isTab = (value: string | null): value is TabValue => TABS.some((t) => t.value === value);
 	/** Tabs that read or change local instance files; hidden while archived. */
-	const LOCAL_TABS: readonly TabValue[] = ['console', 'properties', 'files'];
+	const LOCAL_TABS: readonly TabValue[] = ['console', 'players', 'properties', 'files'];
 	const visibleTabs = $derived(archived ? TABS.filter((t) => !LOCAL_TABS.includes(t.value)) : TABS);
 
 	const initialTab = page.url.searchParams.get('tab');
@@ -435,6 +447,9 @@
 				<Badge variant="secondary" title="Local files removed; restorable from its S3 backup">
 					<CloudIcon aria-hidden="true" />Archived
 				</Badge>
+			{:else if game.active && server.status.state === 'running' && readiness.state !== null}
+				<!-- Game readiness replaces the bare container state once a status ping answered. -->
+				<ReadinessBadge {readiness} compact />
 			{:else}
 				<StatusBadge state={server.status.state} compact />
 			{/if}
@@ -445,7 +460,13 @@
 		>
 			{#if controller.busy && controller.job && controller.action}
 				<Spinner class="size-3" />
-				<span class="truncate">{labels[controller.action]}… job {controller.job.state}</span>
+				<span class="truncate"
+					>{controller.automaticLifecycle === 'recover'
+						? 'Restarting after a crash'
+						: controller.automaticLifecycle === 'auto_start'
+							? 'Starting automatically'
+							: labels[controller.action]}… job {controller.job.state}</span
+				>
 			{:else if controller.deleteActive}
 				<Spinner class="size-3" />
 				<span class="truncate">Deleting… job {controller.deleteJob?.state}</span>
@@ -454,7 +475,10 @@
 				<span class="truncate">Installing… job {controller.installJob?.state}</span>
 			{:else if controller.exportActive}
 				<Spinner class="size-3" />
-				<span class="truncate">Exporting… job {controller.exportJob?.state}</span>
+				<span class="truncate"
+					>{controller.exportScheduled ? 'Scheduled backup' : 'Exporting'}… job {controller
+						.exportJob?.state}</span
+				>
 			{:else if controller.backupActive}
 				<Spinner class="size-3" />
 				<span class="truncate"
@@ -680,6 +704,8 @@
 						onOpenExports={() => selectTab('exports')}
 						onOpenActivity={() => selectTab('activity')}
 						onOpenProperties={() => selectTab('properties')}
+						{game}
+						onOpenSettings={() => selectTab('settings')}
 					/>
 				{/if}
 			</Reveal>
@@ -694,6 +720,21 @@
 					{running}
 					refreshKey={consoleKey}
 				/>
+			</Reveal>
+		{/if}
+	</Tabs.Content>
+	<Tabs.Content value="players">
+		{#if tab === 'players' && !archived}
+			<Reveal preset="step" direction={tabDirection}>
+				{#key server.id}
+					<ServerPlayers
+						serverId={server.id}
+						serverState={server.status.state}
+						busy={controller.busy || deleting || removed || exportBusy}
+						onOpenFiles={() => selectTab('files')}
+						onOpenProperties={() => selectTab('properties')}
+					/>
+				{/key}
 			</Reveal>
 		{/if}
 	</Tabs.Content>

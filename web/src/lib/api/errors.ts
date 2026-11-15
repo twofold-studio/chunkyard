@@ -178,6 +178,18 @@ const KNOWN: Record<string, Omit<ErrorMessage, 'detail'> & { detail?: string }> 
 		title: 'Server is archived',
 		hint: 'Its local files were removed. Restore it from its backup first.'
 	},
+	'operations.invalid': { title: 'Request rejected' },
+	'operations.busy': { title: 'Operation busy', hint: 'Retry shortly.' },
+	'operations.storage': { title: 'Could not save the setting' },
+	'players.identity': {
+		title: 'Player identity unknown',
+		hint: 'Enter the player UUID, pick a known player, or check the online profile service.'
+	},
+	'players.invalid_file': {
+		title: 'Player list is malformed',
+		hint: 'Correct the JSON file in Files. Nothing was rewritten.'
+	},
+	'players.files': { title: 'Player file unavailable', hint: 'Refresh the lists and retry.' },
 	validation: { title: 'Invalid input' }
 };
 

@@ -50,8 +50,14 @@ const LIFECYCLE_KINDS: Record<string, ServerAction> = {
 	'server.start': 'start',
 	'server.stop': 'stop',
 	'server.restart': 'restart',
-	'server.kill': 'kill'
+	'server.kill': 'kill',
+	// Policy starts (manager startup, crash recovery) behave as starts for guards and display.
+	'server.auto_start': 'start',
+	'server.recover': 'start'
 };
+
+/** Export jobs: manual exports and scheduler-created full S3 backups block mutations alike. */
+const EXPORT_KINDS: ReadonlySet<string> = new Set(['server.export', 'server.backup_scheduled']);
 
 /** What a returning page re-attaches to; other job kinds are ignored, never treated as installs. */
 export type RecoverableKind = 'install' | 'lifecycle' | 'export' | 'delete' | 'backup';
@@ -67,7 +73,7 @@ const BACKUP_KINDS: Record<string, BackupOperation> = {
 export function recoverableKind(kind: string): RecoverableKind | null {
 	if (kind === 'server.install') return 'install';
 	if (kind in LIFECYCLE_KINDS) return 'lifecycle';
-	if (kind === 'server.export') return 'export';
+	if (EXPORT_KINDS.has(kind)) return 'export';
 	if (kind === 'server.delete') return 'delete';
 	if (kind in BACKUP_KINDS) return 'backup';
 	return null;
@@ -161,6 +167,19 @@ export class ServerController {
 
 	get exportActive(): boolean {
 		return this.exportJob !== null && isJobActive(this.exportJob);
+	}
+
+	/** The tracked lifecycle job was started by a manager policy (auto-start or crash recovery). */
+	get automaticLifecycle(): 'auto_start' | 'recover' | null {
+		const kind = this.job?.kind;
+		if (kind === 'server.auto_start') return 'auto_start';
+		if (kind === 'server.recover') return 'recover';
+		return null;
+	}
+
+	/** The tracked export is a scheduler-created backup rather than a manual export. */
+	get exportScheduled(): boolean {
+		return this.exportJob?.kind === 'server.backup_scheduled';
 	}
 
 	get deleteActive(): boolean {

@@ -4,7 +4,9 @@ import { render } from 'vitest-browser-svelte';
 import ServerOverview from './server-overview.svelte';
 import ServerDiagnostics from './server-diagnostics.svelte';
 import { MetricsSource } from '#lib/servers/metrics-source.svelte.js';
-import type { ServerView } from '#lib/api/index.js';
+import type { GameStatus, ServerView } from '#lib/api/index.js';
+import { GameStatusSource } from '#lib/servers/game-status.svelte.js';
+import { DocumentAttention } from '#lib/attention.svelte.js';
 
 const server = (extra: Partial<ServerView> = {}): ServerView => ({
 	id: 'srv-1',
@@ -149,6 +151,66 @@ describe('ServerOverview', () => {
 		renderOverview({ server: server({ software: null, launch: null }), pack: null });
 		await expect.element(page.getByRole('heading', { name: 'Custom JAR' })).toBeVisible();
 		await expect.element(page.getByText('server.jar')).toBeVisible();
+	});
+
+	it('shows the shared readiness probe honestly: sample, unknown counts and address hint', async () => {
+		const attention = new DocumentAttention();
+		attention.visible = true;
+		attention.focused = true;
+		let reply: GameStatus = {
+			state: 'ready',
+			observedAt: new Date().toISOString(),
+			latencyMs: 14,
+			onlinePlayers: 5,
+			maxPlayers: 20,
+			playerSample: [{ name: 'Alex', uuid: 'a' }],
+			version: '1.21.1',
+			connectAddress: 'mc.example:25565',
+			detail: 'Minecraft answered a Server List Ping.'
+		};
+		const fetch = vi.fn(async () => reply);
+		const game = new GameStatusSource({ fetch, attention, intervalMs: 30 });
+		game.configure('srv-1', true);
+		const running = server({
+			status: { state: 'running', containerId: 'c', exitCode: null, oomKilled: false }
+		});
+		const handlers = { onRequestEula: vi.fn(), onOpenConsole: vi.fn(), onOpenResources: vi.fn() };
+		render(ServerOverview, {
+			server: running,
+			metrics: new MetricsSource(),
+			pack: PACK,
+			game,
+			opsApi: {
+				exports: async () => [],
+				jobs: async () => [],
+				properties: async () => {
+					throw new Error('not needed here');
+				}
+			},
+			...handlers
+		});
+		const panel = page.getByTestId('server-readiness');
+		await expect.element(page.getByTestId('readiness-badge')).toHaveTextContent('Ready');
+		await expect.element(page.getByTestId('readiness-players')).toHaveTextContent('5/20');
+		await expect
+			.element(page.getByTestId('readiness-sample-note'))
+			.toHaveTextContent('Advertised sample: 1 of 5 online. Not a complete roster.');
+		await expect
+			.element(panel)
+			.toHaveTextContent(/Firewalls, VPNs and routing outside the manager are not checked/);
+		// The bare "may still be loading" note is replaced by the probe.
+		await expect.element(page.getByText(/Minecraft may still be loading/)).not.toBeInTheDocument();
+
+		reply = {
+			...reply,
+			state: 'starting',
+			onlinePlayers: null,
+			maxPlayers: null,
+			playerSample: []
+		};
+		await expect.element(page.getByTestId('readiness-badge')).toHaveTextContent('Starting');
+		await expect.element(page.getByTestId('readiness-players')).toHaveTextContent('—');
+		game.stop();
 	});
 });
 

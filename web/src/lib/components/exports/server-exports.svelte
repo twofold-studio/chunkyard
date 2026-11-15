@@ -49,6 +49,7 @@
 	import RestoreNote from './restore-note.svelte';
 	import RemoveLocalPanel from './remove-local-panel.svelte';
 	import RestoreDialog from './restore-dialog.svelte';
+	import BackupSchedule, { type ScheduleApi } from './backup-schedule.svelte';
 	import { fullS3Backups } from '#lib/exports/backups.js';
 	import JobWorkProgress from '#lib/components/jobs/job-work-progress.svelte';
 	import { readJobWork } from '#lib/jobs/work.js';
@@ -89,6 +90,8 @@
 		onRemoveLocal?: (exportId: string) => void;
 		/** Restores the archived server from a full archive (after confirmation). */
 		onRestore?: (exportId: string) => void;
+		/** Injected in tests (scheduled backups). */
+		scheduleApi?: ScheduleApi;
 	}
 
 	let {
@@ -110,7 +113,8 @@
 		backupError = null,
 		backupOp = null,
 		onRemoveLocal,
-		onRestore
+		onRestore,
+		scheduleApi
 	}: Props = $props();
 
 	const pathsId = $props.id();
@@ -478,7 +482,9 @@
 								<a
 									href={resolve(`activity/${shownJob.id}`)}
 									class="ml-auto shrink-0 text-xs text-muted-foreground underline underline-offset-4"
-									>Started earlier · details</a
+									>{shownJob.kind === 'server.backup_scheduled'
+										? 'Scheduled backup'
+										: 'Started earlier'} · details</a
 								>
 							{/if}
 						</p>
@@ -524,6 +530,15 @@
 				</ErrorAlert>
 			</div>
 		{/if}
+	{/if}
+
+	{#if !archive}
+		<BackupSchedule
+			{serverId}
+			storage={loadError ? null : storage}
+			refreshKey={archivesVersion}
+			api={scheduleApi}
+		/>
 	{/if}
 
 	<section class="flex flex-col gap-2" aria-label="Archives of this server">

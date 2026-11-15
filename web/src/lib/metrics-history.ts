@@ -123,6 +123,53 @@ export function gapThresholdMs(intervalMs: number): number {
 	return base * 2.5 + 2000;
 }
 
+// Persistent background history (`GET …/metrics/history`) ------------------------------
+
+/** Chart ranges for stored history, in hours (the backend accepts 1–168). */
+export const HISTORY_RANGES = [
+	{ hours: 1, label: '1h' },
+	{ hours: 24, label: '24h' },
+	{ hours: 168, label: '7d' }
+] as const;
+export type HistoryRangeHours = (typeof HISTORY_RANGES)[number]['hours'];
+
+/**
+ * Converts stored buckets (`sampledAt` in **Unix seconds**) to chart points in ms. Missing or
+ * invalid values stay `null`, never zero; duplicate or out-of-order buckets are dropped.
+ */
+export function storedHistoryPoints(
+	items: readonly {
+		sampledAt: number;
+		cpuPercent: number | null;
+		memoryWorkingSetBytes: number | null;
+		memoryLimitBytes: number | null;
+	}[]
+): HistoryPoint[] {
+	const points: HistoryPoint[] = [];
+	for (const item of items) {
+		if (typeof item.sampledAt !== 'number' || !Number.isFinite(item.sampledAt)) continue;
+		const t = item.sampledAt * 1000;
+		const last = points.at(-1);
+		if (last && t <= last.t) continue;
+		points.push({
+			t,
+			cpu: finite(item.cpuPercent),
+			memory: finite(item.memoryWorkingSetBytes),
+			memoryLimit: finite(item.memoryLimitBytes)
+		});
+	}
+	return points;
+}
+
+/**
+ * Bucket spacing beyond which a stored series breaks: a skipped bucket or two is jitter,
+ * anything longer (stopped server, collection off, busy sampler) is a gap.
+ */
+export function storedGapMs(resolutionSeconds: number, intervalSeconds = 60): number {
+	const step = Math.max(resolutionSeconds, intervalSeconds, 1) * 1000;
+	return step * 2.5;
+}
+
 /** Latest known hard memory limit in the window, used as the chart ceiling. */
 export function latestMemoryLimit(points: readonly HistoryPoint[]): number | null {
 	for (let i = points.length - 1; i >= 0; i--) {

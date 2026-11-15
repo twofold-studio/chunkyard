@@ -7,6 +7,8 @@ import {
 	MAX_HISTORY_POINTS,
 	segments,
 	seriesStats,
+	storedGapMs,
+	storedHistoryPoints,
 	type HistoryPoint
 } from './metrics-history';
 
@@ -107,5 +109,42 @@ describe('segments', () => {
 	it('scales the gap threshold with the refresh interval', () => {
 		expect(gapThresholdMs(5000)).toBe(14_500);
 		expect(gapThresholdMs(0)).toBe(77_000);
+	});
+});
+
+describe('stored history', () => {
+	it('converts Unix-second buckets to ms and keeps missing values missing', () => {
+		const points = storedHistoryPoints([
+			{ sampledAt: 1794744000, cpuPercent: 3.2, memoryWorkingSetBytes: 100, memoryLimitBytes: 500 },
+			{
+				sampledAt: 1794744120,
+				cpuPercent: null,
+				memoryWorkingSetBytes: -1,
+				memoryLimitBytes: null
+			},
+			// Duplicate and out-of-order buckets are dropped.
+			{ sampledAt: 1794744120, cpuPercent: 9, memoryWorkingSetBytes: 9, memoryLimitBytes: 9 },
+			{ sampledAt: 1794743000, cpuPercent: 9, memoryWorkingSetBytes: 9, memoryLimitBytes: 9 }
+		]);
+		expect(points).toEqual([
+			{ t: 1794744000_000, cpu: 3.2, memory: 100, memoryLimit: 500 },
+			{ t: 1794744120_000, cpu: null, memory: null, memoryLimit: null }
+		]);
+		expect(new Date(points[0].t).getUTCFullYear()).toBe(2026);
+	});
+
+	it('breaks lines at skipped buckets instead of bridging them', () => {
+		const gap = storedGapMs(120);
+		expect(gap).toBe(300_000);
+		expect(storedGapMs(30, 60)).toBe(150_000);
+		const points = storedHistoryPoints(
+			[0, 120, 240, 1200, 1320].map((offset) => ({
+				sampledAt: 1794744000 + offset,
+				cpuPercent: 5,
+				memoryWorkingSetBytes: 10,
+				memoryLimitBytes: null
+			}))
+		);
+		expect(segments(points, 'cpu', gap).map((run) => run.length)).toEqual([3, 2]);
 	});
 });

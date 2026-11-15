@@ -478,3 +478,92 @@ describe('ServerController archive/restore', () => {
 		expect(controller.exportsVersion).toBe(1);
 	});
 });
+
+describe('policy-started jobs', () => {
+	it('maps automatic starts to lifecycle and scheduled backups to export', () => {
+		expect(recoverableKind('server.auto_start')).toBe('lifecycle');
+		expect(recoverableKind('server.recover')).toBe('lifecycle');
+		expect(recoverableKind('server.backup_scheduled')).toBe('export');
+		// Player edits are followed by the Players tab, never by page recovery.
+		expect(recoverableKind('server.players')).toBeNull();
+	});
+
+	it('follows a crash-recovery restart as a start that blocks other actions', async () => {
+		const running = server('s1', {
+			status: { state: 'running', containerId: 'c', exitCode: null, oomKilled: false }
+		});
+		const recover = job('r1', 'server.recover', 'running');
+		let finish = false;
+		const getJob = vi.fn(async () =>
+			finish
+				? job('r1', 'server.recover', 'succeeded', { result: { server: running, automatic: true } })
+				: recover
+		);
+		const { controller, mutations } = make({
+			listJobs: vi.fn().mockResolvedValue(page([recover])),
+			getJob
+		});
+		await controller.recover();
+		expect(controller.action).toBe('start');
+		expect(controller.automaticLifecycle).toBe('recover');
+		expect(controller.busy).toBe(true);
+		// A concurrent owner action is refused while the policy start runs.
+		expect(await controller.run('stop')).toBeNull();
+		finish = true;
+		await vi.waitFor(() => expect(controller.job?.state).toBe('succeeded'));
+		expect(controller.busy).toBe(false);
+		expect(controller.server).toBe(running);
+		expect(mutations.serverAction).not.toHaveBeenCalled();
+	});
+
+	it('reports a failed automatic start with its Activity job and never retries it', async () => {
+		const failure = { code: 'server.eula_required', detail: 'EULA not accepted.' };
+		const { controller, mutations } = make({
+			listJobs: vi.fn().mockResolvedValue(page([job('a1', 'server.auto_start', 'queued')])),
+			getJob: vi
+				.fn()
+				.mockResolvedValue(job('a1', 'server.auto_start', 'failed', { error: failure }))
+		});
+		await controller.recover();
+		await vi.waitFor(() => expect(controller.error).toEqual(failure));
+		expect(controller.errorJobId).toBe('a1');
+		expect(controller.automaticLifecycle).toBe('auto_start');
+		expect(mutations.serverAction).not.toHaveBeenCalled();
+	});
+
+	it('treats a running scheduled backup as an export for the mutation guards', async () => {
+		const scheduled = job('b1', 'server.backup_scheduled', 'running');
+		let finish = false;
+		const { controller } = make({
+			listJobs: vi.fn().mockResolvedValue(page([scheduled])),
+			getJob: vi.fn(async () =>
+				finish
+					? job('b1', 'server.backup_scheduled', 'succeeded', {
+							result: { export: { id: 'e1' }, scheduled: true, retentionDeleted: 0 }
+						})
+					: scheduled
+			)
+		});
+		await controller.recover();
+		expect(controller.exportActive).toBe(true);
+		expect(controller.exportScheduled).toBe(true);
+		expect(controller.busy).toBe(true);
+		expect(await controller.run('start')).toBeNull();
+		finish = true;
+		await vi.waitFor(() => expect(controller.exportActive).toBe(false));
+		expect(controller.exportsVersion).toBe(1);
+		expect(controller.exportError).toBeNull();
+	});
+
+	it('leaves a scheduled backup alone while the Exports tab tracks an export itself', async () => {
+		const getJob = vi.fn();
+		const { controller } = make({
+			listJobs: vi.fn().mockResolvedValue(page([job('b1', 'server.backup_scheduled', 'running')])),
+			getJob
+		});
+		controller.setExternalTracking('export', true);
+		await controller.recover();
+		expect(controller.exportJob).toBeNull();
+		expect(getJob).not.toHaveBeenCalled();
+	});
+});

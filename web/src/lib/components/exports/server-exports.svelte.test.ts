@@ -50,6 +50,23 @@ const job = (state: Job['state'], extra: Partial<Job> = {}): Job => ({
 	...extra
 });
 
+const DEFAULT_AUTOMATION = {
+	recovery: { autoStart: false, restartOnCrash: false, maxAttempts: 3, retryDelaySeconds: 30 },
+	backup: { enabled: false, intervalMinutes: 1440, keepLast: null },
+	historyEnabled: true,
+	desiredRunning: false,
+	restartAttempts: 0,
+	nextRetryAt: null,
+	stableSince: null,
+	nextBackupAt: null,
+	lastBackupAt: null,
+	lastBackupJob: null,
+	lastBackupExportId: null,
+	lastBackupResult: null,
+	lastBackupError: null,
+	lastHistoryAt: null
+};
+
 beforeEach(() => {
 	calls = [];
 	replies = {};
@@ -58,6 +75,16 @@ beforeEach(() => {
 		vi.fn(async (path: string, init: RequestInit) => {
 			const method = init.method ?? 'GET';
 			calls.push({ path, method, body: init.body ? JSON.parse(String(init.body)) : undefined });
+			// The scheduled-backup section reads the (default, disabled) automation state.
+			if (
+				method === 'GET' &&
+				path === '/api/v1/servers/srv-1/automation' &&
+				!replies[`GET ${path}`]
+			)
+				return new Response(JSON.stringify(DEFAULT_AUTOMATION), {
+					status: 200,
+					headers: { 'content-type': 'application/json' }
+				});
 			const next = replies[`${method} ${path}`]?.shift();
 			if (!next) throw new Error(`unexpected request ${method} ${path}`);
 			if (next.status === 204) return new Response(null, { status: 204 });

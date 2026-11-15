@@ -229,3 +229,55 @@ describe('canLinkServer', () => {
 		expect(canLinkServer(job('a', { kind: 'server.delete', state: 'failed' }), known)).toBe(true);
 	});
 });
+
+describe('operations job kinds', () => {
+	it('labels player, policy and scheduled jobs', () => {
+		expect(jobKindLabel('server.players')).toBe('Change player list');
+		expect(jobKindLabel('server.auto_start')).toBe('Automatic start');
+		expect(jobKindLabel('server.recover')).toBe('Crash recovery restart');
+		expect(jobKindLabel('server.backup_scheduled')).toBe('Scheduled backup');
+	});
+
+	it('summarises scheduled backups including retention', () => {
+		const rows = jobResultSummary(
+			job('b', {
+				kind: 'server.backup_scheduled',
+				result: {
+					export: { fileName: 'srv.tar.gz', scope: 'all', destination: 's3', size: 2048 },
+					scheduled: true,
+					retentionDeleted: 2
+				}
+			})
+		);
+		expect(rows).toEqual([
+			{ label: 'Archive', value: 'srv.tar.gz', mono: true },
+			{ label: 'Contents', value: 'Full instance', mono: false },
+			{ label: 'Destination', value: 'S3', mono: false },
+			{ label: 'Size', value: '2.0 KiB', mono: false },
+			{ label: 'Retention', value: '2 older scheduled backups removed', mono: false }
+		]);
+	});
+
+	it('summarises automatic starts and player changes without raw payloads', () => {
+		expect(
+			jobResultSummary(
+				job('a', {
+					kind: 'server.recover',
+					result: { server: { name: 'Survival', status: { state: 'running' } }, automatic: true }
+				})
+			)
+		).toEqual([
+			{ label: 'Server', value: 'Survival', mono: false },
+			{ label: 'Status after', value: 'running', mono: false },
+			{ label: 'Started by', value: 'Manager policy', mono: false }
+		]);
+		expect(
+			jobResultSummary(
+				job('p', {
+					kind: 'server.players',
+					result: { players: { whitelist: [{}, {}], operators: [], bans: [{}], secret: 'x' } }
+				})
+			).map((r) => `${r.label}=${r.value}`)
+		).toEqual(['Whitelist=2', 'Operators=0', 'Bans=1']);
+	});
+});

@@ -16,6 +16,8 @@
 	import type { MetricsSource } from '#lib/servers/metrics-source.svelte.js';
 	import ServerAvatar from './server-avatar.svelte';
 	import ServerMetrics from './server-metrics.svelte';
+	import ServerReadiness from './server-readiness.svelte';
+	import type { GameStatusSource } from '#lib/servers/game-status.svelte.js';
 	import ServerOpsSummary, { type OpsSummaryApi } from './server-ops-summary.svelte';
 
 	interface Props {
@@ -36,6 +38,10 @@
 		onOpenProperties?: () => void;
 		/** Injected in tests. */
 		opsApi?: OpsSummaryApi;
+		/** The page's single readiness poll (shared with the header); shown while active. */
+		game?: GameStatusSource | null;
+		/** Opens Settings (stored resource history collection). */
+		onOpenSettings?: () => void;
 	}
 
 	let {
@@ -50,7 +56,9 @@
 		onOpenExports,
 		onOpenActivity,
 		onOpenProperties,
-		opsApi
+		opsApi,
+		game = null,
+		onOpenSettings
 	}: Props = $props();
 
 	const software = $derived(server.software ?? null);
@@ -141,7 +149,9 @@
 			'Review EULA'
 		)}
 	{/if}
-	{#if state === 'running'}
+	{#if game && game.active}
+		<ServerReadiness source={game} />
+	{:else if state === 'running'}
 		{@render caveat(
 			'info',
 			'The container is running. Minecraft may still be loading; the console shows when it is ready.'
@@ -205,5 +215,5 @@
 		api={opsApi}
 	/>
 
-	<ServerMetrics source={metrics} cpus={server.cpus} />
+	<ServerMetrics source={metrics} cpus={server.cpus} {onOpenSettings} />
 </div>

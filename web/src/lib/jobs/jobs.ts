@@ -16,7 +16,11 @@ export const JOB_KIND_LABELS: Record<string, string> = {
 	'server.delete': 'Delete server',
 	'server.export': 'Export server',
 	'server.archive': 'Remove local files',
-	'server.restore': 'Restore from backup'
+	'server.restore': 'Restore from backup',
+	'server.players': 'Change player list',
+	'server.auto_start': 'Automatic start',
+	'server.recover': 'Crash recovery restart',
+	'server.backup_scheduled': 'Scheduled backup'
 };
 
 export const JOB_STATE_LABELS: Record<JobState, string> = {
@@ -192,6 +196,42 @@ export function jobResultSummary(job: Job): SummaryRow[] {
 			const os = str(runtime.os, 30);
 			const arch = str(runtime.arch, 30);
 			push('Platform', os && arch ? `${os} / ${arch}` : (os ?? arch));
+			break;
+		}
+		case 'server.auto_start':
+		case 'server.recover': {
+			const server = obj(result.server);
+			if (!server) break;
+			push('Server', str(server.name, 80));
+			push('Status after', str(obj(server.status)?.state, 30));
+			if (result.automatic === true) push('Started by', 'Manager policy');
+			break;
+		}
+		case 'server.players': {
+			const players = obj(result.players);
+			if (!players) break;
+			const count = (value: unknown) => (Array.isArray(value) ? String(value.length) : null);
+			push('Whitelist', count(players.whitelist));
+			push('Operators', count(players.operators));
+			push('Bans', count(players.bans));
+			break;
+		}
+		case 'server.backup_scheduled': {
+			const record = obj(result.export);
+			if (!record) break;
+			push('Archive', str(record.fileName, 120), true);
+			push('Contents', SCOPE_TEXT[String(record.scope)] ?? null);
+			push('Destination', DESTINATION_TEXT[String(record.destination)] ?? null);
+			const size = num(record.size);
+			push('Size', size !== null ? formatBytes(size) : null);
+			const deleted = num(result.retentionDeleted);
+			if (deleted !== null)
+				push(
+					'Retention',
+					deleted === 0
+						? 'No older scheduled backups removed'
+						: `${deleted} older scheduled ${deleted === 1 ? 'backup' : 'backups'} removed`
+				);
 			break;
 		}
 		case 'server.install':

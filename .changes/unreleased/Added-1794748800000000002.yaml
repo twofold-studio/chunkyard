@@ -1,0 +1,3 @@
+kind: Added
+body: 'Web UI: add Settings controls for manager-startup and crash-recovery policies and per-server resource history, an Exports section for stopped-only scheduled S3 backups with explicit retention acknowledgement, and 1h/24h/7d stored usage charts that put the live sampler in standby while shown. Automatic starts, crash restarts, scheduled backups and player changes get Activity labels and result summaries; recovered policy jobs block competing actions like starts and exports.'
+time: 2026-11-15T15:20:00.000000002Z
