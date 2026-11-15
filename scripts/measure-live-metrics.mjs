@@ -1,4 +1,4 @@
-// Read-only metrics benchmark against an existing deployment; never starts/stops game servers.
+// Measures an existing deployment without changing existing game servers.
 // CHUNKYARD_TEST_ACCOUNT_ID identifies the owner's Bitwarden entry (not a password).
 // Optional: CHUNKYARD_BENCH_BASE, CHUNKYARD_BENCH_SSH, CHUNKYARD_BENCH_SERVICE,
 // CHUNKYARD_BENCH_SECONDS (default 20), CHUNKYARD_BENCH_OUTPUT (outside the repository).
@@ -42,7 +42,7 @@ const login = await fetch(base + "/api/v1/auth/login", {
     password: account.login.password,
   }),
 });
-assert(login.ok(), "Benchmark login failed: " + login.status);
+assert(login.ok, "Benchmark login failed: " + login.status);
 const cookie = login.headers
   .getSetCookie()
   .map((s) => s.split(";")[0])
@@ -104,7 +104,7 @@ async function api(path, method = "GET", data) {
     },
     ...(data === undefined ? {} : { body: JSON.stringify(data) }),
   });
-  assert(response.ok(), `Benchmark API ${method} ${path}: ${response.status}`);
+  assert(response.ok, `Benchmark API ${method} ${path}: ${response.status}`);
   return response.status === 204 ? null : response.json();
 }
 async function operation(path, method = "POST") {
@@ -138,9 +138,12 @@ try {
         memoryMinMb: 128,
         memoryMaxMb: 128,
         cpus: 0.1,
-        publishIp: "127.0.0.1",
       })
     ).server;
+    await api(`/api/v1/servers/${fixture.id}/network`, "PATCH", {
+      port: fixture.port,
+      publishIp: "127.0.0.1",
+    });
     const script =
       '#!/bin/bash\necho "Temporary Chunkyard metrics test; no Minecraft process"\nwhile IFS= read -r line; do [[ "$line" == stop ]] && exit 0; done\n';
     const upload = await fetch(
@@ -157,7 +160,7 @@ try {
         body: script,
       },
     );
-    assert(upload.ok(), "Fixture upload failed: " + upload.status);
+    assert(upload.ok, "Fixture upload failed: " + upload.status);
     await api(`/api/v1/servers/${fixture.id}/launch`, "PATCH", {
       profile: {
         mode: "script",
@@ -251,6 +254,8 @@ try {
       hostAfter = await hostSnapshot(),
       elapsed = (performance.now() - start) / 1000;
     const delta = (key) => (after[key] ?? 0) - (before[key] ?? 0);
+    // CDP's observation excludes the SSH snapshot time included in the frame window.
+    const browserSeconds = delta("Timestamp") || elapsed;
     const hostCpu = (kind) => {
       if (!hostBefore || !hostAfter) return null;
       assert.equal(
@@ -280,6 +285,7 @@ try {
     results.push({
       intervalMs,
       seconds: elapsed,
+      browserObservationSeconds: browserSeconds,
       frames,
       bytes,
       bytesPerSecond: bytes / elapsed,
@@ -288,8 +294,8 @@ try {
       medianNativeSampleMs: gaps.length
         ? gaps[Math.floor(gaps.length / 2)]
         : null,
-      browserTaskCpuPercent: (delta("TaskDuration") / elapsed) * 100,
-      browserScriptCpuPercent: (delta("ScriptDuration") / elapsed) * 100,
+      browserTaskCpuPercent: (delta("TaskDuration") / browserSeconds) * 100,
+      browserScriptCpuPercent: (delta("ScriptDuration") / browserSeconds) * 100,
       browserLayoutMs: delta("LayoutDuration") * 1000,
       jsHeapBytes: after.JSHeapUsedSize,
       managerCpuPercent: hostCpu("manager"),

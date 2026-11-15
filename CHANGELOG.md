@@ -4,6 +4,12 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## 0.11.1 - 2026-11-15
+
+
+### Fixed
+
+- Development: fix the deployed metrics benchmark response checks and temporary-instance network setup, and calculate browser CPU from its own observation window.
 ## 0.11.0 - 2026-11-15
 
 

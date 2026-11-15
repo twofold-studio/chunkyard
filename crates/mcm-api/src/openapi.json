@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Chunkyard API",
-    "version": "0.11.0",
+    "version": "0.11.1",
     "description": "Single-owner Docker Minecraft manager. Public API reference; protected controls accept browser sessions or owner bearer API keys. Browser mutations require matching Origin/Referer and X-MCM-CSRF: 1. Valid bearer requests do not need browser CSRF headers; supplied Origin and Host remain validated. Console and shared Docker metrics use same-origin WebSockets."
   },
   "servers": [
