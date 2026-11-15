@@ -16,7 +16,8 @@
 		type EditorLanguage,
 		type TextFormat
 	} from '#lib/files/editor-text.js';
-	import type { EditorHandle, EditorStatus } from './codemirror.js';
+	import type { EditorHandle, EditorStatus, VimMode } from './codemirror.js';
+	import { vimPreference } from './vim-preference.svelte.js';
 	import { cn } from '#lib/utils.js';
 
 	interface Props {
@@ -31,6 +32,12 @@
 		shortcuts?: readonly EditorShortcut[];
 		/** Cursor position and size, updated as the user moves around. */
 		status?: EditorStatus | null;
+		/** Vim keybindings; defaults to the browser-wide preference. */
+		vim?: boolean;
+		/** Current Vim mode while Vim is on. */
+		vimMode?: VimMode | null;
+		/** Vim `:w`. Without it, `:w` reports that saving is not available. */
+		onSave?: () => void;
 		/** Load failed: a plain textarea is shown instead. */
 		fallback?: boolean;
 		class?: string;
@@ -46,6 +53,9 @@
 		label,
 		shortcuts = [],
 		status = $bindable(null),
+		vim = vimPreference.enabled,
+		vimMode = $bindable(null),
+		onSave,
 		fallback = $bindable(false),
 		class: className,
 		load = () => import('./codemirror.js')
@@ -86,7 +96,14 @@
 							}
 						})),
 						onDocChange: emit,
-						onStatus: (next) => (status = next)
+						onStatus: (next) => (status = next),
+						vim,
+						onWrite: () => {
+							if (!onSave) return false;
+							onSave();
+							return true;
+						},
+						onVimMode: (mode) => (vimMode = mode)
 					})
 				)
 				.then((editor) => {
@@ -122,6 +139,15 @@
 
 	$effect(() => {
 		handle?.setReadOnly(readOnly);
+	});
+
+	$effect(() => {
+		const enabled = vim;
+		const editor = handle;
+		if (!editor) return;
+		editor.setVim(enabled).catch((error: unknown) => {
+			console.error('Vim keybindings failed to load', error);
+		});
 	});
 
 	// Fallback textarea: same line-ending rules as the editor.

@@ -5,6 +5,7 @@ import ServerFiles from './server-files.svelte';
 import { editorDoc, setEditorDoc } from '#lib/components/editor/test-utils.js';
 import { exportSelection } from '#lib/exports/export-selection.svelte.js';
 import { toast } from 'svelte-sonner';
+import { MemoryFilesHistory } from '#lib/files/files-history.svelte.js';
 
 type Reply = { status: number; body?: unknown; wait?: Promise<void> };
 interface Call {
@@ -90,7 +91,12 @@ afterEach(() => {
 });
 
 function setup(props: Record<string, unknown> = {}) {
-	return render(ServerFiles, { serverId: 'srv-1', serverState: 'stopped', ...props });
+	return render(ServerFiles, {
+		serverId: 'srv-1',
+		serverState: 'stopped',
+		history: new MemoryFilesHistory(),
+		...props
+	});
 }
 
 const mutations = () => calls.filter((c) => c.method !== 'GET');
@@ -655,5 +661,99 @@ describe('ServerFiles', () => {
 			await new Promise((resolve) => setTimeout(resolve, 20));
 			expect(mutations()).toHaveLength(1);
 		});
+	});
+});
+
+describe('ServerFiles history (in-memory history; SvelteKit shallow routing is covered by e2e)', () => {
+	const fileReply = (path: string, text: string) =>
+		reply(
+			'GET',
+			`${BASE}/content?${q(path)}`,
+			ok({ path, content: text, etag: 'e', size: text.length, readOnly: false, canWrite: true })
+		);
+	const worldListing = () =>
+		ok(listing('world', [entry('region', { path: 'world/region', kind: 'directory' })]));
+	const regionListing = () =>
+		ok(listing('world/region', [entry('r.0.0.mca', { path: 'world/region/r.0.0.mca' })]));
+	const crumb = () => document.querySelector('[data-slot="breadcrumb-page"]')?.textContent?.trim();
+
+	it('records each folder, and Back/Forward/Up keep a linear forward branch', async () => {
+		for (let i = 0; i < 4; i++) reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES)));
+		for (let i = 0; i < 4; i++) reply('GET', `${BASE}?${q('world')}`, worldListing());
+		for (let i = 0; i < 4; i++) reply('GET', `${BASE}?${q('world/region')}`, regionListing());
+		const history = new MemoryFilesHistory();
+		setup({ history });
+		await page.getByRole('button', { name: 'world', exact: true }).click();
+		await page.getByRole('button', { name: 'region', exact: true }).click();
+		await vi.waitFor(() => expect(crumb()).toBe('region'));
+		expect(history.entries.map((e) => e.dir)).toEqual(['', 'world', 'world/region']);
+
+		history.back();
+		await vi.waitFor(() => expect(crumb()).toBe('world'));
+		history.go(1);
+		await vi.waitFor(() => expect(crumb()).toBe('region'));
+		// Up and breadcrumbs are navigation too.
+		await page.getByRole('button', { name: 'Up one folder' }).click();
+		await vi.waitFor(() => expect(crumb()).toBe('world'));
+		expect(history.entries.map((e) => e.dir)).toEqual(['', 'world', 'world/region', 'world']);
+		// Navigating after Back drops the old forward entries.
+		history.go(-2);
+		await vi.waitFor(() => expect(crumb()).toBe('world'));
+		await page.getByRole('button', { name: 'region', exact: true }).click();
+		expect(history.entries.map((e) => e.dir)).toEqual(['', 'world', 'world/region']);
+		// Clicking the folder already shown only refreshes; no extra entry.
+		await page.getByRole('button', { name: 'Server', exact: true }).click();
+		expect(history.entries).toHaveLength(4);
+		expect(history.index).toBe(3);
+	});
+
+	it('starts from the recorded location and ignores state of another server', async () => {
+		reply('GET', `${BASE}?${q('world')}`, worldListing());
+		const history = new MemoryFilesHistory();
+		history.entries = [{ dir: 'world', file: null, step: 2 }];
+		setup({ history });
+		await vi.waitFor(() => expect(crumb()).toBe('world'));
+		expect(calls.map((c) => c.url)).toEqual([`${BASE}?${q('world')}`]);
+	});
+
+	it('opening a file is an entry: Back closes a clean editor, Forward reopens it', async () => {
+		for (let i = 0; i < 4; i++) reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES)));
+		fileReply('server.properties', '[]\n');
+		fileReply('server.properties', '[]\n');
+		const history = new MemoryFilesHistory();
+		setup({ history });
+		await page.getByRole('button', { name: 'server.properties', exact: true }).first().click();
+		await vi.waitFor(() => expect(editorDoc('Contents of server.properties')).toBe('[]\n'));
+		history.back();
+		await expect.element(page.getByRole('button', { name: 'world', exact: true })).toBeVisible();
+		history.go(1);
+		await vi.waitFor(() => expect(editorDoc('Contents of server.properties')).toBe('[]\n'));
+		// The editor's own close button returns to the entry before it instead of adding one.
+		await page.getByRole('button', { name: 'Files', exact: true }).click();
+		await expect.element(page.getByRole('button', { name: 'world', exact: true })).toBeVisible();
+		expect(history.index).toBe(0);
+	});
+
+	it('asks before Back discards unsaved edits; Stay returns to the editor entry', async () => {
+		for (let i = 0; i < 3; i++) reply('GET', `${BASE}?${q('')}`, ok(listing('', ROOT_ENTRIES)));
+		fileReply('server.properties', '[]\n');
+		const history = new MemoryFilesHistory();
+		setup({ history });
+		await page.getByRole('button', { name: 'server.properties', exact: true }).first().click();
+		const label = 'Contents of server.properties';
+		await vi.waitFor(() => expect(editorDoc(label)).toBe('[]\n'));
+		setEditorDoc(label, '["me"]\n');
+		history.back();
+		const dialog = page.getByRole('alertdialog', { name: 'Leave this file?' });
+		await expect.element(dialog).toBeVisible();
+		await page.getByRole('button', { name: 'Keep editing' }).click();
+		await expect.element(dialog).not.toBeInTheDocument();
+		expect(history.index).toBe(1);
+		expect(editorDoc(label)).toBe('["me"]\n');
+
+		history.back();
+		await page.getByRole('button', { name: 'Discard and leave' }).click();
+		await expect.element(page.getByRole('button', { name: 'world', exact: true })).toBeVisible();
+		expect(mutations()).toHaveLength(0);
 	});
 });

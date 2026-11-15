@@ -29,19 +29,28 @@ async fn disabled_auth_skips_setup_and_allows_inventory_and_jobs_without_an_acco
     assert!(me["user"].is_null());
     assert_eq!(
         app.client
-            .get(format!("{}/api/v1/java/runtimes", app.base))
+            .get(format!("{}/api/v1/servers", app.base))
             .send()
             .await?
             .status(),
         200
     );
     let response = app
-        .post("/api/v1/java/runtimes/install")
-        .json(&json!({"major":21}))
+        .post("/api/v1/servers")
+        .json(&json!({"name":"Trusted"}))
         .send()
         .await?;
-    assert_eq!(response.status(), 202);
-    let job: Value = response.json().await?;
+    assert_eq!(response.status(), 201);
+    let server: Value = response.json().await?;
+    let job: Value = app
+        .post(&format!(
+            "/api/v1/servers/{}/stop",
+            server["server"]["id"].as_str().ok_or("server ID")?
+        ))
+        .send()
+        .await?
+        .json()
+        .await?;
     assert!(job["job"]["createdBy"].is_null());
     assert_eq!(app.post("/api/v1/auth/logout").send().await?.status(), 204);
     app.close().await
@@ -50,11 +59,11 @@ async fn disabled_auth_skips_setup_and_allows_inventory_and_jobs_without_an_acco
 #[tokio::test]
 async fn disabled_auth_keeps_browser_origin_protection_and_disables_account_creation() -> Result {
     let app = TestApp::with_auth(false).await?;
-    let endpoint = format!("{}/api/v1/java/runtimes/install", app.base);
+    let endpoint = format!("{}/api/v1/servers", app.base);
     assert_eq!(
         app.client
             .post(&endpoint)
-            .json(&json!({"major":21}))
+            .json(&json!({"name":"Trusted"}))
             .send()
             .await?
             .status(),
@@ -65,7 +74,7 @@ async fn disabled_auth_keeps_browser_origin_protection_and_disables_account_crea
             .post(&endpoint)
             .header("Origin", "https://untrusted.example")
             .header("X-MCM-CSRF", "1")
-            .json(&json!({"major":21}))
+            .json(&json!({"name":"Trusted"}))
             .send()
             .await?
             .status(),

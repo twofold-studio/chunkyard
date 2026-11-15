@@ -1,8 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import ServerList from './server-list.svelte';
 import type { ServerView } from '#lib/api/index.js';
+import { metricsHub } from '#lib/servers/metrics-hub.svelte.js';
+
+// Running servers show live usage; keep it off the network here (covered by card-usage tests).
+beforeAll(() =>
+	metricsHub.configure({
+		createSocket: () => ({
+			onopen: null,
+			onmessage: null,
+			onclose: null,
+			onerror: null,
+			close() {}
+		})
+	})
+);
+afterAll(() => metricsHub.configure({}));
 
 const server = (id: string, extra: Partial<ServerView> = {}): ServerView => ({
 	id,

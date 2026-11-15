@@ -19,8 +19,6 @@
 		server: Pick<ServerView, 'id' | 'name' | 'directory' | 'port' | 'status'>;
 		/** Another operation is running on this server. */
 		disabled?: boolean;
-		/** Icon-only trigger below the xl breakpoint (contextual header). */
-		compact?: boolean;
 		/** True from the DELETE request until its job finishes. */
 		deleting?: boolean;
 		ondeleted: (deleted: DeletedServer) => void;
@@ -32,7 +30,6 @@
 	let {
 		server,
 		disabled = false,
-		compact = false,
 		deleting = $bindable(false),
 		ondeleted,
 		jobIntervalMs,
@@ -103,12 +100,12 @@
 				{...props}
 				size="sm"
 				variant="outline"
-				class={['text-destructive hover:text-destructive', compact && 'max-xl:w-8 max-xl:px-0!']}
+				class="text-destructive hover:text-destructive"
 				disabled={!canDelete}
 				title={stopped ? undefined : 'Stop the server before deleting it'}
 			>
 				<TrashIcon data-icon="inline-start" />
-				<span class={compact ? 'sr-only xl:not-sr-only' : undefined}>Delete</span>
+				Delete
 			</Button>
 		{/snippet}
 	</AlertDialog.Trigger>

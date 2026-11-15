@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import ServerConsole from './server-console.svelte';
+// Real app styles, so the layout test measures the shipped flex/Tailwind rules.
+import '../../../routes/layout.css';
 import type { SocketLike } from '#lib/console/console-stream.js';
 
 class FakeSocket implements SocketLike {
@@ -309,5 +311,174 @@ describe('ServerConsole tools', () => {
 		await userEvent.click(page.getByLabelText('Console command'));
 		await userEvent.keyboard('{ArrowUp}');
 		await expect.element(page.getByLabelText('Console command')).toHaveValue('');
+	});
+});
+
+describe('ServerConsole colors', () => {
+	const ESC = '\u001b';
+
+	it('renders SGR and section colors as styled text, never markup or escapes', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi
+				.fn()
+				.mockResolvedValue(
+					snapshot([
+						`${ESC}[32m[12:00 INFO]${ESC}[0m: Done`,
+						'§cDanger §lbold',
+						`${ESC}]8;;https://evil.example${ESC}\\<img src=x onerror=alert(1)>${ESC}[2J`,
+						'plain line'
+					])
+				)
+		);
+		render(ServerConsole, { serverId: 's1', running: false });
+		const log = page.getByRole('log');
+		await expect.element(log).toHaveTextContent('[12:00 INFO]: Done');
+		const element = log.element();
+		expect(element.textContent).not.toContain(ESC);
+		expect(element.textContent).not.toContain('§');
+		expect(element.textContent).toContain('<img src=x onerror=alert(1)>');
+		expect(element.querySelector('img, a, script')).toBeNull();
+		const green = [...element.querySelectorAll('span')].find(
+			(s) => s.textContent === '[12:00 INFO]'
+		);
+		expect(green?.style.color).toBe('var(--ansi-2)');
+		const bold = [...element.querySelectorAll('span')].find((s) => s.textContent === 'bold');
+		expect(bold?.style.color).toBe('var(--ansi-9)');
+		expect(bold?.style.fontWeight).toBe('600');
+		// Colors resolve to real, visible values from the palette.
+		expect(getComputedStyle(green!).color).not.toBe(getComputedStyle(element).color);
+	});
+
+	it('filters and copies the visible text without escape codes', async () => {
+		const writeText = vi.fn(async () => {});
+		vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue(snapshot([`${ESC}[31mred alert${ESC}[0m`, 'other']))
+		);
+		render(ServerConsole, { serverId: 's1', running: false });
+		await expect.element(page.getByRole('log')).toHaveTextContent('red alert');
+		await page.getByLabelText('Filter console output').fill('[31m');
+		await expect.element(page.getByText('No lines match “[31m”.')).toBeVisible();
+		await page.getByLabelText('Filter console output').fill('d al');
+		await vi.waitFor(() => expect(document.querySelector('mark')?.textContent).toBe('d al'));
+		expect(document.querySelector('mark')?.style.color).toBe('var(--ansi-1)');
+		await page.getByRole('button', { name: 'Copy' }).click();
+		expect(writeText).toHaveBeenCalledWith('red alert\n');
+	});
+});
+
+describe('ServerConsole suggestions', () => {
+	function running() {
+		const fetch = vi.fn(async (_path: string, init?: RequestInit) =>
+			init?.method === 'POST' ? new Response(null, { status: 204 }) : snapshot(['ready'])
+		);
+		vi.stubGlobal('fetch', fetch);
+		render(ServerConsole, { serverId: 'suggest', running: true, createSocket: null });
+		const posts = () => fetch.mock.calls.filter(([, init]) => init?.method === 'POST');
+		return { input: page.getByLabelText('Console command'), posts };
+	}
+
+	it('Tab completes a single match; Tab with no match moves focus on', async () => {
+		const { input, posts } = running();
+		await input.click();
+		await userEvent.keyboard('wea{Tab}');
+		await expect.element(input).toHaveValue('weather ');
+		await expect.element(input).toHaveFocus();
+		await userEvent.keyboard('{Tab}');
+		await expect.element(page.getByRole('listbox')).toBeVisible();
+		await userEvent.keyboard('{Escape}');
+		await expect.element(page.getByRole('listbox')).not.toBeInTheDocument();
+		await expect.element(input).toHaveValue('weather ');
+		// After dismissing, Tab is ordinary focus navigation again (no trap).
+		await userEvent.keyboard('{Tab}');
+		await expect.element(input).not.toHaveFocus();
+		expect(posts()).toHaveLength(0);
+	});
+
+	it('menu: Tab/Shift+Tab/arrows move, Enter accepts without sending, next Enter sends', async () => {
+		const { input, posts } = running();
+		await input.click();
+		await userEvent.keyboard('save{Tab}');
+		const listbox = page.getByRole('listbox', { name: 'Command suggestions' });
+		await expect.element(listbox).toBeVisible();
+		await expect.element(input).toHaveAttribute('aria-expanded', 'true');
+		const options = page.getByRole('option');
+		await expect.element(options.nth(0)).toHaveAttribute('aria-selected', 'true');
+		await expect.element(options.nth(0)).toHaveTextContent(/save-all.*built-in/);
+		await userEvent.keyboard('{Tab}');
+		await expect.element(options.nth(1)).toHaveAttribute('aria-selected', 'true');
+		expect(input.element().getAttribute('aria-activedescendant')).toBe(options.nth(1).element().id);
+		await userEvent.keyboard('{ArrowDown}{ArrowDown}');
+		await expect.element(options.nth(0)).toHaveAttribute('aria-selected', 'true');
+		await userEvent.keyboard('{Shift>}{Tab}{/Shift}{ArrowUp}');
+		await expect.element(options.nth(1)).toHaveAttribute('aria-selected', 'true');
+		await userEvent.keyboard('{Enter}');
+		await expect.element(input).toHaveValue('save-off');
+		await expect.element(listbox).not.toBeInTheDocument();
+		expect(posts()).toHaveLength(0);
+		await userEvent.keyboard('{Enter}');
+		await vi.waitFor(() => expect(posts()).toHaveLength(1));
+		expect(JSON.parse(String(posts()[0][1]?.body))).toEqual({ line: 'save-off' });
+	});
+
+	it('offers sent commands as history, and arrows recall history while the menu is closed', async () => {
+		const { input, posts } = running();
+		await input.fill('weather rain');
+		await userEvent.keyboard('{Enter}');
+		await vi.waitFor(() => expect(posts()).toHaveLength(1));
+		await expect.element(input).toHaveValue('');
+		await userEvent.keyboard('{ArrowUp}');
+		await expect.element(input).toHaveValue('weather rain');
+		await userEvent.keyboard('{ArrowDown}');
+		await expect.element(input).toHaveValue('');
+		await userEvent.keyboard('we{Tab}');
+		await expect
+			.element(page.getByRole('option').first())
+			.toHaveTextContent(/weather rain.*history/);
+		// Clicking a suggestion fills the field and keeps focus; nothing is sent.
+		await page.getByRole('option').first().click();
+		await expect.element(input).toHaveValue('weather rain');
+		await expect.element(input).toHaveFocus();
+		expect(posts()).toHaveLength(1);
+	});
+
+	it('does not complete when the caret is inside the text', async () => {
+		const { input } = running();
+		await input.fill('wea');
+		(input.element() as HTMLInputElement).setSelectionRange(1, 1);
+		await userEvent.keyboard('{Tab}');
+		await expect.element(input).toHaveValue('wea');
+		await expect.element(page.getByRole('listbox')).not.toBeInTheDocument();
+	});
+});
+
+describe('ServerConsole layout', () => {
+	it('fills the viewport below its top, keeping the command field at the bottom', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(snapshot(['a', 'b'])));
+		const host = document.createElement('main');
+		host.style.paddingBottom = '40px';
+		document.body.append(host);
+		try {
+			render(ServerConsole, { target: host, props: { serverId: 's1', running: false } });
+			const root = page.getByTestId('console-root').element() as HTMLElement;
+			const viewport = document.documentElement.clientHeight;
+			await vi.waitFor(() => {
+				const rect = root.getBoundingClientRect();
+				expect(Math.abs(rect.bottom + 40 - Math.max(viewport, rect.top + 384 + 40))).toBeLessThan(
+					2
+				);
+			});
+			const form = root.querySelector('form')!.getBoundingClientRect();
+			expect(Math.abs(form.bottom - root.getBoundingClientRect().bottom)).toBeLessThan(2);
+			const log = page.getByRole('log').element().getBoundingClientRect();
+			expect(log.height).toBeGreaterThan(150);
+			expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(
+				document.documentElement.clientWidth
+			);
+		} finally {
+			host.remove();
+		}
 	});
 });

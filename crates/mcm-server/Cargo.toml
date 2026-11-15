@@ -29,7 +29,6 @@ fs2 = "0.4"
 anyhow.workspace = true
 clap.workspace = true
 mcm-core.workspace = true
-mcm-java.workspace = true
 mcm-db.workspace = true
 mcm-download.workspace = true
 serde_json.workspace = true

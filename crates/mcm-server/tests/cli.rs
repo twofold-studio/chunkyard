@@ -1,57 +1,19 @@
 use std::{error::Error, process::Command};
 
 #[test]
-fn migration_and_empty_inventory_work_from_the_cli() -> Result<(), Box<dyn Error>> {
-    let dir = tempfile::tempdir()?;
-    for args in [vec!["migrate"], vec!["java", "list"]] {
-        let output = Command::new(env!("CARGO_BIN_EXE_mcm"))
-            .arg("--data-dir")
-            .arg(dir.path())
-            .args(&args)
-            .output()?;
-        assert!(
-            output.status.success(),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        if args == ["java", "list"] {
-            assert_eq!(
-                serde_json::from_slice::<serde_json::Value>(&output.stdout)?,
-                serde_json::json!([])
-            );
-        }
-    }
-    assert!(dir.path().join("mcm.db").is_file());
-    Ok(())
-}
-
-#[test]
-fn missing_runtime_selection_fails_with_an_actionable_message() -> Result<(), Box<dyn Error>> {
+fn migrate_works_and_host_java_commands_are_removed() -> Result<(), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let output = Command::new(env!("CARGO_BIN_EXE_mcm"))
         .arg("--data-dir")
         .arg(dir.path())
-        .args(["java", "select", "8", "--strict"])
+        .arg("migrate")
         .output()?;
-    assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("no compatible runtime installed"));
-    Ok(())
-}
-
-#[test]
-fn cli_discovery_honors_disabled_system_java_configuration() -> Result<(), Box<dyn Error>> {
-    let dir = tempfile::tempdir()?;
-    let config = dir.path().join("mcm.toml");
-    std::fs::write(&config, "[java]\nallow_system_java = false\n")?;
+    assert!(output.status.success());
+    assert!(dir.path().join("mcm.db").is_file());
     let output = Command::new(env!("CARGO_BIN_EXE_mcm"))
-        .arg("--config")
-        .arg(&config)
-        .arg("--data-dir")
-        .arg(dir.path().join("data"))
-        .args(["java", "discover"])
+        .args(["java", "list"])
         .output()?;
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("discovery is disabled"));
     Ok(())
 }
 

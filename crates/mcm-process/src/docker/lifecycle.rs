@@ -83,6 +83,9 @@ impl ServerRuntime for DockerRuntime {
     async fn metrics(&self, server: &Server) -> Result<ServerMetrics, ServerError> {
         self.sample_metrics(server).await
     }
+    async fn stream_metrics(&self, server: &Server) -> Result<MetricsStream, ServerError> {
+        self.follow_metrics(server).await
+    }
     async fn status(&self, server: &Server) -> Result<RuntimeStatus, ServerError> {
         Ok(Self::status_of(self.inspect(server).await?))
     }

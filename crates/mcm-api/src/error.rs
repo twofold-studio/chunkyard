@@ -4,13 +4,13 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use mcm_auth::AuthError;
-use mcm_core::{java::JavaServiceError, jobs::JobError};
+use mcm_core::jobs::JobError;
 use serde::Serialize;
 
 pub(crate) struct ApiError {
     status: StatusCode,
-    code: &'static str,
-    detail: &'static str,
+    pub(crate) code: &'static str,
+    pub(crate) detail: &'static str,
 }
 #[derive(Serialize)]
 struct Problem {
@@ -67,6 +67,16 @@ impl From<AuthError> for ApiError {
     fn from(error: AuthError) -> Self {
         use StatusCode as S;
         let (status, code, detail) = match error {
+            AuthError::KeyName => (
+                S::UNPROCESSABLE_ENTITY,
+                "validation",
+                "Use an API key name of 1–80 bytes without control characters.",
+            ),
+            AuthError::KeyLimit => (
+                S::CONFLICT,
+                "auth.key_limit",
+                "At most 100 API keys are allowed; revoke an existing key first.",
+            ),
             AuthError::InvalidCredentials => (
                 S::UNAUTHORIZED,
                 "auth.invalid_credentials",
@@ -106,18 +116,6 @@ impl From<AuthError> for ApiError {
             _ => return Self::internal(error),
         };
         Self::new(status, code, detail)
-    }
-}
-impl From<JavaServiceError> for ApiError {
-    fn from(error: JavaServiceError) -> Self {
-        let status = match error.code {
-            "validation" => StatusCode::UNPROCESSABLE_ENTITY,
-            "java.installing" => StatusCode::CONFLICT,
-            "java.unavailable" => StatusCode::FAILED_DEPENDENCY,
-            "download.failed" => StatusCode::BAD_GATEWAY,
-            _ => StatusCode::INTERNAL_SERVER_ERROR,
-        };
-        Self::new(status, error.code, error.detail)
     }
 }
 impl From<JobError> for ApiError {

@@ -9,7 +9,6 @@ use url::Url;
 pub struct Config {
     pub data_dir: PathBuf,
     pub http: HttpConfig,
-    pub java: JavaConfig,
     pub auth: AuthConfig,
     pub docker: mcm_process::DockerConfig,
     pub curseforge: CurseForgeConfig,
@@ -49,18 +48,6 @@ pub struct HttpConfig {
     /// Publish the optional version badge and bundled changelog.
     pub show_version: bool,
 }
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct JavaConfig {
-    pub allow_system_java: bool,
-}
-impl Default for JavaConfig {
-    fn default() -> Self {
-        Self {
-            allow_system_java: true,
-        }
-    }
-}
 impl Default for HttpConfig {
     fn default() -> Self {
         Self {
@@ -77,7 +64,6 @@ impl Default for Config {
         Self {
             data_dir: "data".into(),
             http: HttpConfig::default(),
-            java: JavaConfig::default(),
             auth: AuthConfig::default(),
             docker: mcm_process::DockerConfig::default(),
             curseforge: CurseForgeConfig::default(),

@@ -27,6 +27,26 @@ pub struct Session {
     pub public_id: String,
 }
 
+/// Public metadata only. The bearer secret is never stored or returned here.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiKey {
+    pub id: String,
+    pub name: String,
+    pub prefix: String,
+    pub created_at: String,
+    pub last_used_at: Option<String>,
+}
+
+pub struct NewApiKey {
+    pub key: ApiKey,
+    pub hash: String,
+    pub user_id: Option<String>,
+}
+pub struct ApiKeyIdentity {
+    pub user: Option<User>,
+}
+
 #[async_trait]
 pub trait AuthRepo: Send + Sync {
     async fn setup_required(&self) -> Result<bool, RepositoryError>;
@@ -41,18 +61,30 @@ pub trait AuthRepo: Send + Sync {
     async fn create_session(&self, session: &NewSession) -> Result<(), RepositoryError>;
     async fn session(&self, hash: &str, now: i64) -> Result<Option<Session>, RepositoryError>;
     async fn delete_session(&self, hash: &str) -> Result<(), RepositoryError>;
+    async fn create_api_key(&self, record: &NewApiKey) -> Result<bool, RepositoryError>;
+    async fn api_keys(&self) -> Result<Vec<ApiKey>, RepositoryError>;
+    async fn revoke_api_key(&self, id: &str) -> Result<(), RepositoryError>;
+    /// Returns the owner identity for account-bound keys, or None for trusted-mode keys.
+    async fn api_key(
+        &self,
+        hash: &str,
+        now: i64,
+        trusted: bool,
+    ) -> Result<Option<ApiKeyIdentity>, RepositoryError>;
 }
 
 /// Requests in trusted-network mode have no account or stored session.
 #[derive(Clone)]
 pub enum Actor {
     Session(Session),
+    ApiKey(Option<User>),
     AuthDisabled,
 }
 impl Actor {
     pub fn user_id(&self) -> Option<&str> {
         match self {
             Self::Session(session) => Some(&session.user.id),
+            Self::ApiKey(user) => user.as_ref().map(|user| user.id.as_str()),
             Self::AuthDisabled => None,
         }
     }

@@ -93,7 +93,7 @@ describe('segments', () => {
 			sample(20, { cpuPercent: 40 }),
 			sample(200, { cpuPercent: 50 }) // hidden tab for three minutes
 		);
-		const runs = segments(points, 'cpu', gapThresholdMs(5));
+		const runs = segments(points, 'cpu', gapThresholdMs(5000));
 		expect(runs.map((run) => run.map((p) => p.v))).toEqual([[10, 20], [30, 40], [50]]);
 	});
 
@@ -105,7 +105,7 @@ describe('segments', () => {
 	});
 
 	it('scales the gap threshold with the refresh interval', () => {
-		expect(gapThresholdMs(5)).toBe(14_500);
+		expect(gapThresholdMs(5000)).toBe(14_500);
 		expect(gapThresholdMs(0)).toBe(77_000);
 	});
 });

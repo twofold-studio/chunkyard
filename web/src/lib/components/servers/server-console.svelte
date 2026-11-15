@@ -37,9 +37,11 @@
 		commandHistoryFor,
 		consoleFileName,
 		consoleText,
-		filterLines,
-		matchSegments
+		filterLines
 	} from '#lib/console/command-history.js';
+	import { highlightSegments, lineSegments, segmentCss } from '#lib/console/ansi.js';
+	import { suggestCommands, type Suggestion } from '#lib/console/command-suggestions.js';
+	import { fillViewport } from '#lib/console/fill-viewport.js';
 	import { cn } from '#lib/utils.js';
 
 	interface Props {
@@ -252,8 +254,86 @@
 		}
 	}
 
+	// Suggestions ------------------------------------------------------------------
+	/** Open suggestion menu; `null` when closed. Nothing is applied until chosen. */
+	let suggestions = $state.raw<Suggestion[] | null>(null);
+	let activeSuggestion = $state(0);
+	/** Escape dismissed the menu: the next Tab moves focus on as usual (no keyboard trap). */
+	let suggestionsDismissed = false;
+	const suggestionsId = 'console-command-suggestions';
+
+	function computeSuggestions(): Suggestion[] {
+		const cursor = commandInput?.selectionStart ?? command.length;
+		const end = commandInput?.selectionEnd ?? cursor;
+		if (cursor !== end) return [];
+		return suggestCommands(command, cursor, history.items);
+	}
+
+	function closeSuggestions() {
+		suggestions = null;
+		activeSuggestion = 0;
+	}
+
+	function applySuggestion(suggestion: Suggestion | undefined) {
+		if (!suggestion) return;
+		command = suggestion.value;
+		history.reset();
+		closeSuggestions();
+		void tick().then(() => {
+			commandInput?.focus();
+			commandInput?.setSelectionRange(command.length, command.length);
+		});
+	}
+
+	function moveSuggestion(step: number) {
+		if (!suggestions?.length) return;
+		const count = suggestions.length;
+		activeSuggestion = (activeSuggestion + step + count) % count;
+	}
+
+	/** Returns true when the key was used by the suggestion menu. */
+	function suggestionKey(event: KeyboardEvent): boolean {
+		if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return false;
+		if (suggestions) {
+			if (event.key === 'Tab') moveSuggestion(event.shiftKey ? -1 : 1);
+			else if (event.key === 'ArrowDown' && !event.shiftKey) moveSuggestion(1);
+			else if (event.key === 'ArrowUp' && !event.shiftKey) moveSuggestion(-1);
+			// Enter only accepts the suggestion; sending takes another Enter or Send.
+			else if (event.key === 'Enter') applySuggestion(suggestions[activeSuggestion]);
+			else if (event.key === 'Escape') {
+				suggestionsDismissed = true;
+				closeSuggestions();
+			} else return false;
+			event.preventDefault();
+			return true;
+		}
+		if (event.key !== 'Tab' || event.shiftKey || suggestionsDismissed) return false;
+		const found = computeSuggestions();
+		if (found.length === 0) return false; // Tab moves focus on as usual.
+		event.preventDefault();
+		if (found.length === 1) applySuggestion(found[0]);
+		else {
+			suggestions = found;
+			activeSuggestion = 0;
+		}
+		return true;
+	}
+
+	function onCommandInput() {
+		history.reset();
+		suggestionsDismissed = false;
+		if (suggestions) {
+			const found = computeSuggestions();
+			if (found.length) {
+				suggestions = found;
+				activeSuggestion = 0;
+			} else closeSuggestions();
+		}
+	}
+
 	/** Up/Down recall sent commands; Enter still only sends what is in the field. */
 	function onCommandKeydown(event: KeyboardEvent) {
+		if (suggestionKey(event)) return;
 		if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
 			return;
 		let recalled: string | null = null;
@@ -273,6 +353,7 @@
 		sending = true;
 		commandError = null;
 		const recall = history;
+		closeSuggestions();
 		try {
 			await sendCommand(serverId, line);
 			recall.push(line);
@@ -293,7 +374,7 @@
 
 <svelte:document onvisibilitychange={() => (visible = document.visibilityState === 'visible')} />
 
-<div class="flex flex-col gap-3">
+<div class="flex min-h-0 flex-col gap-3" data-testid="console-root" {@attach fillViewport(384)}>
 	<div class="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
 		<p class="flex items-center gap-1.5" role="status">
 			{#if stream === 'live'}
@@ -411,11 +492,11 @@
 		</div>
 	</div>
 
-	<div class="relative">
+	<div class="relative flex min-h-0 flex-1 flex-col">
 		<div
 			bind:this={viewport}
 			onscroll={onScroll}
-			class="h-[26rem] overflow-auto rounded-lg border border-border bg-background p-4 font-mono text-xs leading-relaxed"
+			class="console-log min-h-40 flex-1 overflow-auto rounded-lg border border-border bg-background p-4 font-mono text-xs leading-relaxed"
 			role="log"
 			aria-label="Server console"
 		>
@@ -435,9 +516,12 @@
 							line.stream === 'stderr' && 'text-warning'
 						)}
 					>
-						{#if filtering}{#each matchSegments(line.text, query) as segment, index (index)}{#if segment.match}<mark
-										class="rounded-[2px] bg-warning/30 text-inherit">{segment.text}</mark
-									>{:else}{segment.text}{/if}{/each}{:else}{line.text}{/if}
+						{#each filtering ? highlightSegments(lineSegments(line), query) : lineSegments(line) as segment, index (index)}{#if 'match' in segment && segment.match}<mark
+									class="rounded-[2px] bg-warning/30 text-inherit"
+									style={segmentCss(segment.style)}>{segment.text}</mark
+								>{:else if segment.style}<span style={segmentCss(segment.style)}
+									>{segment.text}</span
+								>{:else}{segment.text}{/if}{/each}
 					</div>
 				{/each}
 			{/if}
@@ -457,22 +541,62 @@
 		{/if}
 	</div>
 
-	<form {onsubmit} class="flex flex-col gap-2">
+	<form {onsubmit} class="flex shrink-0 flex-col gap-2">
 		<div class="flex gap-2">
 			<label for="console-command" class="sr-only">Console command</label>
-			<Input
-				id="console-command"
-				bind:ref={commandInput}
-				bind:value={command}
-				onkeydown={onCommandKeydown}
-				oninput={() => history.reset()}
-				aria-describedby="console-command-hint"
-				class="font-mono"
-				placeholder={running ? 'say Hello' : 'Start the server to send commands'}
-				autocomplete="off"
-				spellcheck={false}
-				disabled={!running || sending}
-			/>
+			<div class="relative min-w-0 flex-1">
+				<Input
+					id="console-command"
+					bind:ref={commandInput}
+					bind:value={command}
+					onkeydown={onCommandKeydown}
+					oninput={onCommandInput}
+					onblur={closeSuggestions}
+					role="combobox"
+					aria-autocomplete="list"
+					aria-expanded={suggestions !== null}
+					aria-controls={suggestions ? suggestionsId : undefined}
+					aria-activedescendant={suggestions ? `${suggestionsId}-${activeSuggestion}` : undefined}
+					aria-describedby="console-command-hint"
+					class="font-mono"
+					placeholder={running ? 'say Hello' : 'Start the server to send commands'}
+					autocomplete="off"
+					spellcheck={false}
+					disabled={!running || sending}
+				/>
+				{#if suggestions}
+					<ul
+						id={suggestionsId}
+						role="listbox"
+						aria-label="Command suggestions"
+						class="absolute inset-x-0 bottom-full z-20 mb-1 max-h-64 overflow-y-auto rounded-md border border-border bg-popover p-1 font-mono text-xs text-popover-foreground shadow-md"
+					>
+						{#each suggestions as suggestion, index (suggestion.value)}
+							<li
+								id={`${suggestionsId}-${index}`}
+								role="option"
+								aria-selected={index === activeSuggestion}
+								class={cn(
+									'flex cursor-default items-baseline gap-3 rounded-sm px-2 py-1.5',
+									index === activeSuggestion && 'bg-accent text-accent-foreground'
+								)}
+								onpointerdown={(event) => event.preventDefault()}
+								onclick={() => applySuggestion(suggestion)}
+								onkeydown={() => {}}
+							>
+								<span class="min-w-0 truncate">{suggestion.label}</span>
+								{#if suggestion.hint}
+									<span class="truncate text-muted-foreground">{suggestion.hint}</span>
+								{/if}
+								<span
+									class="ml-auto shrink-0 font-sans text-[10px] tracking-wide text-muted-foreground uppercase"
+									>{suggestion.source}</span
+								>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
 			<Button type="submit" variant="outline" disabled={!running || sending || !command.trim()}>
 				{#if sending}<Spinner data-icon="inline-start" />{:else}<SendIcon
 						data-icon="inline-start"
@@ -481,8 +605,49 @@
 			</Button>
 		</div>
 		<p id="console-command-hint" class="text-xs text-muted-foreground">
-			↑/↓ recall commands sent from this tab · nothing is sent until you press Enter
+			Tab suggests common commands and ones sent from this tab · ↑/↓ recall · nothing is sent until
+			you press Enter
 		</p>
 		{#if commandError}<ErrorAlert error={commandError} />{/if}
 	</form>
 </div>
+
+<style>
+	/* Terminal colors 0–15, tuned for contrast on this background in each theme. */
+	.console-log {
+		--ansi-0: oklch(0.25 0 0);
+		--ansi-1: oklch(0.5 0.19 27);
+		--ansi-2: oklch(0.48 0.14 150);
+		--ansi-3: oklch(0.52 0.13 75);
+		--ansi-4: oklch(0.48 0.17 260);
+		--ansi-5: oklch(0.5 0.19 325);
+		--ansi-6: oklch(0.5 0.1 210);
+		--ansi-7: oklch(0.45 0 0);
+		--ansi-8: oklch(0.5 0 0);
+		--ansi-9: oklch(0.55 0.21 27);
+		--ansi-10: oklch(0.52 0.16 145);
+		--ansi-11: oklch(0.55 0.13 90);
+		--ansi-12: oklch(0.52 0.18 260);
+		--ansi-13: oklch(0.55 0.2 325);
+		--ansi-14: oklch(0.52 0.1 200);
+		--ansi-15: oklch(0.2 0 0);
+	}
+	:global(.dark) .console-log {
+		--ansi-0: oklch(0.58 0 0);
+		--ansi-1: oklch(0.7 0.17 25);
+		--ansi-2: oklch(0.74 0.15 150);
+		--ansi-3: oklch(0.8 0.14 85);
+		--ansi-4: oklch(0.7 0.13 255);
+		--ansi-5: oklch(0.72 0.15 320);
+		--ansi-6: oklch(0.77 0.11 210);
+		--ansi-7: oklch(0.86 0 0);
+		--ansi-8: oklch(0.64 0 0);
+		--ansi-9: oklch(0.77 0.17 25);
+		--ansi-10: oklch(0.84 0.17 145);
+		--ansi-11: oklch(0.9 0.15 100);
+		--ansi-12: oklch(0.78 0.13 255);
+		--ansi-13: oklch(0.8 0.15 320);
+		--ansi-14: oklch(0.86 0.11 200);
+		--ansi-15: oklch(0.97 0 0);
+	}
+</style>

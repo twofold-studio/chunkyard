@@ -34,8 +34,8 @@ export function appDestinations(): Destination[] {
 		app('servers', 'Servers', resolve('servers'), 'list home'),
 		app('new', 'New server', resolve('servers/new'), 'create add install'),
 		app('activity', 'Activity', resolve('activity'), 'jobs history'),
-		app('java', 'Java runtimes', resolve('java'), 'jdk jre'),
 		app('exports', 'Storage & exports', resolve('exports'), 'backup archive disk'),
+		app('integrations', 'Integrations', resolve('integrations'), 'api keys tokens mcp claude'),
 		app('api', 'API reference', resolve('api-docs'), 'rest docs')
 	];
 }

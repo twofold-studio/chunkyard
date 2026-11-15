@@ -74,6 +74,13 @@
 	import { UploadQueue } from '#lib/files/upload-queue.svelte.js';
 	import { carriesFiles, readDrop } from '#lib/files/drop.js';
 	import { cn } from '#lib/utils.js';
+	import {
+		kitFilesHistory,
+		sameLocation,
+		type FilesHistory,
+		type FilesHistoryEntry,
+		type FilesLocation
+	} from '#lib/files/files-history.svelte.js';
 
 	interface OpenRequest {
 		path: string;
@@ -92,6 +99,8 @@
 		onOpenProperties?: () => void;
 		/** Opens the Exports tab with the current selection. Hides selection when absent. */
 		onExportSelected?: () => void;
+		/** Browser history for folders and the open file; defaults to SvelteKit shallow entries. */
+		history?: FilesHistory;
 	}
 
 	let {
@@ -100,10 +109,16 @@
 		openRequest = null,
 		dirty = $bindable(false),
 		onOpenProperties,
-		onExportSelected
+		onExportSelected,
+		history: historyProp
 	}: Props = $props();
 
-	let path = $state(ROOT);
+	// The parent keys this component by server, so the history source is fixed per instance.
+	const history: FilesHistory =
+		untrack(() => historyProp) ?? kitFilesHistory(() => untrack(() => serverId));
+	// Returning to this page through Back/Forward restores the folder and open file.
+	const initialLocation = untrack(() => history.current);
+	let path = $state(initialLocation.dir);
 	let listing = $state.raw<DirectoryListing | null>(null);
 	let loading = $state(true);
 	let error = $state.raw<unknown>(null);
@@ -113,7 +128,7 @@
 	let sortDir = $state<SortDirection>('asc');
 	let filter = $state('');
 
-	let editing = $state<string | null>(null);
+	let editing = $state<string | null>(initialLocation.file);
 	let nameRequest = $state<NameDialogRequest | null>(null);
 	let deleteEntry = $state<FileEntry | null>(null);
 	/** Path of the most recently created/changed entry, highlighted once. */
@@ -238,8 +253,81 @@
 			nonce += 1;
 			return;
 		}
+		showFolder(next);
+		history.push({ dir: next, file: null });
+	}
+
+	function showFolder(next: string) {
+		if (next === path) return;
 		path = next;
 		filter = '';
+	}
+
+	/** Shows a file in the editor and records it, so Back returns to the folder. */
+	function showEditor(target: string) {
+		editing = target;
+		history.push({ dir: path, file: target });
+	}
+
+	/** Closes the editor; the entry that opened it is left with Back when it is current. */
+	function closeEditor() {
+		const file = editing;
+		editing = null;
+		dirty = false;
+		nonce += 1;
+		const current = history.current;
+		if (file && current.step > 0 && current.file === file) history.back();
+		else if (current.file) history.replace({ dir: path, file: null });
+	}
+
+	// Back/Forward ------------------------------------------------------------------
+	/** Location the browser moved to while the editor holds unsaved changes. */
+	let pendingTraversal = $state<FilesHistoryEntry | null>(null);
+	/** Step of the entry the shown location came from (to undo a cancelled traversal). */
+	let shownStep = initialLocation.step;
+
+	function applyLocation(target: FilesLocation) {
+		showFolder(target.dir);
+		if (target.file !== editing) {
+			dirty = false;
+			editing = target.file;
+			if (!target.file) nonce += 1;
+		}
+	}
+
+	$effect(() => {
+		const target = history.current;
+		untrack(() => {
+			const shown = { dir: path, file: editing };
+			if (sameLocation(target, shown)) {
+				shownStep = target.step;
+				pendingTraversal = null;
+				return;
+			}
+			if (editing && dirty && target.file !== editing) {
+				// Unsaved edits: ask before leaving the editor; the editor stays as is meanwhile.
+				pendingTraversal = target;
+				return;
+			}
+			pendingTraversal = null;
+			shownStep = target.step;
+			applyLocation(target);
+		});
+	});
+
+	function stayAfterTraversal() {
+		const target = pendingTraversal;
+		pendingTraversal = null;
+		// Return to the entry that matches the open editor.
+		if (target && target.step !== shownStep) history.go(shownStep - target.step);
+	}
+
+	function discardAfterTraversal() {
+		const target = pendingTraversal;
+		pendingTraversal = null;
+		if (!target) return;
+		shownStep = target.step;
+		applyLocation(target);
 	}
 
 	function openEditor(target: string) {
@@ -253,7 +341,7 @@
 			pendingOpen = target;
 			return;
 		}
-		editing = target;
+		showEditor(target);
 	}
 
 	/** Another file was chosen while the editor holds unsaved changes. */
@@ -320,7 +408,7 @@
 				// `etag: null` only creates; an existing file fails with files.exists.
 				await writeFile(serverId, target, { content: '', etag: null });
 				changed(target, `Created ${name}`);
-				editing = target;
+				showEditor(target);
 			}
 		};
 	}
@@ -354,10 +442,8 @@
 			description: `to /${target}`
 		});
 		const where = parentPath(target);
-		if (where !== path) {
-			path = where;
-			filter = '';
-		} else nonce += 1;
+		if (where !== path) navigate(where);
+		else nonce += 1;
 	}
 
 	function onFilesPicked(event: Event) {
@@ -482,6 +568,7 @@
 		pendingOpen = null;
 		if (!target) return;
 		dirty = false;
+		if (editing) history.replace({ dir: path, file: target });
 		editing = target;
 	}}
 >
@@ -492,6 +579,19 @@
 	{/snippet}
 </UnsavedChangesDialog>
 
+<UnsavedChangesDialog
+	open={pendingTraversal !== null}
+	title="Leave this file?"
+	stayLabel="Keep editing"
+	discardLabel="Discard and leave"
+	onStay={stayAfterTraversal}
+	onDiscard={discardAfterTraversal}
+>
+	{#snippet description()}
+		Your edits to <code class="font-mono">{baseName(editing ?? '')}</code> have not been saved.
+	{/snippet}
+</UnsavedChangesDialog>
+
 {#if editing}
 	{#key editing}
 		<FileEditor
@@ -499,11 +599,7 @@
 			path={editing}
 			{writable}
 			bind:dirty
-			onClose={() => {
-				editing = null;
-				dirty = false;
-				nonce += 1;
-			}}
+			onClose={closeEditor}
 			onSaved={() => toast.success(`Saved ${baseName(editing ?? '')}`)}
 		/>
 	{/key}

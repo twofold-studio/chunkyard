@@ -411,6 +411,11 @@ impl ServerService for ServerManager {
     async fn metrics(&self, id: &str) -> Result<ServerMetrics, ServerError> {
         self.runtime.metrics(&self.local_record(id).await?).await
     }
+    async fn metrics_stream(&self, id: &str) -> Result<MetricsStream, ServerError> {
+        self.runtime
+            .stream_metrics(&self.local_record(id).await?)
+            .await
+    }
     async fn set_eula(&self, id: &str, accepted: bool) -> Result<ServerView, ServerError> {
         let server = self.local_record(id).await?;
         let lock = self.lock(&server.id)?;

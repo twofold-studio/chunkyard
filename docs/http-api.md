@@ -1,5 +1,7 @@
 # Current backend HTTP API
 
+Owner API keys, public documentation and MCP are documented in [integrations](integrations-contract.md). Valid bearer-key requests bypass browser CSRF headers but retain Host and supplied-Origin checks.
+
 Compressed instance exports and the private S3/RustFS connection are documented in [the export contract](exports-contract.md). `PATCH /api/v1/servers/{id}/resources` changes `{memoryMinMb,memoryMaxMb,cpus}` while stopped and returns `{server}`. Heap bounds must satisfy `128 <= min <= max <= 262144` MiB; CPU must be finite and between 0.1 and 256. The owned stopped container is removed, preserving files; next start uses the new limits.
 
 Start with `cargo run -p mcm-server -- serve`, or run `mcm` without a subcommand. The default address is `http://127.0.0.1:8420`. It serves the built UI from `web/build/` alongside the JSON API when available; see [frontend usage](frontend.md) for build and hosting instructions. Set `CHUNKYARD_HTTP__UI_DIR=` for API-only operation.
@@ -20,7 +22,7 @@ New setup/login requests use `email`, and user responses expose `email` instead 
 
 Read the initial token locally from `<data-dir>/setup-token`. The setup UI first sends it to `POST /api/v1/setup/verify-token` with `{setupToken}`. A valid token returns 204 without creating an account, issuing a session, or consuming the token. Step two sends the original token to `POST /api/v1/setup` with `{setupToken, email, password}`; that final request checks it again. Existing clients may still submit the final request directly. A successful setup creates the owner, removes the token file, and sets the session cookie. Setup can only succeed once. Passwords use salted Argon2id with a bundled common-password blocklist. Hashing runs in a blocking worker pool limited to four concurrent operations.
 
-Every mutation requires `X-MCM-CSRF: 1` and an `Origin` matching the backend origin (a matching `Referer` is also supported). Requests must use the configured public host. Cookie requests use `credentials: 'same-origin'`; there is no CORS allowance. Configure `http.public_url` when using a reverse proxy and preserve its Host header. Forwarded IP headers are currently ignored; login throttling uses the direct TCP peer.
+Every browser-session mutation requires `X-MCM-CSRF: 1` and an `Origin` matching the backend origin (a matching `Referer` is also supported). Requests must use the configured public host. Cookie requests use `credentials: 'same-origin'`; there is no CORS allowance. Configure `http.public_url` when using a reverse proxy and preserve its Host header. Forwarded IP headers are currently ignored; login throttling uses the direct TCP peer.
 
 Sessions use a 32-byte random token; only SHA-256 is stored. Cookies are HttpOnly, SameSite=Lax, and Secure when the public URL uses HTTPS. Local loopback HTTP works without TLS. Idle expiry is seven days; absolute expiry is thirty days. Logout revokes the database record immediately. The daemon limits sessions to 100 per account. Non-loopback HTTP requires an explicit insecure-HTTP opt-in; HTTPS is terminated by a reverse proxy in this increment.
 
@@ -57,10 +59,6 @@ Sessions use a 32-byte random token; only SHA-256 is stored. Cookies are HttpOnl
 | POST | `/api/v1/servers/{id}/files/move` | `{entry}`; body `{from,to}`; rename/move without overwrite |
 | POST | `/api/v1/servers/{id}/files/copy` | `{entry}`; body `{from,to}`; bounded directory/file copy without overwrite |
 | POST | `/api/v1/servers/{id}/files/delete` | 204; body `{path,recursive}`; permanent deletion |
-| GET | `/api/v1/java/runtimes` | `{items: JavaRuntime[]}` |
-| POST | `/api/v1/java/runtimes/discover` | `{items: JavaRuntime[]}` |
-| GET | `/api/v1/java/available` | `{lts: number[], all: number[], mostRecentLts: number}` |
-| POST | `/api/v1/java/runtimes/install` | 202 `{job}`; body `{major: number}` |
 | GET | `/api/v1/jobs?limit=50&cursor=...&serverId=...&activeOnly=true` | `{items: Job[], nextCursor: string | null}`; max limit 200; optional server UUID / queued-running filters |
 | GET | `/api/v1/jobs/{id}` | `Job` |
 
@@ -96,11 +94,10 @@ The first JSON text frame is `{type:"snapshot",lines:[]}`, resetting the client 
 
 There are at most 16 concurrent console sockets. Lines are limited to 8192 UTF-8 bytes and 256 lines per Docker frame. Slow sends time out, heartbeats detect disconnected peers, and authenticated sessions are revalidated every five seconds. Revoked sessions receive `auth.required` and close. Unexpected client data closes the read-only socket. The frontend reconnects with backoff and falls back to snapshots when streaming is unavailable; it closes sockets on hidden/inactive tabs and navigation. The page CSP permits only the configured same-origin WebSocket endpoint.
 
-`JavaRuntime` is the current core model: `{id, vendor, major, fullVersion, os, arch, path, managed, sha256}`. OS can be `linux`, `alpine-linux`, or `windows`. Planned fields such as `usedBy` and `installedAt` are not present yet. `java.allow_system_java = false` hides system runtimes and disables discovery.
 
 `Job` follows the phase 0 shape: `{id, kind, serverId, state, progress, message, error, result, createdBy, createdAt, startedAt, finishedAt}`. Java install success has `result: {runtime}`. Progress is indeterminate during work and becomes 1 on success. Poll a job while its state is `queued` or `running`. Jobs survive restarts; interrupted work becomes failed with `job.interrupted`. There are at most four active jobs; excess submissions return 429 `job.busy`. A panicking task becomes failed with `job.panicked`. SIGINT/SIGTERM interrupts active jobs and flushes their final states before closing the database. Only one daemon may own a data directory.
 
-This is a single-owner service. Email/password login and the optional authentication switch are the current auth scope; multi-user permissions, 2FA, and API tokens are deferred. WebSocket console streaming is implemented; job cancellation and native process management remain pending. Install/export jobs report measured stage progress and byte counts. See [Docker usage](docker.md) and [CurseForge installation and launch profiles](curseforge.md). Older phase 0 specs describe a broader product than the current scope.
+This is a single-owner service. Email/password login, the optional authentication switch, owner-wide API keys and MCP are implemented; multi-user permissions, 2FA, scoped keys and OAuth connector flows remain deferred. Console and metrics WebSocket streaming are implemented; job cancellation and native process management remain pending. Install/export jobs report measured stage progress and byte counts. See [Docker usage](docker.md), [integrations](integrations-contract.md) and [CurseForge installation and launch profiles](curseforge.md). Older phase 0 specs describe a broader product than the current scope.
 
 For an opt-in test with a real daemon and live Java 21 download:
 
@@ -123,13 +120,13 @@ Server responses include `icon: {url,source:"custom"|"modpack"}|null`. `GET /api
 
 `GET /api/v1/system/isolation` includes `docker.capacity`: `{logicalCpus, memoryTotalBytes, architecture, operatingSystem}` from the Docker engine that runs game containers. Totals are positive numbers or null when unknown; capacity is null when the engine is unavailable. These are engine-visible totals (including Docker Desktop VM limits), not free memory, reserved resources or the manager container's own cgroup allowance. Nested/rootless engine constraints may be narrower than reported totals. Use them for allocation guidance, leave headroom for the OS, other services and JVM overhead, and do not silently clamp existing server settings. This endpoint uses the normal session/auth-disabled checks.
 
-`GET /api/v1/openapi.json` returns the current OpenAPI 3.1.1 document, including schemas, operations, cookie authentication and mutation CSRF requirements. It uses the normal owner-session/auth-disabled checks and `no-store`. The app's **API reference** page at `/api-docs` renders it locally with search, grouped operations, schema links and examples. It is read-only and sends no operation requests. Examples are illustrative, not recorded server data.
+`GET /api/v1/openapi.json` returns the current OpenAPI 3.1.1 document, including schemas, operations, cookie/bearer authentication and conditional browser CSRF requirements. It is public, including before initial setup, and uses `no-store`. The app's **API reference** page at `/api-docs` renders it locally with search, grouped operations, schema links and examples. It is read-only and sends no operation requests. Examples are illustrative, not recorded server data.
 
 `GET /api/v1/servers/{id}/metrics` returns a bounded, on-demand container resource snapshot. See [monitoring](monitoring.md) for units, missing measurements, sampling limits and readiness caveats.
 
 ## Version badge and changelog
 
-`GET /api/v1/system/version` returns `{enabled:true, version:"0.10.0", channel:"development"}` for the current build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
+`GET /api/v1/system/version` returns `{enabled:true, version:"0.11.0", channel:"development"}` for the current build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
 
 `[http] show_version = true` is the default. Set `CHUNKYARD_HTTP__SHOW_VERSION=false`, restart/redeploy, and reload the page to hide the badge: version metadata then returns `{enabled:false, version:null, channel:null}`, and the changelog endpoint returns 404 `version.disabled`. The UI fetches changelog content only when the modal opens. Completed, verified milestones batch notes and bump the project version under the authorized [changelog workflow](changelog.md); in-progress changes remain Unreleased.
 

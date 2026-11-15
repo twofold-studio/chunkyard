@@ -225,4 +225,102 @@ describe('Properties tab', () => {
 			expect(editorDoc('Contents of server.properties')).toBe('motd=bad \\uZZZZ\npvp=true\n')
 		);
 	});
+
+	it('compares a version with its previous revision or the latest, by setting', async () => {
+		const versions: Record<number, string> = {
+			1: '#one\r\nmotd=Old\r\npvp=true\r\nwhite-list=false\r\n',
+			2: '#two\r\nmotd=New\r\npvp=true\r\nspawn-protection=0\r\n'
+		};
+		const getPropertiesVersion = vi.fn(async (_id: string, version: number) => ({
+			version,
+			etag: `e${version}`,
+			createdAt: '2026-11-13T10:00:00Z',
+			source: 'edit',
+			content: versions[version]
+		}));
+		setup({
+			content: '#three\r\nmotd=New\r\npvp=false\r\nspawn-protection=0\r\n',
+			initial: { version: 3, etag: 'e3' },
+			api: {
+				listPropertiesVersions: vi.fn(async () => ({
+					items: [3, 2, 1].map((version) => ({
+						version,
+						etag: `e${version}`,
+						createdAt: '2026-11-14T10:00:00Z',
+						source: 'edit'
+					})),
+					nextBefore: null
+				})),
+				getPropertiesVersion
+			}
+		});
+		await page.getByRole('button', { name: 'History' }).click();
+		await page.getByRole('button', { name: /^v2/ }).click();
+		const compare = page.getByTestId('properties-compare');
+		await expect.element(compare).toHaveTextContent(/Changes\s*v1\s*v2/);
+		await expect
+			.element(page.getByRole('radio', { name: 'Previous (v1)' }))
+			.toHaveAttribute('aria-checked', 'true');
+		await expect
+			.element(page.getByTestId('compare-summary'))
+			.toHaveTextContent('1 changed · 1 added · 1 removed');
+		const rows = compare.getByRole('listitem');
+		await expect.element(rows.nth(0)).toHaveTextContent(/Changed\s*motd\s*Old\s*New/);
+		await expect.element(rows.nth(1)).toHaveTextContent(/Added\s*spawn-protection\s*0/);
+		await expect.element(rows.nth(2)).toHaveTextContent(/Removed\s*white-list\s*false/);
+		expect(getPropertiesVersion.mock.calls.map((c) => c[1])).toEqual([2, 1]);
+
+		await page.getByRole('radio', { name: 'Latest (v3)' }).click();
+		await expect.element(compare).toHaveTextContent(/Changes\s*v2\s*v3/);
+		await expect
+			.element(page.getByTestId('compare-summary'))
+			.toHaveTextContent('1 changed · 0 added · 0 removed');
+		await expect
+			.element(compare.getByRole('listitem').first())
+			.toHaveTextContent(/pvp\s*true\s*false/);
+		// Comparing never changes what is viewed or saved; restore still restores the selection.
+		await expect.element(page.getByText(/Viewing/)).toHaveTextContent('v2');
+	});
+
+	it('reports comment-only differences and the first version honestly', async () => {
+		setup({
+			content: '#edited comment\r\npvp=true\r\n',
+			initial: { version: 2, etag: 'e2' },
+			api: {
+				getPropertiesVersion: vi.fn(async () => ({
+					version: 1,
+					etag: 'e1',
+					createdAt: '2026-11-13T10:00:00Z',
+					source: 'import',
+					content: '#original\r\npvp=true\r\n'
+				}))
+			}
+		});
+		await page.getByRole('button', { name: 'History' }).click();
+		await page.getByRole('button', { name: /^v1/ }).click();
+		await expect.element(page.getByRole('radio', { name: 'Previous' })).toBeDisabled();
+		await expect
+			.element(page.getByText('v1 is the first version; comparing with the latest instead.'))
+			.toBeVisible();
+		await expect
+			.element(page.getByText('No setting changes; only comments, order or formatting differ.'))
+			.toBeVisible();
+	});
+
+	it('opens and closes History in place without a lingering or misplaced panel', async () => {
+		setup({ initial: { version: 2, etag: 'e2' } });
+		const toggle = page.getByRole('button', { name: 'History' });
+		await expect.element(page.getByLabelText('Message of the day')).toBeVisible();
+		await toggle.click();
+		const panel = document.querySelector<HTMLElement>('[data-testid="history-panel"]');
+		expect(panel).not.toBeNull();
+		// The panel and the column layout arrive together.
+		expect(panel!.parentElement!.className).toContain('lg:grid-cols-');
+		await expect.element(page.getByRole('region', { name: 'Version history' })).toBeVisible();
+		await toggle.click();
+		// Removed in the same update: no outro keeps it around in a one-column layout.
+		expect(document.querySelector('[data-testid="history-panel"]')).toBeNull();
+		await expect.element(toggle).toHaveFocus();
+		await expect.element(toggle).toHaveAttribute('aria-pressed', 'false');
+	});
 });

@@ -16,6 +16,7 @@
 	import type { MetricsSource } from '#lib/servers/metrics-source.svelte.js';
 	import ServerAvatar from './server-avatar.svelte';
 	import ServerMetrics from './server-metrics.svelte';
+	import ServerOpsSummary, { type OpsSummaryApi } from './server-ops-summary.svelte';
 
 	interface Props {
 		server: ServerView;
@@ -28,6 +29,13 @@
 		onOpenResources?: () => void;
 		/** Another operation is running. */
 		busy?: boolean;
+		/** Re-reads backup/activity/properties status when it changes (start/stop, job done). */
+		opsRefreshKey?: string;
+		onOpenExports?: () => void;
+		onOpenActivity?: () => void;
+		onOpenProperties?: () => void;
+		/** Injected in tests. */
+		opsApi?: OpsSummaryApi;
 	}
 
 	let {
@@ -37,7 +45,12 @@
 		onRequestEula,
 		onOpenConsole,
 		onOpenResources,
-		busy = false
+		busy = false,
+		opsRefreshKey,
+		onOpenExports,
+		onOpenActivity,
+		onOpenProperties,
+		opsApi
 	}: Props = $props();
 
 	const software = $derived(server.software ?? null);
@@ -181,6 +194,16 @@
 			{/if}
 		</div>
 	</section>
+
+	<ServerOpsSummary
+		serverId={server.id}
+		running={state === 'running'}
+		refreshKey={opsRefreshKey}
+		{onOpenExports}
+		{onOpenActivity}
+		{onOpenProperties}
+		api={opsApi}
+	/>
 
 	<ServerMetrics source={metrics} cpus={server.cpus} />
 </div>

@@ -1,9 +1,10 @@
 use mcm_auth::AuthService;
-use mcm_core::{java::JavaRuntimeService, jobs::JobService};
+use mcm_core::jobs::JobService;
 use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct AppState {
+    pub metrics: Arc<crate::MetricsHub>,
     pub health: Arc<dyn mcm_core::system::HealthCheck>,
     pub auth_enabled: bool,
     pub show_version: bool,
@@ -13,9 +14,7 @@ pub struct AppState {
     pub files: Arc<dyn mcm_core::files::FileService>,
     pub properties: Arc<dyn mcm_core::properties::PropertiesService>,
     pub exports: Arc<dyn mcm_core::exports::ExportService>,
-    pub java: Arc<dyn JavaRuntimeService>,
     pub jobs: Arc<dyn JobService>,
     pub origin: String,
     pub secure_cookie: bool,
-    pub allow_system_java: bool,
 }

@@ -1,7 +1,7 @@
 use crate::{AppState, error::ApiError, json::ApiJson};
 use axum::{
     Extension, Json,
-    extract::{ConnectInfo, Request, State},
+    extract::{ConnectInfo, Path, Request, State},
     http::{HeaderMap, HeaderValue, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
@@ -76,6 +76,9 @@ pub(crate) async fn login(
 pub(crate) async fn me(Extension(actor): Extension<Actor>) -> Json<Value> {
     Json(match actor {
         Actor::Session(session) => me_json(&session),
+        Actor::ApiKey(user) => {
+            json!({"authEnabled":true,"user":user,"principal":{"kind":"api_key"},"isAdmin":true})
+        }
         Actor::AuthDisabled => {
             json!({"authEnabled":false, "user":null, "principal":{"kind":"auth_disabled"}, "isAdmin":true})
         }
@@ -100,6 +103,13 @@ pub(crate) async fn require_session(
     mut request: Request,
     next: Next,
 ) -> Result<Response, ApiError> {
+    if request
+        .extensions()
+        .get::<Actor>()
+        .is_some_and(|actor| matches!(actor, Actor::ApiKey(_)))
+    {
+        return Ok(next.run(request).await);
+    }
     if !state.auth_enabled {
         request.extensions_mut().insert(Actor::AuthDisabled);
         return Ok(next.run(request).await);
@@ -118,6 +128,69 @@ pub(crate) async fn require_session(
     }
     request.extensions_mut().insert(Actor::Session(session));
     Ok(next.run(request).await)
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CreateKey {
+    name: String,
+}
+
+fn browser_only(actor: &Actor) -> Result<(), ApiError> {
+    if matches!(actor, Actor::ApiKey(_)) {
+        return Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "auth.session_required",
+            "Use a browser session to manage API keys.",
+        ));
+    }
+    Ok(())
+}
+pub(crate) async fn api_keys(
+    State(state): State<AppState>,
+    Extension(actor): Extension<Actor>,
+) -> Result<Json<Value>, ApiError> {
+    browser_only(&actor)?;
+    Ok(Json(json!({"items":state.auth.api_keys().await?})))
+}
+pub(crate) async fn create_api_key(
+    State(state): State<AppState>,
+    Extension(actor): Extension<Actor>,
+    ApiJson(body): ApiJson<CreateKey>,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    browser_only(&actor)?;
+    let (key, token) = state
+        .auth
+        .issue_api_key(&body.name, actor.user_id())
+        .await?;
+    Ok((StatusCode::CREATED, Json(json!({"key":key,"token":token}))))
+}
+pub(crate) async fn revoke_api_key(
+    State(state): State<AppState>,
+    Extension(actor): Extension<Actor>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    browser_only(&actor)?;
+    state.auth.revoke_api_key(&id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Explicit bearer authentication; never fall back to cookies for a bad header.
+pub(crate) fn bearer(headers: &HeaderMap) -> Result<Option<&str>, ApiError> {
+    let mut values = headers.get_all("authorization").iter();
+    let Some(value) = values.next() else {
+        return Ok(None);
+    };
+    if values.next().is_some() || session_cookie(headers).is_some() {
+        return Err(mcm_auth::AuthError::Required.into());
+    }
+    let token = value
+        .to_str()
+        .ok()
+        .and_then(|s| s.strip_prefix("Bearer "))
+        .filter(|s| !s.is_empty())
+        .ok_or(mcm_auth::AuthError::Required)?;
+    Ok(Some(token))
 }
 pub(crate) async fn health(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
     if state.health.healthy().await {

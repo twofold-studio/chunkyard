@@ -22,10 +22,7 @@
 </script>
 
 <!-- The create tile always holds the first slot, also when servers exist. -->
-<ul
-	class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
-	aria-label="Servers"
->
+<ul class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Servers">
 	<li class="min-w-0">
 		<AddTile
 			href={createHref}
@@ -33,7 +30,7 @@
 			description={servers.length
 				? 'Add a Vanilla, Paper or CurseForge server.'
 				: 'Install Vanilla, Paper or CurseForge, or use a custom JAR.'}
-			class="h-full min-h-36 gap-2 p-4"
+			class="h-full min-h-40 gap-2 p-5"
 		/>
 	</li>
 	{#each servers as server, index (server.id)}

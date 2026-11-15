@@ -69,9 +69,6 @@ impl Config {
                 "HTTP__ALLOW_INSECURE_HTTP" => {
                     config.http.allow_insecure_http = value.parse().map_err(|_| invalid())?
                 }
-                "JAVA__ALLOW_SYSTEM_JAVA" => {
-                    config.java.allow_system_java = value.parse().map_err(|_| invalid())?
-                }
                 _ if suffix.contains("__") && !suffix.starts_with("TEST_") => {
                     return Err(ConfigError::Invalid(format!(
                         "unknown environment setting {key}"

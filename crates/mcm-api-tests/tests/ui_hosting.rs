@@ -7,7 +7,7 @@ type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 #[tokio::test]
 async fn root_and_deep_links_serve_the_same_html_with_a_hashed_bootstrap_policy() -> Result {
     let app = TestApp::with_ui().await?;
-    for path in ["/", "/servers", "/servers/new", "/login", "/java"] {
+    for path in ["/", "/servers", "/servers/new", "/login", "/integrations"] {
         let response = app.client.get(format!("{}{path}", app.base)).send().await?;
         assert_eq!(response.status(), 200);
         assert_eq!(response.headers()["content-type"], "text/html");

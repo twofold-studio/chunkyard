@@ -3,6 +3,8 @@
  * the lifetime of the browser tab (never persisted or sent anywhere).
  */
 
+import { lineText } from './ansi.js';
+
 export const COMMAND_HISTORY_LIMIT = 50;
 
 export class CommandHistory {
@@ -74,19 +76,19 @@ export function commandHistoryFor(serverId: string): CommandHistory {
 	return history;
 }
 
-/** Plain-text export of console lines: one line each, exactly as received. */
+/** Plain-text export of console lines: one line each, without color or control escapes. */
 export function consoleText(lines: readonly { text: string }[]): string {
-	return lines.map((line) => line.text).join('\n') + (lines.length ? '\n' : '');
+	return lines.map((line) => lineText(line)).join('\n') + (lines.length ? '\n' : '');
 }
 
-/** Case-insensitive substring filter; an empty query keeps every line. */
+/** Case-insensitive substring filter over the visible text; an empty query keeps every line. */
 export function filterLines<T extends { line: { text: string } }>(
 	entries: readonly T[],
 	query: string
 ): readonly T[] {
 	const needle = query.trim().toLowerCase();
 	if (!needle) return entries;
-	return entries.filter((entry) => entry.line.text.toLowerCase().includes(needle));
+	return entries.filter((entry) => lineText(entry.line).toLowerCase().includes(needle));
 }
 
 /** Splits text around case-insensitive matches so they can be marked without HTML. */

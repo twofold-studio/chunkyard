@@ -18,12 +18,12 @@
 Chunkyard is a self-hosted Minecraft Java Edition server manager for one owner. A Rust service and Svelte web UI let you manage Docker server instances from one address, with persistent storage and no separate Node service to run.
 
 - **Control** servers with start, stop, restart, and force kill. Stream the console, send commands, and watch CPU, memory and uptime with adjustable refresh intervals.
-- **Choose** a Docker image's Java version for each server, and discover or install host Java runtimes separately.
+- **Run** each server with a compatible Java version supplied by its Docker image; no host Java installation is required.
 - **Keep** a simple owner login, or disable authentication explicitly for a trusted local environment.
 
 Choose Vanilla, Paper or a supported CurseForge server pack; Chunkyard downloads and verifies the files and selects a compatible Java image. Browse and edit files, or autosave versioned `server.properties` changes while the game runs and restart when ready to apply them. Export worlds or full instances to local storage or S3-compatible services such as RustFS. A verified full S3 backup lets you remove local files while keeping the server listed, then restore it when you want to play again. See the [backup and restore contract](docs/exports-contract.md) for limits.
 
-This project is in active development. Custom JARs remain an advanced option. Host-managed Java installations are separate from Docker runtimes, and a running container does not establish Minecraft readiness.
+This project is in active development. Custom JARs remain an advanced option. A running container does not establish Minecraft readiness.
 
 ## Run it
 

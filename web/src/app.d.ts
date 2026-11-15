@@ -1,5 +1,6 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 import type { Crumb } from '#lib/components/app/types.js';
+import type { FilesPageState } from '#lib/files/files-history.svelte.js';
 
 declare global {
 	namespace App {
@@ -13,7 +14,10 @@ declare global {
 		interface PageData {
 			crumbs?: Crumb[];
 		}
-		// interface PageState {}
+		interface PageState {
+			/** Files browser location of this history entry (shallow routing). */
+			files?: FilesPageState;
+		}
 		// interface Platform {}
 	}
 }

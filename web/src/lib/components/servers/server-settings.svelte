@@ -1,7 +1,7 @@
 <script lang="ts">
 	import ScaleIcon from '@lucide/svelte/icons/scale';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
-	import { tick, untrack } from 'svelte';
+	import { tick, untrack, type Snippet } from 'svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import FileCogIcon from '@lucide/svelte/icons/file-cog';
@@ -34,6 +34,8 @@
 		onResourcesFocused?: () => void;
 		/** Local files were removed: only display metadata stays editable. */
 		archived?: boolean;
+		/** Destructive actions (Delete), shown last in their own section. */
+		danger?: Snippet;
 	}
 
 	let {
@@ -49,7 +51,8 @@
 		onLaunchFocused,
 		resourcesFocus = 0,
 		onResourcesFocused,
-		archived = false
+		archived = false,
+		danger
 	}: Props = $props();
 
 	const stopped = $derived(server.status.state === 'stopped');
@@ -182,4 +185,19 @@
 	<section aria-label="Diagnostics" class="overflow-hidden rounded-lg border border-border bg-card">
 		<ServerDiagnostics {server} />
 	</section>
+
+	{#if danger && !archived}
+		<section
+			aria-labelledby="danger-zone-title"
+			class="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-lg border border-destructive/30 bg-card px-4 py-3"
+		>
+			<div class="flex min-w-0 flex-1 flex-col gap-0.5">
+				<h2 id="danger-zone-title" class="text-sm font-medium">Delete server</h2>
+				<p class="text-xs text-muted-foreground">
+					Removes it from the manager. You choose whether its files are kept.
+				</p>
+			</div>
+			{@render danger()}
+		</section>
+	{/if}
 </div>

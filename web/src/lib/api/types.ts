@@ -369,22 +369,20 @@ export interface JobPage {
 	nextCursor: string | null;
 }
 
-export interface JavaRuntime {
+/** `GET /api/v1/auth/api-keys` item. The full token is never listed. */
+export interface ApiKey {
 	id: string;
-	vendor: string;
-	major: number;
-	fullVersion: string;
-	os: string;
-	arch: string;
-	path: string;
-	managed: boolean;
-	sha256: string | null;
+	name: string;
+	/** Leading characters of the token, for recognising it (e.g. `cyk_ab12`). */
+	prefix: string;
+	createdAt: string;
+	lastUsedAt: string | null;
 }
 
-export interface AvailableJava {
-	lts: number[];
-	all: number[];
-	mostRecentLts: number;
+/** `POST /api/v1/auth/api-keys` (201): the only response that contains the full `token`. */
+export interface CreatedApiKey {
+	key: ApiKey;
+	token: string;
 }
 
 export interface Items<T> {

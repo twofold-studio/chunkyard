@@ -1,8 +1,8 @@
 use crate::{Database, storage};
 use async_trait::async_trait;
 use mcm_core::{
-    java::RepositoryError,
     jobs::{Job, JobCursor, JobFailure, JobRepo, JobState},
+    repository::RepositoryError,
 };
 use sqlx::SqlitePool;
 #[derive(Clone)]

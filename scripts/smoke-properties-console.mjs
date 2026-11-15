@@ -449,7 +449,7 @@ try {
   assert.equal(completed.state,"succeeded");
   assert((await api("/api/v1/exports")).items.some(item=>item.id===completed.result.id));
   console.log("PASS: real filtered active-job lookup, recovery after navigation, mutation guard and per-instance Activity completion");
-  await page.goto(`${base}/java`);
+  await page.goto(`${base}/servers`);
   assert.equal(
     await page
       .locator("header")

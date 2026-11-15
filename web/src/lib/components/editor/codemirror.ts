@@ -27,6 +27,9 @@ import {
 } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import type { EditorLanguage } from '#lib/files/editor-text.js';
+import type { VimMode } from './vim.js';
+
+export type { VimMode };
 
 export interface EditorStatus {
 	line: number;
@@ -46,6 +49,12 @@ export interface EditorOptions {
 	shortcuts: readonly KeyBinding[];
 	onDocChange: (doc: string) => void;
 	onStatus: (status: EditorStatus) => void;
+	/** Start with Vim keybindings (loaded on demand). */
+	vim?: boolean;
+	/** `:w` in Vim mode. Returns false when there is nothing to save to. */
+	onWrite?: () => boolean;
+	/** Current Vim mode, or null while Vim is off. */
+	onVimMode?: (mode: VimMode | null) => void;
 }
 
 export interface EditorHandle {
@@ -53,6 +62,8 @@ export interface EditorHandle {
 	/** Replaces the document and clears undo history (used after reload). */
 	reset(doc: string): void;
 	setReadOnly(readOnly: boolean): void;
+	/** Turns Vim keybindings on or off; resolves once applied (or superseded). */
+	setVim(enabled: boolean): Promise<void>;
 	focus(): void;
 	destroy(): void;
 }
@@ -201,10 +212,34 @@ export async function createEditor(
 	parent: HTMLElement,
 	options: EditorOptions
 ): Promise<EditorHandle> {
-	const languageExt = await languageExtension(options.language);
+	const vimCompartment = new Compartment();
+	let vimExt: Extension = [];
+	let vimWanted = options.vim ?? false;
+	let destroyed = false;
+	const loadVim = async (): Promise<Extension> =>
+		(await import('./vim.js')).vimExtension({
+			onWrite: () => options.onWrite?.() ?? false,
+			onMode: (mode) => options.onVimMode?.(mode)
+		});
+	const [languageExt, initialVim] = await Promise.all([
+		languageExtension(options.language),
+		vimWanted
+			? loadVim().catch((error: unknown): Extension => {
+					// Keep a working editor with the normal keys; Vim can be retried by toggling.
+					console.error('Vim keybindings failed to load', error);
+					vimWanted = false;
+					return [];
+				})
+			: Promise.resolve<Extension>([])
+	]);
+	// A toggle while loading is applied by the caller through setVim.
+	vimExt = initialVim;
+	let vimApplied = vimWanted;
 	const readOnly = new Compartment();
 
 	const extensions = (): Extension[] => [
+		// Vim first, so its keys win over the keymaps below (as the binding requires).
+		vimCompartment.of(vimExt),
 		lineNumbers(),
 		highlightActiveLineGutter(),
 		highlightSpecialChars(),
@@ -257,6 +292,16 @@ export async function createEditor(
 			view.setState(makeState(doc));
 			options.onStatus(status(view.state));
 		},
+		async setVim(enabled) {
+			vimWanted = enabled;
+			if (enabled === vimApplied) return;
+			const next = enabled ? await loadVim() : [];
+			// A later call (or destroy) superseded this one while the chunk loaded.
+			if (destroyed || vimWanted !== enabled || vimApplied === enabled) return;
+			vimExt = next;
+			vimApplied = enabled;
+			view.dispatch({ effects: vimCompartment.reconfigure(next) });
+		},
 		setReadOnly(next) {
 			currentReadOnly = next;
 			view.dispatch({ effects: readOnly.reconfigure(EditorState.readOnly.of(next)) });
@@ -265,6 +310,7 @@ export async function createEditor(
 			view.focus();
 		},
 		destroy() {
+			destroyed = true;
 			view.destroy();
 		}
 	};

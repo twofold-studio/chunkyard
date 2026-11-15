@@ -6,6 +6,56 @@ use std::time::Duration;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 impl DockerRuntime {
+    pub(super) async fn follow_metrics(
+        &self,
+        server: &Server,
+    ) -> Result<mcm_core::server::MetricsStream, ServerError> {
+        let container = self.inspect(server).await?;
+        let started_at = container
+            .as_ref()
+            .and_then(|c| c.state.as_ref())
+            .and_then(|s| s.started_at.clone());
+        let status = Self::status_of(container);
+        if status.state != ServerState::Running {
+            return Err(ServerError::NotRunning);
+        }
+        let id = status.container_id.clone().ok_or(ServerError::Docker)?;
+        let server_id = server.id.clone();
+        let stream = self.ready().await?.stats(
+            &id,
+            Some(StatsOptionsBuilder::default().stream(true).build()),
+        );
+        // A single Docker stream supplies native samples. No repeated inspect/stats
+        // requests and no fabricated 100 ms timestamps over Docker's slower cadence.
+        Ok(Box::pin(stream.map(move |stats| {
+            let stats = stats.map_err(docker_error)?;
+            let now = OffsetDateTime::now_utc();
+            let mut result = ServerMetrics {
+                server_id: server_id.clone(),
+                status: status.clone(),
+                sampled_at: stats
+                    .read
+                    .clone()
+                    .unwrap_or_else(|| now.format(&Rfc3339).unwrap_or_default()),
+                started_at: started_at.clone(),
+                uptime_seconds: started_at
+                    .as_deref()
+                    .and_then(|s| OffsetDateTime::parse(s, &Rfc3339).ok())
+                    .and_then(|s| u64::try_from((now - s).whole_seconds()).ok()),
+                cpu_percent: None,
+                memory_usage_bytes: None,
+                memory_working_set_bytes: None,
+                memory_limit_bytes: None,
+                network_rx_bytes: None,
+                network_tx_bytes: None,
+                block_read_bytes: None,
+                block_write_bytes: None,
+                pids: None,
+            };
+            apply_stats(&mut result, &stats);
+            Ok(result)
+        })))
+    }
     pub(super) async fn sample_metrics(
         &self,
         server: &Server,

@@ -2,8 +2,8 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Chunkyard API",
-    "version": "0.10.0",
-    "description": "Single-owner Minecraft manager. Cookie authentication is required unless CHUNKYARD_AUTH__ENABLED=false. Host/origin and X-MCM-CSRF protections apply in both modes. JSON bodies are limited to 1 MiB, except file/properties editors' 8 MiB envelopes for escaped text up to 1 MiB. Raw uploads stream up to 128 MiB. Properties revisions can be saved while running and apply on the next explicit start/restart. Console supports snapshots and same-origin WebSocket streaming; metrics are snapshots."
+    "version": "0.11.0",
+    "description": "Single-owner Docker Minecraft manager. Public API reference; protected controls accept browser sessions or owner bearer API keys. Browser mutations require matching Origin/Referer and X-MCM-CSRF: 1. Valid bearer requests do not need browser CSRF headers; supplied Origin and Host remain validated. Console and shared Docker metrics use same-origin WebSockets."
   },
   "servers": [
     {
@@ -33,9 +33,6 @@
       "name": "Monitoring"
     },
     {
-      "name": "Java"
-    },
-    {
       "name": "Jobs"
     },
     {
@@ -52,6 +49,9 @@
   "security": [
     {
       "cookieAuth": []
+    },
+    {
+      "bearerAuth": []
     }
   ],
   "paths": {
@@ -1909,190 +1909,6 @@
         }
       }
     },
-    "/api/v1/java/runtimes": {
-      "get": {
-        "operationId": "get_api_v1_java_runtimes",
-        "tags": [
-          "Java"
-        ],
-        "summary": "List Java runtimes",
-        "responses": {
-          "200": {
-            "description": "List Java runtimes",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JavaInventory"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/java/runtimes/discover": {
-      "post": {
-        "operationId": "post_api_v1_java_runtimes_discover",
-        "tags": [
-          "Java"
-        ],
-        "summary": "Discover system Java installations",
-        "responses": {
-          "200": {
-            "description": "Discover system Java installations",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JavaInventory"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "description": "Runs local JVM probes. Disabled when java.allow_system_java=false. Docker servers use the JVM in their image.",
-        "parameters": [
-          {
-            "name": "X-MCM-CSRF",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "1"
-              ]
-            },
-            "description": "Required in both authentication modes."
-          },
-          {
-            "name": "Origin",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "format": "uri"
-            },
-            "description": "Must match the configured public origin; a same-origin Referer may substitute."
-          }
-        ]
-      }
-    },
-    "/api/v1/java/available": {
-      "get": {
-        "operationId": "get_api_v1_java_available",
-        "tags": [
-          "Java"
-        ],
-        "summary": "List installable Java major versions",
-        "responses": {
-          "200": {
-            "description": "List installable Java major versions",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AvailableJava"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/java/runtimes/install": {
-      "post": {
-        "operationId": "post_api_v1_java_runtimes_install",
-        "tags": [
-          "Java"
-        ],
-        "summary": "Install a Temurin Java runtime",
-        "responses": {
-          "202": {
-            "description": "Install a Temurin Java runtime",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Problem response; error code identifies the cause. Authentication, setup, Host/origin and CSRF checks apply.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "description": "Downloads and verifies a runtime for this host platform. Poll the returned job.",
-        "parameters": [
-          {
-            "name": "X-MCM-CSRF",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "1"
-              ]
-            },
-            "description": "Required in both authentication modes."
-          },
-          {
-            "name": "Origin",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "format": "uri"
-            },
-            "description": "Must match the configured public origin; a same-origin Referer may substitute."
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InstallJava"
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/jobs": {
       "get": {
         "operationId": "get_api_v1_jobs",
@@ -2235,7 +2051,9 @@
               }
             }
           }
-        }
+        },
+        "security": [],
+        "description": "Public versioned OpenAPI contract; server controls remain protected."
       }
     },
     "/api/v1/setup/verify-token": {
@@ -3579,6 +3397,259 @@
         },
         "description": "Refuses existing local files. Preserves current resources/network/EULA for retained records; recreated records require new EULA acceptance. Staged, bounded extraction and journaled publication; game stays stopped. Success job.result is {server}."
       }
+    },
+    "/api/v1/auth/api-keys": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "operationId": "listApiKeys",
+        "description": "Browser session or auth-disabled trusted mode only. Bearer keys cannot manage keys.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public key metadata, never tokens/hashes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ApiKey"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/IntegrationProblem"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "operationId": "createApiKey",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Browser-session/trusted-mode mutations require X-MCM-CSRF: 1 and same-origin Origin/Referer. Bearer keys cannot manage keys."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "New metadata and one-time secret. At most 100 keys.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "key",
+                    "token"
+                  ],
+                  "properties": {
+                    "key": {
+                      "$ref": "#/components/schemas/ApiKey"
+                    },
+                    "token": {
+                      "type": "string",
+                      "description": "Returned exactly once here; never available from list."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/IntegrationProblem"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/api-keys/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "delete": {
+        "tags": [
+          "Authentication"
+        ],
+        "operationId": "revokeApiKey",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-MCM-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Browser-session/trusted-mode mutations require X-MCM-CSRF: 1 and same-origin Origin/Referer. Bearer keys cannot manage keys."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Revoked, including an absent key."
+          },
+          "default": {
+            "$ref": "#/components/responses/IntegrationProblem"
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/metrics/stream": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/FileServerId"
+        }
+      ],
+      "get": {
+        "operationId": "streamMetrics",
+        "tags": [
+          "Console"
+        ],
+        "summary": "WebSocket: stream running-instance console",
+        "description": "Same-origin authenticated WebSocket. One shared Docker native statistics stream per container. Frames: {type:sample,sample:ServerMetrics}, error, end. Latest-value backpressure. intervalMs limits delivery, not native measurement cadence. Maximum 16 watched servers and 32 sockets. Credentials rechecked every 5 seconds.",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "intervalMs",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 60000,
+              "default": 1000
+            }
+          }
+        ],
+        "x-websocket": true,
+        "responses": {
+          "101": {
+            "description": "JSON text frames use ConsoleEvent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleEvent"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/FileProblem"
+          }
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "tags": [
+          "Integrations"
+        ],
+        "operationId": "mcpRequest",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Stateless MCP Streamable HTTP JSON responses. API bearer key required even in auth-disabled mode. Accept must include application/json and text/event-stream. Supports initialize, ping, tools/list, tools/call. No OAuth connector flow or standalone SSE stream.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON-RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Notification accepted."
+          },
+          "default": {
+            "$ref": "#/components/responses/IntegrationProblem"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3614,13 +3685,14 @@
       "FileCsrf": {
         "name": "X-MCM-CSRF",
         "in": "header",
-        "required": true,
+        "required": false,
         "schema": {
           "type": "string",
           "enum": [
             "1"
           ]
-        }
+        },
+        "description": "Required for browser session/trusted-mode mutations; not needed for valid bearer-key requests. Supplied Origin/Host are always validated."
       }
     },
     "responses": {
@@ -3643,6 +3715,16 @@
             }
           }
         }
+      },
+      "IntegrationProblem": {
+        "description": "Authentication, validation, capacity or internal failure; no credentials are returned.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -3651,6 +3733,12 @@
         "in": "cookie",
         "name": "mcm_session",
         "description": "HttpOnly SameSite=Lax session cookie issued by setup or login. Required by protected endpoints unless authentication is disabled by configuration."
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Chunkyard API key",
+        "description": "Owner API key shown once at creation. Never send in query strings."
       }
     },
     "schemas": {
@@ -4588,71 +4676,6 @@
         },
         "required": [
           "docker"
-        ]
-      },
-      "JavaRuntime": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "vendor": {
-            "type": "string"
-          },
-          "major": {
-            "type": "integer"
-          },
-          "fullVersion": {
-            "type": "string"
-          },
-          "os": {
-            "type": "string"
-          },
-          "arch": {
-            "type": "string"
-          },
-          "path": {
-            "type": "string"
-          },
-          "managed": {
-            "type": "boolean"
-          },
-          "sha256": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "vendor",
-          "major",
-          "fullVersion",
-          "os",
-          "arch",
-          "path",
-          "managed",
-          "sha256"
-        ]
-      },
-      "JavaInventory": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/JavaRuntime"
-            }
-          }
-        },
-        "required": [
-          "items"
         ]
       },
       "AvailableJava": {
@@ -5900,6 +5923,39 @@
           "exportId",
           "archivedAt"
         ]
+      },
+      "ApiKey": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "prefix",
+          "createdAt",
+          "lastUsedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
       }
     }
   }

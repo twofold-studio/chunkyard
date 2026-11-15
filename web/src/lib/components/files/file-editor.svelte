@@ -18,7 +18,9 @@
 	import { baseName, formatBytes, SERVER_PROPERTIES } from '#lib/files/paths.js';
 	import { detectFormat, eolLabel, languageFor, LANGUAGE_LABELS } from '#lib/files/editor-text.js';
 	import CodeEditor from '#lib/components/editor/code-editor.svelte';
-	import type { EditorStatus } from '#lib/components/editor/codemirror.js';
+	import type { EditorStatus, VimMode } from '#lib/components/editor/codemirror.js';
+	import VimToggle from '#lib/components/editor/vim-toggle.svelte';
+	import { vimPreference } from '#lib/components/editor/vim-preference.svelte.js';
 	import { collapse, fadeIn } from '#lib/motion/index.js';
 	import { formatTime } from '#lib/format.js';
 
@@ -73,6 +75,7 @@
 	const language = languageFor(untrack(() => path));
 	const format = $derived(detectFormat(editor.original));
 	let status = $state<EditorStatus | null>(null);
+	let vimMode = $state<VimMode | null>(null);
 	let confirmClose = $state(false);
 
 	const readOnlyReason = $derived.by(() => {
@@ -207,6 +210,8 @@
 				readOnly={!canEdit}
 				label={`Contents of ${path}`}
 				bind:status
+				bind:vimMode
+				onSave={() => void save()}
 				class="h-[min(70vh,48rem)]"
 			/>
 			<div
@@ -220,10 +225,15 @@
 					{/if}
 					<span>{formatBytes(editor.size)} on disk</span>
 				</span>
-				<span class="flex flex-wrap gap-x-3">
+				<span class="flex flex-wrap items-center gap-x-3">
 					<span>{LANGUAGE_LABELS[language]}</span>
 					<span>UTF-8{format.bom ? ' with BOM' : ''} · {eolLabel(format.eol)}</span>
-					<span class="max-md:hidden">Ctrl/⌘+S saves · Ctrl/⌘+F finds · Esc then Tab leaves</span>
+					<span class="max-md:hidden">
+						{vimPreference.enabled
+							? 'Ctrl/⌘+S or :w saves · / finds · Esc then Tab leaves'
+							: 'Ctrl/⌘+S saves · Ctrl/⌘+F finds · Esc then Tab leaves'}
+					</span>
+					<VimToggle mode={vimMode} />
 				</span>
 			</div>
 		</div>

@@ -21,6 +21,8 @@
 		current?: string;
 		/** Test hook for the current reading. */
 		currentTestId?: string;
+		/** Smaller chart without the range readout (server cards). */
+		compact?: boolean;
 	}
 
 	let {
@@ -34,7 +36,8 @@
 		format,
 		windowText,
 		current,
-		currentTestId
+		currentTestId,
+		compact = false
 	}: Props = $props();
 
 	const W = 240;
@@ -79,7 +82,7 @@
 				>
 			{/if}
 		</span>
-		<span class="font-mono text-muted-foreground tabular-nums">
+		<span class={['font-mono text-muted-foreground tabular-nums', compact && 'sr-only']}>
 			{#if stats.count > 0}
 				<span class="sr-only">Range </span>{show(stats.min)} – {show(stats.max)}
 			{/if}
@@ -88,7 +91,7 @@
 	<svg
 		viewBox="0 0 {W} {H}"
 		preserveAspectRatio="none"
-		class="h-14 w-full overflow-visible text-foreground"
+		class={['w-full overflow-visible text-foreground', compact ? 'h-8' : 'h-14']}
 		role="img"
 		aria-label={summary}
 		data-runs={runs.length}

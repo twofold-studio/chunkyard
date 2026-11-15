@@ -13,6 +13,7 @@
 	import { resolve } from '$app/paths';
 	import { provideTopbarSlot } from '#lib/components/app/topbar-context.svelte.js';
 	import { activityIndicator } from '#lib/jobs/activity-indicator.svelte.js';
+	import { isPublicPath } from '#lib/navigation/public-pages.js';
 	import type { LayoutProps } from './$types';
 
 	let { data, children }: LayoutProps = $props();
@@ -24,13 +25,16 @@
 	const topbar = provideTopbarSlot();
 
 	// A protected request reported an expired session or pending setup: leave the app shell.
-	$effect(() =>
-		onAuthLost((error) => {
+	// Not for signed-out visitors of a public page: their 401s are expected (e.g. the login
+	// page checking the session) and must not restart navigation.
+	$effect(() => {
+		if (!data.auth) return;
+		return onAuthLost((error) => {
 			goto(error.code === 'setup_required' ? resolve('setup') : resolve('login'), {
 				invalidateAll: true
 			});
-		})
-	);
+		});
+	});
 
 	// Discreet active-job count: one throttled check per route change, no timer.
 	$effect(() => {
@@ -60,9 +64,30 @@
 	);
 	const crumbs = $derived(page.data.crumbs ?? []);
 	const onCreatePage = $derived(page.url.pathname === resolve('servers/new'));
+	/** Signed-out visitor on a public page (the API reference): no app shell. */
+	const visitorView = $derived(!data.auth && data.visitor && isPublicPath(page.url.pathname));
 </script>
 
-{#if data.unavailable || !data.auth}
+{#if visitorView}
+	<div class="flex min-h-svh flex-col">
+		<header
+			class="flex h-14 shrink-0 items-center justify-between border-b border-border px-4 sm:px-8"
+		>
+			<span class="flex items-center gap-2.5 text-sm font-semibold">
+				<span class="flex size-7 items-center justify-center rounded-md border border-border">
+					<img src="/logo.png" alt="" class="size-6 object-contain" />
+				</span>
+				Chunkyard
+			</span>
+			<Button href={resolve('login')} variant="outline" size="sm">Sign in</Button>
+		</header>
+		<main
+			class="mx-auto flex w-full max-w-[72rem] flex-1 flex-col gap-8 px-4 py-8 sm:px-8 lg:px-16 lg:py-10"
+		>
+			{@render children()}
+		</main>
+	</div>
+{:else if data.unavailable || !data.auth}
 	<main class="flex min-h-svh items-center justify-center p-6">
 		<div class="w-full max-w-lg">
 			<BackendUnavailable

@@ -6,8 +6,8 @@
  */
 import type { ServerMetrics } from '#lib/api/index.js';
 
-/** Bounded buffer: ~10 minutes at the default 5 s interval. */
-export const MAX_HISTORY_POINTS = 120;
+/** Bounded buffer: ~3 minutes at Docker's ~1 s cadence, ~15 minutes at the default 5 s. */
+export const MAX_HISTORY_POINTS = 180;
 
 export interface HistoryPoint {
 	/** Sample time in ms since the epoch. */
@@ -114,10 +114,13 @@ export function seriesStats(points: readonly HistoryPoint[], key: HistoryKey): S
 	return { latest: last ? last[key] : null, min, max, count };
 }
 
-/** Allowed spacing before a line breaks: generous for sampling jitter, strict for pauses. */
-export function gapThresholdMs(intervalSeconds: number): number {
-	const base = intervalSeconds > 0 ? intervalSeconds : 30;
-	return base * 1000 * 2.5 + 2000;
+/**
+ * Allowed spacing before a line breaks: generous for sampling jitter, strict for pauses.
+ * Docker measures about once a second, so sub-second delivery still expects ~1 s spacing.
+ */
+export function gapThresholdMs(intervalMs: number): number {
+	const base = intervalMs > 0 ? Math.max(intervalMs, 1000) : 30000;
+	return base * 2.5 + 2000;
 }
 
 /** Latest known hard memory limit in the window, used as the chart ceiling. */

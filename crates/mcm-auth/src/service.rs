@@ -3,7 +3,7 @@ use crate::{
     throttle::Throttle,
     token::{random_token, token_hash, unix_time},
 };
-use mcm_core::auth::{AuthRepo, NewSession, Session, User};
+use mcm_core::auth::{Actor, ApiKey, AuthRepo, NewApiKey, NewSession, Session, User};
 use std::{
     net::IpAddr,
     sync::{Arc, Mutex},
@@ -23,6 +23,61 @@ pub struct AuthService {
     throttle: Mutex<Throttle>,
 }
 impl AuthService {
+    pub async fn issue_api_key(
+        &self,
+        name: &str,
+        user_id: Option<&str>,
+    ) -> Result<(ApiKey, String), AuthError> {
+        let name = name.trim();
+        if name.is_empty() || name.len() > 80 || name.chars().any(char::is_control) {
+            return Err(AuthError::KeyName);
+        }
+        let token = format!("cyk_{}", random_token());
+        let key = ApiKey {
+            id: Uuid::new_v4().to_string(),
+            name: name.into(),
+            prefix: token[..12].into(),
+            created_at: rfc3339(unix_time()),
+            last_used_at: None,
+        };
+        if !self
+            .repo
+            .create_api_key(&NewApiKey {
+                key: key.clone(),
+                hash: token_hash(&token),
+                user_id: user_id.map(str::to_owned),
+            })
+            .await?
+        {
+            return Err(AuthError::KeyLimit);
+        }
+        Ok((key, token))
+    }
+    pub async fn api_keys(&self) -> Result<Vec<ApiKey>, AuthError> {
+        Ok(self.repo.api_keys().await?)
+    }
+    pub async fn revoke_api_key(&self, id: &str) -> Result<(), AuthError> {
+        Ok(self.repo.revoke_api_key(id).await?)
+    }
+    pub async fn authenticate_api_key(
+        &self,
+        token: &str,
+        trusted: bool,
+    ) -> Result<Actor, AuthError> {
+        if token.len() != 47
+            || !token.starts_with("cyk_")
+            || !token[4..]
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        {
+            return Err(AuthError::Required);
+        }
+        self.repo
+            .api_key(&token_hash(token), unix_time(), trusted)
+            .await?
+            .map(|identity| Actor::ApiKey(identity.user))
+            .ok_or(AuthError::Required)
+    }
     pub async fn new(
         repo: Arc<dyn AuthRepo>,
         setup: Option<SetupToken>,

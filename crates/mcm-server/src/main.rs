@@ -2,11 +2,7 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use mcm_config::Config;
-use mcm_core::java::{JavaRequirement, JavaRuntimeRepo};
-use mcm_db::SqliteJavaRuntimeRepo;
-use mcm_download::SafeHttp;
-use mcm_java::{Adoptium, AdoptiumApi, DiscoveryPaths, JavaManager};
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "mcm", version, about = "Chunkyard — Minecraft server manager")]
@@ -30,11 +26,6 @@ enum Command {
         #[command(subcommand)]
         command: ConfigCommand,
     },
-    /// Discover, download, inspect, and select per-server Java runtimes.
-    Java {
-        #[command(subcommand)]
-        command: JavaCommand,
-    },
     /// Apply database migrations and exit.
     Migrate,
 }
@@ -42,26 +33,6 @@ enum Command {
 enum ConfigCommand {
     Check,
 }
-#[derive(Subcommand)]
-enum JavaCommand {
-    /// Scan JAVA_HOME, PATH, and common Linux/Windows installation directories.
-    Discover,
-    /// Show persisted system and managed runtimes.
-    List,
-    /// Show versions currently offered by Adoptium for download.
-    Releases,
-    /// Install the latest available Temurin JRE for a major (e.g. 8, 17, 21, 25).
-    Install { major: u16 },
-    /// Select an existing runtime; prints its stable ID and executable path.
-    Select {
-        major: u16,
-        #[arg(long)]
-        strict: bool,
-    },
-    /// Inspect an explicit executable without adding it to the inventory.
-    Inspect { path: PathBuf },
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -105,68 +76,8 @@ async fn main() -> Result<()> {
         }
         _ => (),
     }
-    // Read-only upstream/explicit probes do not create a database or data directory.
-    let http = SafeHttp::adoptium()?;
-    let upstream = Arc::new(Adoptium::new(http.clone()));
-    match &command {
-        Command::Java {
-            command: JavaCommand::Releases,
-        } => return print_json(&upstream.releases().await?),
-        Command::Java {
-            command: JavaCommand::Inspect { path },
-        } => return print_json(&mcm_java::identify(path).await?),
-        _ => (),
-    }
-    tokio::fs::create_dir_all(&config.data_dir)
-        .await
-        .context("create data directory")?;
-    let repo = Arc::new(SqliteJavaRuntimeRepo::open(&config.data_dir.join("mcm.db")).await?);
-    let manager = JavaManager::new(
-        config.data_dir.join("runtimes/java"),
-        repo.clone(),
-        upstream,
-        http,
-    );
-    match command {
-        Command::Migrate
-        | Command::Serve { .. }
-        | Command::Config {
-            command: ConfigCommand::Check,
-        } => (),
-        Command::Java { command } => match command {
-            JavaCommand::Discover => {
-                anyhow::ensure!(
-                    config.java.allow_system_java,
-                    "system Java discovery is disabled by configuration"
-                );
-                print_json(&manager.discover(DiscoveryPaths::system()).await?)?
-            }
-            JavaCommand::List => {
-                let mut runtimes = manager.list().await?;
-                if !config.java.allow_system_java {
-                    runtimes.retain(|runtime| runtime.managed);
-                }
-                print_json(&runtimes)?;
-            }
-            JavaCommand::Install { major } => print_json(&manager.install(major).await?)?,
-            JavaCommand::Select { major, strict } => {
-                let mut runtimes = repo.list().await?;
-                if !config.java.allow_system_java {
-                    runtimes.retain(|runtime| runtime.managed);
-                }
-                let runtime = mcm_java::select(&runtimes, JavaRequirement { major, strict })
-                    .context(
-                        "no compatible runtime installed; run java discover or java install",
-                    )?;
-                anyhow::ensure!(
-                    runtime.path.is_file(),
-                    "selected Java executable has vanished; rescan or reinstall it"
-                );
-                print_json(runtime)?;
-            }
-            JavaCommand::Releases | JavaCommand::Inspect { .. } => (),
-        },
-    }
+    let database = mcm_db::Database::open(&config.data_dir.join("mcm.db")).await?;
+    database.close().await;
     Ok(())
 }
 

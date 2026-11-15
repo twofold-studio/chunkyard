@@ -1,17 +1,13 @@
 #![allow(dead_code)]
 pub mod runtime;
 pub mod software;
-use async_trait::async_trait;
-use mcm_core::java::{
-    AvailableJava, JavaRuntime, JavaRuntimeId, JavaRuntimeService, JavaServiceError,
-};
 use mcm_server::wiring::{Backend, build_state};
 use serde_json::{Value, json};
 use std::{error::Error, sync::Arc};
 use tokio::sync::oneshot;
-use uuid::Uuid;
 
 pub struct TestApp {
+    pub runtime: Arc<runtime::FakeRuntime>,
     pub backend: Backend,
     pub client: reqwest::Client,
     pub base: String,
@@ -21,23 +17,18 @@ pub struct TestApp {
 }
 impl TestApp {
     pub async fn new() -> Result<Self, Box<dyn Error>> {
-        Self::with_options(true, false).await
-    }
-    pub async fn with_options(discover: bool, fail_install: bool) -> Result<Self, Box<dyn Error>> {
-        Self::with_settings(discover, fail_install, true, false, true).await
+        Self::with_settings(true, false, true).await
     }
     pub async fn with_auth(enabled: bool) -> Result<Self, Box<dyn Error>> {
-        Self::with_settings(true, false, enabled, false, true).await
+        Self::with_settings(enabled, false, true).await
     }
     pub async fn with_ui() -> Result<Self, Box<dyn Error>> {
-        Self::with_settings(true, false, false, true, true).await
+        Self::with_settings(false, true, true).await
     }
     pub async fn with_version(enabled: bool) -> Result<Self, Box<dyn Error>> {
-        Self::with_settings(true, false, true, false, enabled).await
+        Self::with_settings(true, false, enabled).await
     }
     async fn with_settings(
-        discover: bool,
-        fail_install: bool,
         auth_enabled: bool,
         ui: bool,
         show_version: bool,
@@ -52,16 +43,15 @@ impl TestApp {
         config.http.listen = address;
         config.http.show_version = show_version;
         config.auth.enabled = auth_enabled;
-        config.java.allow_system_java = discover;
         let mut backend = build_state(&config).await?;
-        backend.state.java = Arc::new(FakeJava { fail_install });
         backend.state.software = Arc::new(software::FakeSoftware::default());
+        let runtime = Arc::new(runtime::FakeRuntime::default());
         let servers = Arc::new(
             mcm_process::ServerManager::new(
                 directory.path().join("servers"),
                 "fixture-image".into(),
                 Arc::new(mcm_db::SqliteServerRepo::new(&backend.database)),
-                Arc::new(runtime::FakeRuntime::default()),
+                runtime.clone(),
             )
             .with_installers(backend.state.software.clone())
             .with_properties(Arc::new(mcm_db::SqlitePropertiesRepo::new(
@@ -106,6 +96,7 @@ impl TestApp {
             .cookie_store(true)
             .build()?;
         Ok(Self {
+            runtime,
             backend,
             client,
             base,
@@ -133,46 +124,5 @@ impl TestApp {
         self.server.await??;
         self.backend.shutdown().await;
         Ok(())
-    }
-}
-struct FakeJava {
-    fail_install: bool,
-}
-#[async_trait]
-impl JavaRuntimeService for FakeJava {
-    async fn list(&self) -> Result<Vec<JavaRuntime>, JavaServiceError> {
-        Ok(vec![JavaRuntime {
-            id: JavaRuntimeId(Uuid::nil()),
-            vendor: "Test Vendor".into(),
-            major: 21,
-            full_version: "21.0.10".into(),
-            os: "linux".into(),
-            arch: "x64".into(),
-            path: "/test/java".into(),
-            managed: false,
-            sha256: None,
-        }])
-    }
-    async fn discover(&self) -> Result<Vec<JavaRuntime>, JavaServiceError> {
-        self.list().await
-    }
-    async fn available(&self) -> Result<AvailableJava, JavaServiceError> {
-        Ok(AvailableJava {
-            lts: vec![8, 17, 21],
-            all: vec![8, 17, 21],
-            most_recent_lts: 21,
-        })
-    }
-    async fn install(&self, _: u16) -> Result<JavaRuntime, JavaServiceError> {
-        if self.fail_install {
-            return Err(JavaServiceError {
-                code: "download.failed",
-                detail: "The Java provider request failed.",
-            });
-        }
-        self.list().await?.pop().ok_or(JavaServiceError {
-            code: "internal",
-            detail: "missing fixture",
-        })
     }
 }

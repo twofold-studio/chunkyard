@@ -21,6 +21,7 @@
 	import { cardSummary, needsInstall } from '#lib/servers/software.js';
 	import { resolve } from '$app/paths';
 	import ServerAvatar from './server-avatar.svelte';
+	import CardUsage from './card-usage.svelte';
 	import type { CardBackup } from './card-backup.js';
 
 	interface Props {
@@ -53,6 +54,7 @@
 	const notInstalled = $derived(!archived && needsInstall(server));
 	const working = $derived(requesting || (job !== null && isJobActive(job)));
 	const failure = $derived(error ? describeError(error) : null);
+	const running = $derived(!archived && server.status.state === 'running');
 </script>
 
 {#snippet spec(Icon: typeof ServerIcon, label: string, value: string, title?: string)}
@@ -68,7 +70,7 @@
 <!-- The name link stretches over the card; actions sit above it, so no control is nested in a link. -->
 <article
 	class={[
-		'motion-lift relative flex h-full flex-col gap-4 rounded-xl border bg-card p-4 has-[a[data-card-link]:focus-visible]:border-ring has-[a[data-card-link]:focus-visible]:ring-3 has-[a[data-card-link]:focus-visible]:ring-ring/40 has-[a[data-card-link]:hover]:border-ring/60 has-[a[data-card-link]:hover]:bg-accent/20',
+		'motion-lift relative flex h-full flex-col gap-4 rounded-xl border bg-card p-4 has-[a[data-card-link]:focus-visible]:border-ring has-[a[data-card-link]:focus-visible]:ring-3 has-[a[data-card-link]:focus-visible]:ring-ring/40 has-[a[data-card-link]:hover]:border-ring/60 has-[a[data-card-link]:hover]:bg-accent/20 sm:p-5',
 		archived ? 'border-dashed border-border' : 'border-border'
 	]}
 	data-testid="server-card"
@@ -110,6 +112,9 @@
 		{@render spec(CpuIcon, 'CPU limit', formatCpus(server.cpus))}
 		{@render spec(NetworkIcon, 'Host game port', `Port ${server.port}`)}
 	</dl>
+	{#if running}
+		<CardUsage serverId={server.id} cpus={server.cpus} />
+	{/if}
 	{#if backup || archived}
 		<div
 			class="mt-auto flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3 text-xs"

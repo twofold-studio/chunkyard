@@ -1,8 +1,23 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import ServerGrid from './server-grid.svelte';
 import type { ExportRecord, Job, ServerView } from '#lib/api/index.js';
+import { metricsHub } from '#lib/servers/metrics-hub.svelte.js';
+
+// Running servers show live usage; keep it off the network here (covered by card-usage tests).
+beforeAll(() =>
+	metricsHub.configure({
+		createSocket: () => ({
+			onopen: null,
+			onmessage: null,
+			onclose: null,
+			onerror: null,
+			close() {}
+		})
+	})
+);
+afterAll(() => metricsHub.configure({}));
 import { BackupOperations } from '#lib/exports/backup-operations.svelte.js';
 
 const server = (extra: Partial<ServerView>): ServerView => ({

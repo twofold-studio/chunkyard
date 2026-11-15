@@ -10,6 +10,10 @@ pub use token::{token_hash, unix_time};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AuthError {
+    #[error("a key name of 1–80 bytes without control characters is required")]
+    KeyName,
+    #[error("revoke an API key before creating more; at most 100 are allowed")]
+    KeyLimit,
     #[error("invalid credentials")]
     InvalidCredentials,
     #[error("authentication is required")]

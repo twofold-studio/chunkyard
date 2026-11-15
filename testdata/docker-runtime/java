@@ -2,6 +2,8 @@
 # A console fixture, not Minecraft or a Java implementation.
 echo 'fixture started' >> /data/starts.txt
 echo 'Done (0.1s)! For help, type "help"'
+printf '\033[32m[INFO] Green ANSI fixture\033[0m\n'
+printf '\302\247bMinecraft color fixture\302\247r\n'
 while IFS= read -r line; do
   case "$line" in
     stop) echo 'Stopping server'; exit 0 ;;

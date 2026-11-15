@@ -9,11 +9,29 @@ use uuid::Uuid;
 
 pub(crate) async fn secure(
     State(state): State<AppState>,
-    request: Request,
+    mut request: Request,
     next: Next,
 ) -> Response {
     let request_id = Uuid::new_v4().to_string();
-    let checked = check(&state, request.method(), request.headers());
+    let checked = async {
+        // Validate browser origin/host before any credential/database work.
+        check(&state, &Method::GET, request.headers(), false)?;
+        let actor = match crate::auth::bearer(request.headers())? {
+            Some(token) => Some(
+                state
+                    .auth
+                    .authenticate_api_key(token, !state.auth_enabled)
+                    .await?,
+            ),
+            None => None,
+        };
+        check(&state, request.method(), request.headers(), actor.is_some())?;
+        if let Some(actor) = actor {
+            request.extensions_mut().insert(actor);
+        }
+        Ok::<(), ApiError>(())
+    }
+    .await;
     let mut response = match checked {
         Ok(()) => next.run(request).await,
         Err(error) => error.into_response(),
@@ -51,7 +69,12 @@ pub(crate) async fn secure(
     }
     response
 }
-fn check(state: &AppState, method: &Method, headers: &HeaderMap) -> Result<(), ApiError> {
+fn check(
+    state: &AppState,
+    method: &Method,
+    headers: &HeaderMap,
+    bearer: bool,
+) -> Result<(), ApiError> {
     let authority = state.origin.split_once("://").map(|(_, host)| host);
     let host = headers.get("host").and_then(|h| h.to_str().ok());
     if host != authority {
@@ -69,7 +92,7 @@ fn check(state: &AppState, method: &Method, headers: &HeaderMap) -> Result<(), A
     {
         return Err(csrf());
     }
-    if !matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS) {
+    if !bearer && !matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS) {
         let referer_origin = headers
             .get("referer")
             .and_then(|h| h.to_str().ok())

@@ -2,9 +2,7 @@ use mcm_api::AppState;
 use mcm_auth::{AuthService, SetupToken};
 use mcm_config::Config;
 use mcm_core::auth::AuthRepo;
-use mcm_db::{Database, SqliteAuthRepo, SqliteJavaRuntimeRepo, SqliteJobRepo, SqliteServerRepo};
-use mcm_download::SafeHttp;
-use mcm_java::{Adoptium, JavaManager};
+use mcm_db::{Database, SqliteAuthRepo, SqliteJobRepo, SqliteServerRepo};
 use mcm_jobs::JobManager;
 use std::{fs::File, sync::Arc};
 
@@ -52,13 +50,6 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
     };
     let auth = Arc::new(AuthService::new(repo, setup).await?);
     let jobs = Arc::new(JobManager::new(Arc::new(SqliteJobRepo::new(&database)), 4).await?);
-    let http = SafeHttp::adoptium()?;
-    let java = Arc::new(JavaManager::new(
-        config.data_dir.join("runtimes/java"),
-        Arc::new(SqliteJavaRuntimeRepo::new(&database)),
-        Arc::new(Adoptium::new(http.clone())),
-        http,
-    ));
     let software = Arc::new(
         mcm_install::Installers::new()?.with_curseforge(config.curseforge.api_key.clone()),
     );
@@ -88,6 +79,7 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
         )
     })?;
     let state = AppState {
+        metrics: Arc::new(mcm_api::MetricsHub::new()),
         exports: Arc::new(mcm_process::ExportManager::new(
             config.data_dir.join("exports"),
             servers.clone(),
@@ -100,11 +92,9 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
         auth_enabled: config.auth.enabled,
         show_version: config.http.show_version,
         auth,
-        java,
         jobs: jobs.clone(),
         origin: config.origin()?,
         secure_cookie: config.secure_cookie(),
-        allow_system_java: config.java.allow_system_java,
     };
     Ok(Backend {
         state,

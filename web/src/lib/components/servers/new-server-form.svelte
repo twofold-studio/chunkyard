@@ -506,7 +506,7 @@
 							{:else}
 								<SettingsSection
 									title="Docker image"
-									description="The container's Java comes from this image, not from host Java runtimes managed on the Java page."
+									description="Java runs inside the server container and comes from this image; the manager host needs no Java."
 									icon={ContainerIcon}
 								>
 									<Field.Field data-invalid={errors.dockerImage ? true : undefined}>

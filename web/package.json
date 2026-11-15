@@ -1,6 +1,6 @@
 {
 	"name": "chunkyard-web",
-	"version": "0.10.0",
+	"version": "0.11.0",
 	"private": true,
 	"type": "module",
 	"imports": {
@@ -17,7 +17,8 @@
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"test:unit": "vitest",
-		"test": "npm run test:unit -- --run"
+		"test": "npm run test:unit -- --run",
+		"test:e2e": "node e2e/files-history.e2e.mjs && node e2e/public-docs.e2e.mjs"
 	},
 	"devDependencies": {
 		"@codemirror/commands": "^6.11.1",
@@ -32,6 +33,7 @@
 		"@internationalized/date": "^3.12.4",
 		"@lezer/highlight": "^1.2.5",
 		"@lucide/svelte": "^1.72.0",
+		"@replit/codemirror-vim": "^6.4.0",
 		"@sveltejs/adapter-static": "^4.0.0",
 		"@sveltejs/kit": "^3.0.0",
 		"@sveltejs/vite-plugin-svelte": "^7.2.0",

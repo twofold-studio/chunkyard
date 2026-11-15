@@ -225,6 +225,8 @@ pub struct ConsoleLine {
     pub text: String,
 }
 pub type ConsoleStream = futures_util::stream::BoxStream<'static, Result<ConsoleLine, ServerError>>;
+pub type MetricsStream =
+    futures_util::stream::BoxStream<'static, Result<ServerMetrics, ServerError>>;
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
     #[error("Restore this archived instance before using its local files or runtime.")]
@@ -313,6 +315,11 @@ pub trait ServerRepo: Send + Sync {
 /// the single managed directory belonging to the persisted server.
 #[async_trait]
 pub trait ServerRuntime: Send + Sync {
+    async fn stream_metrics(&self, server: &Server) -> Result<MetricsStream, ServerError> {
+        Ok(Box::pin(futures_util::stream::iter([Ok(self
+            .metrics(server)
+            .await?)])))
+    }
     async fn run_installer(
         &self,
         _server: &Server,
@@ -366,6 +373,11 @@ pub trait ServerRuntime: Send + Sync {
 }
 #[async_trait]
 pub trait ServerService: Send + Sync {
+    async fn metrics_stream(&self, id: &str) -> Result<MetricsStream, ServerError> {
+        Ok(Box::pin(futures_util::stream::iter([Ok(self
+            .metrics(id)
+            .await?)])))
+    }
     async fn install_with_progress(
         &self,
         id: &str,

@@ -9,7 +9,7 @@
 		formatMetricsInterval,
 		METRICS_INTERVALS,
 		metricsInterval,
-		type MetricsIntervalSeconds
+		type MetricsIntervalMs
 	} from '#lib/metrics-interval.svelte.js';
 	import { describeError, errorCode } from '#lib/api/index.js';
 	import { formatTime } from '#lib/format.js';
@@ -37,7 +37,8 @@
 	const metrics = $derived(source.metrics);
 	const history = $derived(source.history);
 	const live = $derived(source.running);
-	const seconds = $derived(source.seconds);
+	const ms = $derived(source.ms);
+	const transport = $derived(source.transport);
 	const paused = $derived(source.paused);
 	const error = $derived(source.error);
 	const busy = $derived(source.busy);
@@ -48,7 +49,7 @@
 		return Number.isNaN(date.getTime()) ? null : date;
 	});
 
-	const gapMs = $derived(gapThresholdMs(seconds));
+	const gapMs = $derived(gapThresholdMs(ms));
 	const windowStart = $derived(history[0]?.t ?? 0);
 	const windowEnd = $derived(history.at(-1)?.t ?? 0);
 	const cpuStats = $derived(seriesStats(history, 'cpu'));
@@ -85,7 +86,13 @@
 				{:else if paused}
 					Paused{#if sampledAt}&nbsp;· sampled {formatTime(sampledAt)}{/if}
 				{:else if sampledAt}
-					Sampled {formatTime(sampledAt)} · every {seconds}s
+					<span
+						title={ms < 1000
+							? 'Docker measures about once a second; delivery is never faster than real measurements.'
+							: undefined}
+						>Sampled {formatTime(sampledAt)} · {transport === 'stream' ? 'live' : 'polling'}, up to
+						every {formatMetricsInterval(ms)}</span
+					>
 				{:else}
 					Waiting for first sample
 				{/if}
@@ -99,8 +106,8 @@
 			{/if}
 			<Select.Root
 				type="single"
-				value={String(seconds)}
-				onValueChange={(next) => metricsInterval.set(Number(next) as MetricsIntervalSeconds)}
+				value={String(ms)}
+				onValueChange={(next) => metricsInterval.set(Number(next) as MetricsIntervalMs)}
 			>
 				<Select.Trigger
 					size="sm"
@@ -108,12 +115,12 @@
 					aria-label="Metrics refresh interval"
 					title="Automatic refresh (saved in this browser)"
 				>
-					{formatMetricsInterval(seconds)}
+					{formatMetricsInterval(ms)}
 				</Select.Trigger>
 				<Select.Content>
 					{#each METRICS_INTERVALS as option (option)}
 						<Select.Item value={String(option)} label={formatMetricsInterval(option)}>
-							{option === 0 ? 'Off' : `Every ${option}s`}
+							{option === 0 ? 'Off' : `Every ${formatMetricsInterval(option)}`}
 						</Select.Item>
 					{/each}
 				</Select.Content>

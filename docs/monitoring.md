@@ -1,6 +1,10 @@
 # Lightweight monitoring
 
-The server detail page includes a **Resources** panel backed by `GET /api/v1/servers/{id}/metrics`, an on-demand Docker snapshot under the normal authentication rules. There is no background collector, time-series database or Grafana dependency. The browser refresh preference defaults to five seconds and offers Off, 1, 2, 5, 10, 30 or 60 seconds. It persists across instances in this browser. Requests remain sequential and stop while hidden; Off keeps the last sample and allows manual Refresh. Faster intervals create more sampling traffic.
+`GET /api/v1/servers/{id}/metrics` provides an on-demand Docker snapshot under the normal authentication rules. `GET /api/v1/servers/{id}/metrics/stream?intervalMs=100` upgrades to a same-origin authenticated WebSocket. Delivery intervals range from 100 ms to 60 seconds. Each watched server has one shared Docker statistics stream, irrespective of viewer count. Disconnected viewers release it; there is no collector running when nobody is watching and no time-series database or Grafana dependency.
+
+The native Docker stream controls measurement cadence, commonly about one second. Choosing a 100 ms delivery interval does not make Docker produce ten distinct measurements per second. Duplicate source timestamps are suppressed; values are never interpolated or relabeled as newer samples. The browser keeps bounded history while the view is open. Hidden pages and Off stop live subscriptions, and REST fallback must not poll faster than once per second.
+
+Frames are `{type:"sample",sample:ServerMetrics}`, `{type:"error",code,detail}`, or `{type:"end"}`. Only the latest pending sample is retained for a slow viewer. The manager limits live metrics to 16 watched servers and 32 sockets; writes time out after five seconds, and credentials are rechecked every five seconds. Use matching Origin for WebSocket upgrades even when normal browser authentication is disabled.
 
 The response includes `serverId`, `status`, `sampledAt`, `startedAt`, `uptimeSeconds`, `cpuPercent`, `memoryUsageBytes`, `memoryWorkingSetBytes`, `memoryLimitBytes`, `networkRxBytes`, `networkTxBytes`, `blockReadBytes`, `blockWriteBytes`, and `pids`.
 
@@ -10,7 +14,7 @@ The response includes `serverId`, `status`, `sampledAt`, `startedAt`, `uptimeSec
 - Uptime measures time since the container started, not time since Minecraft became ready.
 - Stopped and paused containers return their actual status with resource measurements set to `null`. A missing Docker engine fails clearly instead of reporting zero usage.
 
-Running-container sampling waits for Docker's CPU delta sample, usually about a second, with a five-second stats timeout. Up to four samples may run concurrently; excess requests return 429 `metrics.busy`. Container identity is verified before sampling, and the stats request uses the verified immutable container ID. No host process metrics, Minecraft TPS, player counts, protocol readiness checks or historical charts are included yet.
+Running-container REST sampling waits for Docker's CPU delta sample, usually about a second, with a five-second timeout. Up to four snapshots may run concurrently; excess requests return 429 `metrics.busy`. Both transports verify container ownership and address the immutable container ID. No Minecraft TPS, player counts, readiness checks or persistent historical metrics are included.
 
 For endpoint schemas and authentication details, open **API reference** in the app or fetch `/api/v1/openapi.json`. The schema is served locally; the page needs no CDN or third-party scripts.
 

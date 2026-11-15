@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import ServerMetrics from '../../../tests/metrics-harness.svelte';
 import { METRICS_INTERVAL_KEY, metricsInterval } from '#lib/metrics-interval.svelte.js';
+import { metricsHub } from '#lib/servers/metrics-hub.svelte.js';
 
 const GiB = 1024 ** 3;
 
@@ -48,7 +49,11 @@ function json(body: unknown, status = 200) {
 	});
 }
 
+// These cases cover the REST path (no WebSocket); the stream has its own tests.
+beforeEach(() => metricsHub.configure({ createSocket: null }));
+
 afterEach(() => {
+	metricsHub.reset();
 	vi.unstubAllGlobals();
 	localStorage.removeItem(METRICS_INTERVAL_KEY);
 	metricsInterval.reload();
@@ -165,8 +170,8 @@ describe('ServerMetrics', () => {
 	});
 
 	it('polls at the saved interval and shares the browser preference', async () => {
-		metricsInterval.set(1);
-		expect(localStorage.getItem(METRICS_INTERVAL_KEY)).toBe('1');
+		metricsInterval.set(1000);
+		expect(localStorage.getItem(METRICS_INTERVAL_KEY)).toBe('1000');
 		const fetch = vi.fn().mockImplementation(async () => json(sample()));
 		vi.stubGlobal('fetch', fetch);
 		const screen = render(ServerMetrics, { serverId: 's1', serverState: 'running' });
@@ -203,7 +208,7 @@ describe('ServerMetrics', () => {
 			sample({ sampledAt: new Date(Date.now() + ms).toISOString(), ...extra });
 
 		it('charts samples collected while open, labelled as not stored', async () => {
-			metricsInterval.set(1);
+			metricsInterval.set(1000);
 			let n = 0;
 			const fetch = vi.fn(async () => json(at(n * 1000, { cpuPercent: 10 + 10 * n++ })));
 			vi.stubGlobal('fetch', fetch);
@@ -266,7 +271,7 @@ describe('ServerMetrics', () => {
 
 	describe('single shared source', () => {
 		it('keeps one polling loop for the header when the charts panel unmounts', async () => {
-			metricsInterval.set(1);
+			metricsInterval.set(1000);
 			const fetch = vi.fn().mockImplementation(async () => json(sample()));
 			vi.stubGlobal('fetch', fetch);
 			const { rerender, unmount } = render(ServerMetrics, {
@@ -292,7 +297,10 @@ describe('ServerMetrics', () => {
 			const fetch = vi
 				.fn()
 				.mockResolvedValueOnce(json(sample({ cpuPercent: 20 })))
-				.mockResolvedValueOnce(json(sample({ cpuPercent: 30 })))
+				// A later measurement (the same `sampledAt` would be the same sample, not a new one).
+				.mockResolvedValueOnce(
+					json(sample({ cpuPercent: 30, sampledAt: new Date(Date.now() + 1000).toISOString() }))
+				)
 				.mockImplementation(async () =>
 					json({ code: 'docker.unavailable', detail: 'Docker is not reachable.' }, 424)
 				);
@@ -307,8 +315,7 @@ describe('ServerMetrics', () => {
 			await expect.element(header).toHaveTextContent('no live usage');
 			visibility.mockRestore();
 			document.dispatchEvent(new Event('visibilitychange'));
-			// A fresh sample makes it live again.
-			await page.getByRole('button', { name: 'Refresh metrics' }).click();
+			// Visible again: live updates resume, and only a fresh sample is live again.
 			await expect.element(header).toHaveTextContent('CPU 30.0%');
 
 			// Refresh off: the chart keeps the snapshot, the header does not claim it is live.

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
-	import CoffeeIcon from '@lucide/svelte/icons/coffee';
+	import PlugIcon from '@lucide/svelte/icons/plug';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import HistoryIcon from '@lucide/svelte/icons/history';
 	import PanelLeftCloseIcon from '@lucide/svelte/icons/panel-left-close';
@@ -31,7 +31,7 @@
 		{ label: 'Servers', href: resolve('servers'), icon: ServerIcon },
 		{ label: 'Activity', href: resolve('activity'), icon: HistoryIcon },
 		{ label: 'Storage & exports', href: resolve('exports'), icon: ArchiveIcon },
-		{ label: 'Java runtimes', href: resolve('java'), icon: CoffeeIcon },
+		{ label: 'Integrations', href: resolve('integrations'), icon: PlugIcon },
 		{ label: 'API reference', href: resolve('api-docs'), icon: BookOpenIcon }
 	];
 

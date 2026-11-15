@@ -158,3 +158,39 @@ describe('FileEditor (CodeMirror)', () => {
 		expect(onClose).toHaveBeenCalledOnce();
 	});
 });
+
+describe('FileEditor Vim toggle', () => {
+	it('is opt-in, remembered, and saves with :w through the normal save path', async () => {
+		const { vimPreference, VIM_PREFERENCE_KEY } =
+			await import('#lib/components/editor/vim-preference.svelte.js');
+		localStorage.removeItem(VIM_PREFERENCE_KEY);
+		vimPreference.reload();
+		try {
+			const { label, writeFile, onClose } = setup('a: 1\r\n');
+			await vi.waitFor(() => expect(editorDoc(label)).toBe('a: 1\n'));
+			const toggle = page.getByRole('button', { name: 'Vim' });
+			await expect.element(toggle).toHaveAttribute('aria-pressed', 'false');
+			await toggle.click();
+			await expect.element(toggle).toHaveAttribute('aria-pressed', 'true');
+			expect(localStorage.getItem(VIM_PREFERENCE_KEY)).toBe('on');
+			await vi.waitFor(() => expect(document.querySelector('.cm-vimMode')).not.toBeNull());
+			await expect.element(page.getByText('normal', { exact: true })).toBeVisible();
+
+			findEditor(label)!.focus();
+			await userEvent.keyboard('gg0A2{Escape}');
+			await expect.element(page.getByText('Unsaved')).toBeVisible();
+			await userEvent.keyboard(':w{Enter}');
+			await vi.waitFor(() => expect(writeFile).toHaveBeenCalledOnce());
+			expect((writeFile.mock.calls[0] as unknown[])[2]).toEqual({
+				content: 'a: 12\r\n',
+				etag: 'e1'
+			});
+			await expect.element(page.getByText(/^Saved/)).toBeVisible();
+			// `:q` is not a way out of the editor.
+			await userEvent.keyboard(':q{Enter}');
+			expect(onClose).not.toHaveBeenCalled();
+		} finally {
+			vimPreference.set(false);
+		}
+	});
+});

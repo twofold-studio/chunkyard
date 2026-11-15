@@ -132,7 +132,7 @@ pub(crate) async fn eula(
     ))
 }
 #[derive(Clone)]
-enum Action {
+pub(crate) enum Action {
     Delete { delete_files: bool },
     Install(mcm_core::software::InstallOptions),
     Start,
@@ -140,7 +140,7 @@ enum Action {
     Restart,
     Kill,
 }
-async fn action(
+pub(crate) async fn action(
     state: AppState,
     actor: Actor,
     id: String,

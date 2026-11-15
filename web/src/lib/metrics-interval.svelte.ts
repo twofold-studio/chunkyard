@@ -1,41 +1,56 @@
 /**
- * Browser-wide refresh interval for the resource metrics panel, shared by every
- * server page and remembered in localStorage. `0` turns automatic refresh off.
+ * Browser-wide live metrics delivery interval, shared by the server page and the server list
+ * and remembered in localStorage. `0` turns live updates off.
+ *
+ * Sub-second choices only change how often the live stream may deliver; Docker's own
+ * statistics usually update about once a second, and the UI never shows more samples than
+ * were actually measured. REST fallback never polls faster than once a second.
  */
 
-/** Choices in seconds; 0 = off. The backend samples on demand (~1 s), so 1 s is the floor. */
-export const METRICS_INTERVALS = [0, 1, 2, 5, 10, 30, 60] as const;
-export type MetricsIntervalSeconds = (typeof METRICS_INTERVALS)[number];
+/** Choices in milliseconds; 0 = off. */
+export const METRICS_INTERVALS = [0, 100, 250, 500, 1000, 2000, 5000, 10000, 30000, 60000] as const;
+export type MetricsIntervalMs = (typeof METRICS_INTERVALS)[number];
 
-export const DEFAULT_METRICS_INTERVAL: MetricsIntervalSeconds = 5;
-export const METRICS_INTERVAL_KEY = 'chunkyard.metrics.intervalSeconds';
+export const DEFAULT_METRICS_INTERVAL: MetricsIntervalMs = 5000;
+export const METRICS_INTERVAL_KEY = 'chunkyard.metrics.intervalMs';
+/** Earlier versions stored whole seconds under this key. */
+export const LEGACY_METRICS_INTERVAL_KEY = 'chunkyard.metrics.intervalSeconds';
+/** Slowest REST fallback may poll (and the cadence Docker typically measures at). */
+export const MIN_POLL_MS = 1000;
 
-export function parseMetricsInterval(raw: string | null): MetricsIntervalSeconds {
+export function parseMetricsInterval(raw: string | null): MetricsIntervalMs {
 	const value = Number(raw);
 	return raw !== null && raw.trim() !== '' && METRICS_INTERVALS.includes(value as never)
-		? (value as MetricsIntervalSeconds)
+		? (value as MetricsIntervalMs)
 		: DEFAULT_METRICS_INTERVAL;
 }
 
-function readStored(): MetricsIntervalSeconds {
+function readStored(): MetricsIntervalMs {
 	try {
-		return parseMetricsInterval(globalThis.localStorage?.getItem(METRICS_INTERVAL_KEY) ?? null);
+		const storage = globalThis.localStorage;
+		const raw = storage?.getItem(METRICS_INTERVAL_KEY) ?? null;
+		if (raw !== null) return parseMetricsInterval(raw);
+		const legacy = storage?.getItem(LEGACY_METRICS_INTERVAL_KEY) ?? null;
+		if (legacy !== null && legacy.trim() !== '')
+			return parseMetricsInterval(String(Number(legacy) * 1000));
+		return DEFAULT_METRICS_INTERVAL;
 	} catch {
 		return DEFAULT_METRICS_INTERVAL; // Storage blocked (private mode, sandbox).
 	}
 }
 
-export function formatMetricsInterval(seconds: MetricsIntervalSeconds): string {
-	return seconds === 0 ? 'Off' : `${seconds}s`;
+export function formatMetricsInterval(ms: MetricsIntervalMs): string {
+	if (ms === 0) return 'Off';
+	return ms < 1000 ? `${ms} ms` : `${ms / 1000}s`;
 }
 
 class MetricsIntervalPreference {
-	seconds = $state<MetricsIntervalSeconds>(readStored());
+	ms = $state<MetricsIntervalMs>(readStored());
 
-	set(seconds: MetricsIntervalSeconds) {
-		this.seconds = seconds;
+	set(ms: MetricsIntervalMs) {
+		this.ms = ms;
 		try {
-			globalThis.localStorage?.setItem(METRICS_INTERVAL_KEY, String(seconds));
+			globalThis.localStorage?.setItem(METRICS_INTERVAL_KEY, String(ms));
 		} catch {
 			// Not persisted; still applies for this page view.
 		}
@@ -43,7 +58,7 @@ class MetricsIntervalPreference {
 
 	/** Re-reads storage (tests, or another tab changed it). */
 	reload() {
-		this.seconds = readStored();
+		this.ms = readStored();
 	}
 }
 

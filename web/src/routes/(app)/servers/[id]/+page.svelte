@@ -500,13 +500,6 @@
 				startBlocked={notInstalled}
 				{onAction}
 			/>
-			<DeleteServerDialog
-				compact
-				{server}
-				disabled={controller.busy || removed || propertiesPending || exportBusy}
-				bind:deleting
-				ondeleted={onDeleted}
-			/>
 		{/if}
 	</div>
 {/snippet}
@@ -683,6 +676,10 @@
 						onRequestEula={() => (eulaOpen = true)}
 						onOpenConsole={() => selectTab('console')}
 						onOpenResources={editResources}
+						opsRefreshKey={`${server.status.state}:${controller.busy}:${exportBusy}`}
+						onOpenExports={() => selectTab('exports')}
+						onOpenActivity={() => selectTab('activity')}
+						onOpenProperties={() => selectTab('properties')}
 					/>
 				{/if}
 			</Reveal>
@@ -778,7 +775,29 @@
 					{resourcesFocus}
 					onResourcesFocused={() => (resourcesFocus = 0)}
 					{archived}
-				/>
+				>
+					{#snippet danger()}
+						<div class="flex flex-col items-end gap-1">
+							<DeleteServerDialog
+								{server}
+								disabled={controller.busy ||
+									removed ||
+									propertiesPending ||
+									filesDirty ||
+									exportBusy}
+								bind:deleting
+								ondeleted={onDeleted}
+							/>
+							{#if removeBlocked}
+								<span class="text-xs text-muted-foreground">{removeBlocked}</span>
+							{:else if exportBusy || controller.busy}
+								<span class="text-xs text-muted-foreground"
+									>Wait for the running task to finish.</span
+								>
+							{/if}
+						</div>
+					{/snippet}
+				</ServerSettings>
 			</Reveal>
 		{/if}
 	</Tabs.Content>

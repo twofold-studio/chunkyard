@@ -53,7 +53,7 @@ describe('app sidebar', () => {
 			'Servers',
 			'Activity',
 			'Storage & exports',
-			'Java runtimes',
+			'Integrations',
 			'API reference'
 		]);
 	});

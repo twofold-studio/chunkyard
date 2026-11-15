@@ -1,8 +1,8 @@
 use crate::{Database, storage};
 use async_trait::async_trait;
 use mcm_core::{
-    auth::{AuthRepo, Credentials, NewSession, Session, User},
-    java::RepositoryError,
+    auth::{ApiKey, ApiKeyIdentity, AuthRepo, Credentials, NewApiKey, NewSession, Session, User},
+    repository::RepositoryError,
 };
 use sqlx::{Row, SqlitePool, sqlite::SqliteRow};
 const IDLE: i64 = 7 * 86400;
@@ -28,6 +28,66 @@ fn user(row: &SqliteRow) -> Result<User, RepositoryError> {
 }
 #[async_trait]
 impl AuthRepo for SqliteAuthRepo {
+    async fn create_api_key(&self, record: &NewApiKey) -> Result<bool, RepositoryError> {
+        let result = sqlx::query("INSERT INTO api_keys(id,name,prefix,token_hash,user_id,created_at) SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM api_keys) < 100")
+            .bind(&record.key.id).bind(&record.key.name).bind(&record.key.prefix)
+            .bind(&record.hash).bind(&record.user_id).bind(&record.key.created_at)
+            .execute(&self.pool).await.map_err(storage)?;
+        Ok(result.rows_affected() == 1)
+    }
+    async fn api_keys(&self) -> Result<Vec<ApiKey>, RepositoryError> {
+        let rows = sqlx::query("SELECT id,name,prefix,created_at,last_used_at FROM api_keys ORDER BY created_at DESC,id")
+            .fetch_all(&self.pool).await.map_err(storage)?;
+        rows.iter()
+            .map(|row| {
+                Ok(ApiKey {
+                    id: row.try_get("id").map_err(storage)?,
+                    name: row.try_get("name").map_err(storage)?,
+                    prefix: row.try_get("prefix").map_err(storage)?,
+                    created_at: row.try_get("created_at").map_err(storage)?,
+                    last_used_at: row.try_get("last_used_at").map_err(storage)?,
+                })
+            })
+            .collect()
+    }
+    async fn revoke_api_key(&self, id: &str) -> Result<(), RepositoryError> {
+        sqlx::query("DELETE FROM api_keys WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(storage)?;
+        Ok(())
+    }
+    async fn api_key(
+        &self,
+        hash: &str,
+        now: i64,
+        trusted: bool,
+    ) -> Result<Option<ApiKeyIdentity>, RepositoryError> {
+        let row = sqlx::query("SELECT k.user_id,k.last_used_unix,u.id,u.email,u.role,u.created_at FROM api_keys k LEFT JOIN users u ON u.id=k.user_id AND u.disabled=0 WHERE k.token_hash=? AND ((u.id IS NOT NULL AND u.role IN ('owner','admin')) OR (k.user_id IS NULL AND ?))")
+            .bind(hash).bind(trusted).fetch_optional(&self.pool).await.map_err(storage)?;
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let identity = if row
+            .try_get::<Option<String>, _>("user_id")
+            .map_err(storage)?
+            .is_some()
+        {
+            Some(user(&row)?)
+        } else {
+            None
+        };
+        if row
+            .try_get::<Option<i64>, _>("last_used_unix")
+            .map_err(storage)?
+            .is_none_or(|last| last < now - 60)
+        {
+            sqlx::query("UPDATE api_keys SET last_used_unix=?,last_used_at=strftime('%Y-%m-%dT%H:%M:%SZ',?,'unixepoch') WHERE token_hash=? AND (last_used_unix IS NULL OR last_used_unix < ?)")
+                .bind(now).bind(now).bind(hash).bind(now-60).execute(&self.pool).await.map_err(storage)?;
+        }
+        Ok(Some(ApiKeyIdentity { user: identity }))
+    }
     async fn setup_required(&self) -> Result<bool, RepositoryError> {
         sqlx::query_scalar("SELECT NOT EXISTS(SELECT 1 FROM users)")
             .fetch_one(&self.pool)

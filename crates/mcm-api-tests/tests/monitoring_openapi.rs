@@ -24,10 +24,10 @@ async fn engine_capacity_requires_setup_and_reports_totals_in_bytes() -> Result 
 }
 
 #[tokio::test]
-async fn schema_is_protected_and_references_only_local_resolvable_components() -> Result {
+async fn schema_is_public_and_references_only_local_resolvable_components() -> Result {
     let app = TestApp::new().await?;
     let url = format!("{}/api/v1/openapi.json", app.base);
-    assert_eq!(app.client.get(&url).send().await?.status(), 503);
+    assert_eq!(app.client.get(&url).send().await?.status(), 200);
     app.setup().await?;
     let response = app.client.get(&url).send().await?;
     assert_eq!(response.status(), 200);
@@ -55,6 +55,7 @@ async fn schema_is_protected_and_references_only_local_resolvable_components() -
             );
             let expected_public = [
                 "/healthz",
+                "/api/v1/openapi.json",
                 "/api/v1/system/version",
                 "/api/v1/system/changelog",
                 "/api/v1/setup/status",
@@ -82,7 +83,7 @@ async fn schema_is_protected_and_references_only_local_resolvable_components() -
                 "documented route missing: {method} {path}"
             );
             assert!(operation["responses"].get("default").is_some());
-            if ["post", "put", "patch", "delete"].contains(&method.as_str()) {
+            if path != "/mcp" && ["post", "put", "patch", "delete"].contains(&method.as_str()) {
                 assert!(
                     operation["parameters"]
                         .as_array()
@@ -94,7 +95,7 @@ async fn schema_is_protected_and_references_only_local_resolvable_components() -
                             .and_then(Value::as_str)
                             .and_then(|reference| doc.pointer(&reference[1..]))
                             .unwrap_or(p))
-                        .any(|p| p["name"] == "X-MCM-CSRF" && p["required"] == true)
+                        .any(|p| p["name"] == "X-MCM-CSRF")
                 );
             }
         }

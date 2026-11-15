@@ -1,6 +1,7 @@
 import { request, type Fetch } from './client';
 import type {
-	AvailableJava,
+	ApiKey,
+	CreatedApiKey,
 	Changelog,
 	CreateExportRequest,
 	ExportRecord,
@@ -27,7 +28,6 @@ import type {
 	UpdateNetworkRequest,
 	UpdateResourcesRequest,
 	Items,
-	JavaRuntime,
 	Job,
 	JobPage,
 	LoginResponse,
@@ -70,6 +70,18 @@ export const login = (body: { email: string; password: string }, o: Opts = {}) =
 
 export const logout = (o: Opts = {}) =>
 	request<void>('/api/v1/auth/logout', { ...o, method: 'POST' });
+
+// Owner API keys (browser session or trusted auth-disabled mode only) --------------
+
+export const listApiKeys = (o: Opts = {}) => request<Items<ApiKey>>('/api/v1/auth/api-keys', o);
+
+/** The returned `token` is the only time the full key is available. */
+export const createApiKey = (body: { name: string }, o: Opts = {}) =>
+	request<CreatedApiKey>('/api/v1/auth/api-keys', { ...o, method: 'POST', body });
+
+/** 204; revoking an already revoked key also succeeds. */
+export const revokeApiKey = (id: string, o: Opts = {}) =>
+	request<void>(`/api/v1/auth/api-keys/${enc(id)}`, { ...o, method: 'DELETE' });
 
 // Servers --------------------------------------------------------------------
 
@@ -182,23 +194,7 @@ export const getVersion = (o: Opts = {}) => request<VersionInfo>('/api/v1/system
 
 export const getChangelog = (o: Opts = {}) => request<Changelog>('/api/v1/system/changelog', o);
 
-// Java & jobs ----------------------------------------------------------------
-
-export const listJavaRuntimes = (o: Opts = {}) =>
-	request<Items<JavaRuntime>>('/api/v1/java/runtimes', o);
-
-export const discoverJavaRuntimes = (o: Opts = {}) =>
-	request<Items<JavaRuntime>>('/api/v1/java/runtimes/discover', { ...o, method: 'POST' });
-
-export const getAvailableJava = (o: Opts = {}) =>
-	request<AvailableJava>('/api/v1/java/available', o);
-
-export const installJava = (major: number, o: Opts = {}) =>
-	request<{ job: Job }>('/api/v1/java/runtimes/install', {
-		...o,
-		method: 'POST',
-		body: { major }
-	});
+// Jobs -----------------------------------------------------------------------
 
 /** Server-side filters for `GET /api/v1/jobs`; keep them identical across cursor pages. */
 export interface JobListFilter {

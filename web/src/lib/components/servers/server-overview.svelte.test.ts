@@ -49,6 +49,13 @@ function renderOverview(props: Partial<{ server: ServerView; pack: typeof PACK |
 		server: props.server ?? server(),
 		metrics: new MetricsSource(),
 		pack: props.pack === undefined ? PACK : props.pack,
+		opsApi: {
+			exports: async () => [],
+			jobs: async () => [],
+			properties: async () => {
+				throw new Error('not needed here');
+			}
+		},
 		...handlers
 	});
 	return { ...screen, ...handlers };

@@ -1,11 +1,9 @@
 //! SQLite repository implementations. All repositories share one database pool.
 mod auth;
 mod database;
-mod java;
 mod jobs;
 pub use auth::SqliteAuthRepo;
 pub use database::{Database, DatabaseError};
-pub use java::SqliteJavaRuntimeRepo;
 pub use jobs::SqliteJobRepo;
 pub(crate) fn storage(error: impl std::fmt::Display) -> mcm_core::repository::RepositoryError {
     mcm_core::repository::RepositoryError(error.to_string())

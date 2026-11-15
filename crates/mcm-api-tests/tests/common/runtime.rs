@@ -4,8 +4,16 @@ use std::{collections::HashMap, path::PathBuf, sync::Mutex};
 
 #[derive(Default)]
 pub struct FakeRuntime {
+    pub metrics_streams: std::sync::atomic::AtomicUsize,
+    pub active_metrics_streams: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     states: Mutex<HashMap<String, ServerState>>,
     commands: Mutex<Vec<String>>,
+}
+struct MetricsLease(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+impl Drop for MetricsLease {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
 }
 impl FakeRuntime {
     fn set(&self, server: &Server, state: ServerState) -> Result<(), ServerError> {
@@ -18,6 +26,29 @@ impl FakeRuntime {
 }
 #[async_trait]
 impl ServerRuntime for FakeRuntime {
+    async fn stream_metrics(&self, server: &Server) -> Result<MetricsStream, ServerError> {
+        if self.status(server).await?.state != ServerState::Running {
+            return Err(ServerError::NotRunning);
+        }
+        self.metrics_streams
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let sample = self.metrics(server).await?;
+        self.active_metrics_streams
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let lease = MetricsLease(self.active_metrics_streams.clone());
+        Ok(Box::pin(futures_util::stream::unfold(
+            (sample, 0u32, lease),
+            |(mut sample, sequence, lease)| async move {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                sample.sampled_at = format!(
+                    "2026-01-01T00:00:{:02}.{:03}Z",
+                    sequence / 10,
+                    sequence % 10 * 100
+                );
+                Some((Ok(sample.clone()), (sample, sequence + 1, lease)))
+            },
+        )))
+    }
     async fn remove(&self, server: &Server) -> Result<(), ServerError> {
         if self.status(server).await?.state != ServerState::Stopped {
             return Err(ServerError::AlreadyRunning);

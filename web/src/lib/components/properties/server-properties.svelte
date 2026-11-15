@@ -16,6 +16,8 @@
 	import { ErrorAlert } from '#lib/components/app/index.js';
 	import { isAbortError, type ServerState } from '#lib/api/index.js';
 	import CodeEditor from '#lib/components/editor/code-editor.svelte';
+	import VimToggle from '#lib/components/editor/vim-toggle.svelte';
+	import type { VimMode } from '#lib/components/editor/codemirror.js';
 	import {
 		PropertiesStore,
 		type PropertiesStoreOptions
@@ -23,6 +25,7 @@
 	import { collapse, fadeIn } from '#lib/motion/index.js';
 	import PropertiesForm from './properties-form.svelte';
 	import PropertiesHistory from './properties-history.svelte';
+	import PropertiesCompare from './properties-compare.svelte';
 
 	type Mode = 'form' | 'raw';
 
@@ -78,6 +81,7 @@
 	});
 
 	let mode = $state<Mode>('form');
+	let vimMode = $state<VimMode | null>(null);
 	let historyOpen = $state(false);
 	/** Version shown read-only from history. */
 	let viewing = $state.raw<{ version: number; content: string } | null>(null);
@@ -285,6 +289,7 @@
 						Restore as new version
 					</Button>
 				</div>
+				<PropertiesCompare {store} selected={viewing} />
 				{#if mode === 'form'}
 					<PropertiesForm
 						content={viewing.content}
@@ -328,11 +333,16 @@
 							{ key: 'Mod-Enter', run: () => void store.flush() },
 							{ key: 'Mod-s', run: () => void store.flush() }
 						]}
+						onSave={() => void store.flush()}
+						bind:vimMode
 						class="h-[min(70vh,40rem)]"
 					/>
-					<p class="border-t border-border px-4 py-2 text-xs text-muted-foreground">
-						Saves after a pause · Ctrl/⌘ + Enter saves now
-					</p>
+					<div
+						class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-border px-4 py-2 text-xs text-muted-foreground"
+					>
+						<p>Saves after a pause · Ctrl/⌘ + Enter saves now</p>
+						<VimToggle mode={vimMode} />
+					</div>
 				</div>
 			{/if}
 			{#if doc && !viewing}
@@ -342,7 +352,9 @@
 			{/if}
 		</div>
 		{#if historyOpen && doc}
-			<div transition:collapse class="min-w-0">
+			<!-- Enters with a fade only and leaves at once: the grid column changes in the same
+			     frame, so the panel never animates in a stale position. -->
+			<div in:fadeIn class="min-w-0 lg:min-h-48" data-testid="history-panel">
 				<PropertiesHistory {store} selected={viewing?.version ?? null} onSelect={selectVersion} />
 			</div>
 		{/if}

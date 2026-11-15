@@ -6,27 +6,29 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 
 - **Authentication.** Reads `/api/v1/setup/status`. First-run setup in two steps (verify the setup token, then create the owner with email and password) and email/password sign-in when authentication is enabled; sign-out from the sidebar. When the backend runs with `CHUNKYARD_AUTH__ENABLED=false`, setup and login are skipped and the sidebar shows "Authentication disabled"; no user is shown or invented. An expired session on any request returns the browser to sign-in.
 - **Servers.** List with container status, refreshed every 10 s while the tab is visible. Staged Vanilla/Paper/CurseForge creation with version/build or pack-release selection, automatic verified installation, Java image selection, name, port, heap, CPUs and explicit EULA acceptance. Custom JAR/image fields remain an advanced choice. Management tabs provide lifecycle controls, console, properties, files, exports, launch/network/resources settings and EULA acceptance. Generic file and runtime-setting changes require a stopped instance.
-- **Java runtimes.** Inventory, system discovery, and Temurin install from `/api/v1/java/available` with job polling.
-- **API reference.** A searchable, locally rendered view of the live OpenAPI document, including request/response schemas and examples; no request execution.
-- **Resources.** A compact server-detail panel shows on-demand CPU, memory, uptime, PIDs and cumulative I/O; it polls every five seconds while running and visible, clears stale measurements on stop, and marks unknown values with a dash. See [monitoring](monitoring.md).
+- **API reference.** Public, searchable local rendering of the live OpenAPI document, including schemas and examples; no request execution.
+- **Integrations.** Create named owner API keys, copy each secret once, and revoke keys. The page includes MCP endpoint and Claude Code setup examples; OAuth-only browser connectors are not supported.
+- **Resources.** Shared metrics WebSockets feed the header, Overview and running server cards. Off through 60-second delivery preferences include 100/250/500 ms, but fresh measurements follow Docker cadence (usually about one second). Charts keep up to 180 samples while viewed, with gaps for missing data. See [monitoring](monitoring.md).
 - **Docker status** in the sidebar from `/api/v1/system/isolation`.
 
 ## Behaviour to know
 
 - A small version badge opens a changelog modal, including on setup/login. `CHUNKYARD_HTTP__SHOW_VERSION=false` hides it and disables changelog delivery.
 - Every mutation sends `X-MCM-CSRF: 1`; requests are same-origin with relative paths. The UI must be served from the origin in `CHUNKYARD_HTTP__PUBLIC_URL`.
-- Lifecycle actions and Java installs are jobs. The UI polls `/api/v1/jobs/{id}` every second and shows queued/running/finished only; the backend reports no percentage.
+- Lifecycle, software installation and export operations are jobs. Views track their IDs and recover active work after navigation. Install/export progress shows measured stages and bytes, with percentages only when a stage has a known total.
 - The console streams over a same-origin WebSocket while running, visible and open. It keeps at most 1000 lines, resets on reconnect, and falls back to sequential 3-second snapshots if streaming is unavailable. Stopped servers show one snapshot. Commands still use the protected POST route.
 - Server status is re-read every 5 s on the detail page. "Container running" means the process runs; Minecraft may still be starting.
 - Creating a managed server submits creation followed by an install job automatically; it downloads the selected software, without starting Minecraft or accepting the EULA. Failed installs retain the server ID for retry. Only Custom JAR creation asks you to supply a file.
-- Docker servers use the JVM from their image. The Java page states that host runtimes are not used by Docker servers.
+- Docker servers use Java from their image; there is no host Java runtime management page.
+- File editors offer optional, remembered Vim mode. `:w` saves, Ctrl/⌘+S remains available, and Esc then Tab leaves the editor. Folder/file navigation participates in browser Back/Forward history; unsaved edits retain their guard.
+- Properties history compares changed, added and removed settings between revisions. The console supports safe ANSI/Minecraft colors, a viewport-height log, and local built-in/history command suggestions with Tab. Suggestions never execute a command automatically.
 - All polling and in-flight requests are cancelled when leaving a page.
 
-## Not included
+## Instance inventory and deletion
 
 The server list uses compact responsive cards with software, installed/requested Minecraft version, RAM, CPUs and host port, each with an icon. A dashed Create server tile always occupies the first slot, including when instances already exist. The port field defaults to Automatic; an explicit port may be shared, but only one instance using it can run at a time.
 
-Stopped instances can be deleted from their detail page after confirmation. World and server files are retained on the manager host by default, with a copyable path. An explicit checkbox permanently deletes those files too. Deletion tracks only its job and returns to the list after success; it does not continue polling the removed server. An interrupted deletion may have partially completed, so errors do not promise that all requested files survived.
+Stopped local instances can be deleted from Settings after confirmation. World and server files are retained on the manager host by default, with a copyable path. An explicit checkbox permanently deletes those files too. Deletion tracks only its job and returns to the list after success; it does not continue polling the removed server. An interrupted deletion may have partially completed, so errors do not promise that all requested files survived.
 
 There is no UI for editing CPU/heap limits after creation, modpacks, historical metrics/graphs, multiple users or roles, 2FA, or API tokens. Vanilla/Paper installation, file management and network settings are implemented.
 
@@ -40,7 +42,7 @@ pnpm --dir web build
 cargo run -p mcm-server -- serve
 ```
 
-Open `http://127.0.0.1:8420`. Rust serves the UI and API on the same origin, including direct navigation and refreshes on `/servers` and `/java`. The Docker image builds and includes the UI automatically; no Node runtime or separate web server is needed at runtime.
+Open `http://127.0.0.1:8420`. Rust serves the UI and API on the same origin, including direct navigation and refreshes on `/servers` and `/integrations`. The Docker image builds and includes the UI automatically; no Node runtime or separate web server is needed at runtime.
 
 `http.ui_dir` defaults to `web/build`, relative to the working directory. Set `CHUNKYARD_HTTP__UI_DIR=/absolute/path/to/build` for an installed binary, or set it to an empty string for API-only operation. A missing directory also starts in API-only mode; an existing directory without `200.html`, or containing symlinks, fails startup. Assets are loaded once with a 64 MiB bundle limit; restart after replacing the build. UI files are distributed alongside the binary, not embedded in it. Source maps and hidden files are excluded.
 

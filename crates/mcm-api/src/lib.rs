@@ -5,8 +5,11 @@ mod error;
 mod exports;
 mod files;
 mod icons;
-mod java;
+mod jobs;
 mod json;
+mod mcp;
+mod metrics_stream;
+pub use metrics_stream::MetricsHub;
 mod openapi;
 mod properties;
 mod security;
@@ -69,8 +72,11 @@ pub fn routes(state: AppState) -> Router {
             get(software::builds),
         )
         .route("/api/v1/servers/{id}/install", post(servers::install))
-        .route("/api/v1/openapi.json", get(openapi::document))
         .route("/api/v1/servers/{id}/metrics", get(servers::metrics))
+        .route(
+            "/api/v1/servers/{id}/metrics/stream",
+            get(metrics_stream::upgrade),
+        )
         .route("/api/v1/servers", get(servers::list).post(servers::create))
         .route(
             "/api/v1/servers/{id}",
@@ -89,19 +95,28 @@ pub fn routes(state: AppState) -> Router {
         .route("/api/v1/system/isolation", get(servers::isolation))
         .route("/api/v1/auth/me", get(auth::me))
         .route("/api/v1/auth/logout", post(auth::logout))
-        .route("/api/v1/java/runtimes", get(java::list))
-        .route("/api/v1/java/runtimes/discover", post(java::discover))
-        .route("/api/v1/java/available", get(java::available))
-        .route("/api/v1/java/runtimes/install", post(java::install))
-        .route("/api/v1/jobs", get(java::jobs))
-        .route("/api/v1/jobs/{id}", get(java::job))
+        .route(
+            "/api/v1/auth/api-keys",
+            get(auth::api_keys).post(auth::create_api_key),
+        )
+        .route(
+            "/api/v1/auth/api-keys/{id}",
+            axum::routing::delete(auth::revoke_api_key),
+        )
+        .route("/api/v1/jobs", get(jobs::jobs))
+        .route("/api/v1/jobs/{id}", get(jobs::job))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_session,
         ));
     Router::new()
         .merge(protected)
+        .route(
+            "/mcp",
+            post(mcp::handle).layer(axum::extract::DefaultBodyLimit::max(1024 * 1024)),
+        )
         .route("/healthz", get(auth::health))
+        .route("/api/v1/openapi.json", get(openapi::document))
         .route("/api/v1/system/version", get(version::version))
         .route("/api/v1/system/changelog", get(version::changelog))
         .route("/api/v1/setup/status", get(auth::setup_status))

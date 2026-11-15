@@ -8,7 +8,7 @@ async fn setup_login_logout_and_session_revocation_work_over_http() -> Result {
     let app = TestApp::new().await?;
     let response = app
         .client
-        .get(format!("{}/api/v1/java/runtimes", app.base))
+        .get(format!("{}/api/v1/servers", app.base))
         .send()
         .await?;
     assert_eq!(response.status(), 503);

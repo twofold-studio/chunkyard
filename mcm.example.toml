@@ -10,9 +10,6 @@ listen = "127.0.0.1:8420"
 # Non-loopback HTTP requires this explicit opt-in; HTTPS reverse proxies do not.
 allow_insecure_http = false
 
-[java]
-allow_system_java = true
-
 [auth]
 # Override with CHUNKYARD_AUTH__ENABLED=false for a trusted local/VPN environment.
 enabled = true

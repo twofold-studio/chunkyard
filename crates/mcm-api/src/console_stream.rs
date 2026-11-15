@@ -39,6 +39,7 @@ pub(crate) async fn upgrade(
         )
     })?;
     let token = auth::session_cookie(&headers).map(str::to_owned);
+    let bearer = auth::bearer(&headers)?.map(str::to_owned);
     let stream = state.servers.console_stream(&id).await?;
     Ok(ws
         .max_message_size(1024)
@@ -47,7 +48,7 @@ pub(crate) async fn upgrade(
         .max_write_buffer_size(128 * 1024)
         .on_upgrade(move |socket| async move {
             let _permit = permit;
-            serve(socket, state, token, stream).await;
+            serve(socket, state, token, bearer, stream).await;
         }))
 }
 async fn send(
@@ -67,6 +68,7 @@ async fn serve(
     socket: WebSocket,
     state: AppState,
     token: Option<String>,
+    bearer: Option<String>,
     mut lines: ConsoleStream,
 ) {
     let (mut writer, mut reader) = socket.split();
@@ -100,8 +102,10 @@ async fn serve(
             },
             _=heartbeat.tick()=>{
                 if last_control.elapsed()>Duration::from_secs(20) {break;}
-                if state.auth_enabled {
-                    let authenticated=match token.as_deref() {Some(token)=>matches!(tokio::time::timeout(Duration::from_secs(5),state.auth.authenticate(token)).await,Ok(Ok(_))),None=>false};
+                if state.auth_enabled || bearer.is_some() {
+                    let authenticated=if let Some(key)=&bearer {
+                        matches!(tokio::time::timeout(Duration::from_secs(5),state.auth.authenticate_api_key(key,!state.auth_enabled)).await,Ok(Ok(_)))
+                    } else {match token.as_deref() {Some(token)=>matches!(tokio::time::timeout(Duration::from_secs(5),state.auth.authenticate(token)).await,Ok(Ok(_))),None=>false}};
                     if !authenticated {
                         let _=send(&mut writer,json!({"type":"error","code":"auth.required","detail":"Sign in to continue."})).await;
                         break;
