@@ -93,6 +93,27 @@ sudo -n cat /proc/$daemon_pid/stat`;
 let browser;
 let context;
 let fixture;
+let existingInstances;
+function preservedInstances(items) {
+  return items
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      state: s.status.state,
+      containerId: s.status.containerId,
+      software: s.software,
+      launch: s.launch,
+      launchOverride: s.launchOverride,
+      port: s.port,
+      publishIp: s.publishIp,
+      cpus: s.cpus,
+      memoryMinMb: s.memoryMinMb,
+      memoryMaxMb: s.memoryMaxMb,
+      acceptEula: s.acceptEula,
+      archive: s.archive,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
 async function api(path, method = "GET", data) {
   const response = await fetch(base + path, {
     method,
@@ -124,6 +145,7 @@ try {
   const inventory = await (
     await fetch(base + "/api/v1/servers", { headers: { Cookie: cookie } })
   ).json();
+  existingInstances = preservedInstances(inventory.items);
   let server = inventory.items.find(
     (s) => !s.archive && s.status.state === "running",
   );
@@ -233,26 +255,26 @@ try {
     );
   const results = [];
   await page.goto(base + "/servers");
-  for (const intervalMs of [0, 1000, 100]) {
+  for (const intervalMs of [0, 1000, 100, 0]) {
     await page.evaluate(
       (ms) => localStorage.setItem("chunkyard.metrics.intervalMs", String(ms)),
       intervalMs,
     );
     await page.goto(base + `/servers/${server.id}`);
     await page.getByRole("tab", { name: "Overview", exact: true }).waitFor();
-    // Warm startup requests/layout before measuring steady-state work.
-    await page.waitForTimeout(2500);
+    // Fill the bounded 180-point chart before measuring fast-mode rendering cost.
+    await page.waitForTimeout(intervalMs === 100 ? 20000 : 2500);
+    const captureStart = performance.now();
     frames = 0;
     bytes = 0;
     rest = 0;
     sampleTimes = [];
     const hostBefore = await hostSnapshot(),
-      before = await perf(),
-      start = performance.now();
+      before = await perf();
     await page.waitForTimeout(duration * 1000);
     const after = await perf(),
       hostAfter = await hostSnapshot(),
-      elapsed = (performance.now() - start) / 1000;
+      elapsed = (performance.now() - captureStart) / 1000;
     const delta = (key) => (after[key] ?? 0) - (before[key] ?? 0);
     // CDP's observation excludes the SSH snapshot time included in the frame window.
     const browserSeconds = delta("Timestamp") || elapsed;
@@ -282,6 +304,20 @@ try {
         .slice(1)
         .map((t, i) => t - times[i])
         .sort((a, b) => a - b);
+    const sampleHz =
+      times.length > 1
+        ? ((times.length - 1) * 1000) / (times.at(-1) - times[0])
+        : 0;
+    if (intervalMs === 100 && process.env.CHUNKYARD_BENCH_EXPECT_FAST !== "false") {
+      assert(
+        sampleHz >= 8,
+        `Expected genuine fast sampling, received ${sampleHz.toFixed(2)} Hz`,
+      );
+      assert(
+        gaps[Math.floor(gaps.length / 2)] <= 150,
+        "Fast sample median exceeds 150 ms",
+      );
+    }
     results.push({
       intervalMs,
       seconds: elapsed,
@@ -291,8 +327,12 @@ try {
       bytesPerSecond: bytes / elapsed,
       restMetricsRequests: rest,
       freshSamples: times.length,
-      medianNativeSampleMs: gaps.length
+      freshSamplesPerSecond: sampleHz,
+      medianSourceSampleMs: gaps.length
         ? gaps[Math.floor(gaps.length / 2)]
+        : null,
+      p95SourceSampleMs: gaps.length
+        ? gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * 0.95))]
         : null,
       browserTaskCpuPercent: (delta("TaskDuration") / browserSeconds) * 100,
       browserScriptCpuPercent: (delta("ScriptDuration") / browserSeconds) * 100,
@@ -302,6 +342,12 @@ try {
       dockerDaemonCpuPercent: hostCpu("daemon"),
       managerRssBytes: hostAfter?.manager.rss ?? null,
     });
+    if (intervalMs === 100 && process.env.CHUNKYARD_BENCH_SCREENSHOT) {
+      await page.screenshot({
+        path: process.env.CHUNKYARD_BENCH_SCREENSHOT,
+        fullPage: true,
+      });
+    }
     console.log(JSON.stringify(results.at(-1)));
   }
   await writeFile(
@@ -311,7 +357,7 @@ try {
         measuredAt: new Date().toISOString(),
         base,
         notes:
-          "One owned Chrome viewer; existing workloads and other viewers were left untouched. CPU percentages are of one logical core; Docker controls fresh sample cadence. These short samples are observations, not a capacity guarantee.",
+          "One owned Chrome viewer; existing workloads and other viewers were left untouched. CPU percentages are of one logical core. Fast sampling uses sequential Docker one-shot collection. These short samples are observations, not a capacity guarantee.",
         temporaryShellFixture: Boolean(fixture),
         results,
       },
@@ -330,6 +376,15 @@ try {
     if (current.status.state === "running")
       await operation(`/api/v1/servers/${fixture.id}/stop`);
     await operation(`/api/v1/servers/${fixture.id}?deleteFiles=true`, "DELETE");
+  }
+  if (existingInstances) {
+    const inventory = await api("/api/v1/servers");
+    assert.deepEqual(
+      preservedInstances(inventory.items),
+      existingInstances,
+      "Existing instances changed during benchmark",
+    );
+    console.log("Existing instances preserved.");
   }
   await fetch(base + "/api/v1/auth/logout", {
     method: "POST",

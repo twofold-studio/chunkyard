@@ -88,7 +88,7 @@
 				{:else if sampledAt}
 					<span
 						title={ms < 1000
-							? 'Docker measures about once a second; delivery is never faster than real measurements.'
+							? 'Requests fresh Docker measurements at this interval. Slow responses may reduce the actual rate.'
 							: undefined}
 						>Sampled {formatTime(sampledAt)} · {transport === 'stream' ? 'live' : 'polling'}, up to
 						every {formatMetricsInterval(ms)}</span

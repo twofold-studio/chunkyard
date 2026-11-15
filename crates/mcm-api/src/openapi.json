@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Chunkyard API",
-    "version": "0.11.1",
+    "version": "0.12.0",
     "description": "Single-owner Docker Minecraft manager. Public API reference; protected controls accept browser sessions or owner bearer API keys. Browser mutations require matching Origin/Referer and X-MCM-CSRF: 1. Valid bearer requests do not need browser CSRF headers; supplied Origin and Host remain validated. Console and shared Docker metrics use same-origin WebSockets."
   },
   "servers": [
@@ -3567,7 +3567,7 @@
           "Console"
         ],
         "summary": "WebSocket: stream running-instance console",
-        "description": "Same-origin authenticated WebSocket. One shared Docker native statistics stream per container. Frames: {type:sample,sample:ServerMetrics}, error, end. Latest-value backpressure. intervalMs limits delivery, not native measurement cadence. Maximum 16 watched servers and 32 sockets. Credentials rechecked every 5 seconds.",
+        "description": "Same-origin authenticated WebSocket. One shared sequential Docker one-shot sampler per container. The fastest active viewer controls collection cadence (intervalMs: 100–60000); slow Docker responses reduce the actual rate without creating a backlog. Frames: {type:sample,sample:ServerMetrics}, error, end. Latest-value backpressure and per-viewer delivery limits. Maximum 16 watched servers and 32 sockets. Credentials rechecked every 5 seconds.",
         "parameters": [
           {
             "name": "Origin",

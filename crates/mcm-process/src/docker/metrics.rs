@@ -1,7 +1,7 @@
 use super::{DockerRuntime, docker_error};
 use bollard::{models::ContainerStatsResponse, query_parameters::StatsOptionsBuilder};
 use futures_util::StreamExt;
-use mcm_core::server::{Server, ServerError, ServerMetrics, ServerState};
+use mcm_core::server::{MetricsSampling, Server, ServerError, ServerMetrics, ServerState};
 use std::time::Duration;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
@@ -9,6 +9,7 @@ impl DockerRuntime {
     pub(super) async fn follow_metrics(
         &self,
         server: &Server,
+        sampling: MetricsSampling,
     ) -> Result<mcm_core::server::MetricsStream, ServerError> {
         let container = self.inspect(server).await?;
         let started_at = container
@@ -21,22 +22,75 @@ impl DockerRuntime {
         }
         let id = status.container_id.clone().ok_or(ServerError::Docker)?;
         let server_id = server.id.clone();
-        let stream = self.ready().await?.stats(
-            &id,
-            Some(StatsOptionsBuilder::default().stream(true).build()),
+        let docker = self.ready().await?.clone();
+        // One request at a time, addressed to the verified immutable container ID.
+        // One-shot bypasses Docker's periodic collector; successive CPU counters
+        // supply the delta that a one-shot response intentionally omits.
+        let stream = futures_util::stream::unfold(
+            (
+                docker,
+                id,
+                sampling,
+                None::<bollard::models::ContainerCpuStats>,
+                None::<tokio::time::Instant>,
+            ),
+            |(docker, id, sampling, previous, last_started)| async move {
+                if let Some(started) = last_started {
+                    loop {
+                        let deadline = started + Duration::from_millis(sampling.interval_ms());
+                        let now = tokio::time::Instant::now();
+                        if now >= deadline {
+                            break;
+                        }
+                        // Re-read the shared cadence so a newly joined fast viewer
+                        // does not wait for a slow viewer's entire interval.
+                        tokio::time::sleep_until(deadline.min(now + Duration::from_millis(100)))
+                            .await;
+                    }
+                }
+                let started = tokio::time::Instant::now();
+                let mut source = docker.stats(
+                    &id,
+                    Some(
+                        StatsOptionsBuilder::default()
+                            .stream(false)
+                            .one_shot(true)
+                            .build(),
+                    ),
+                );
+                let result = match tokio::time::timeout(Duration::from_secs(5), source.next()).await
+                {
+                    Ok(Some(Ok(mut stats))) => {
+                        stats.precpu_stats = previous;
+                        Ok(stats)
+                    }
+                    Ok(Some(Err(error))) => Err(docker_error(error)),
+                    Ok(None) => Err(ServerError::NotRunning),
+                    Err(_) => Err(ServerError::DockerUnavailable),
+                };
+                let previous = result
+                    .as_ref()
+                    .ok()
+                    .and_then(|stats| stats.cpu_stats.clone());
+                // A slow request never creates a backlog or catch-up burst.
+                let next_started =
+                    if started.elapsed() >= Duration::from_millis(sampling.interval_ms()) {
+                        tokio::time::Instant::now()
+                    } else {
+                        started
+                    };
+                Some((result, (docker, id, sampling, previous, Some(next_started))))
+            },
         );
-        // A single Docker stream supplies native samples. No repeated inspect/stats
-        // requests and no fabricated 100 ms timestamps over Docker's slower cadence.
         Ok(Box::pin(stream.map(move |stats| {
-            let stats = stats.map_err(docker_error)?;
+            let stats = stats?;
             let now = OffsetDateTime::now_utc();
+            let sampled_at = stats.read.clone().ok_or(ServerError::Docker)?;
+            OffsetDateTime::parse(&sampled_at, &Rfc3339).map_err(|_| ServerError::Docker)?;
             let mut result = ServerMetrics {
                 server_id: server_id.clone(),
                 status: status.clone(),
-                sampled_at: stats
-                    .read
-                    .clone()
-                    .unwrap_or_else(|| now.format(&Rfc3339).unwrap_or_default()),
+                sampled_at,
                 started_at: started_at.clone(),
                 uptime_seconds: started_at
                     .as_deref()

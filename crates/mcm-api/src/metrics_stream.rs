@@ -9,7 +9,7 @@ use axum::{
     response::Response,
 };
 use futures_util::{SinkExt, StreamExt};
-use mcm_core::server::{ServerError, ServerService};
+use mcm_core::server::{MetricsSampling, ServerError, ServerService};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
@@ -30,6 +30,41 @@ impl Default for MetricsHub {
 }
 struct Feed {
     receiver: watch::Receiver<Option<Arc<Value>>>,
+    sampling: MetricsSampling,
+    viewers: std::sync::Mutex<HashMap<uuid::Uuid, u64>>,
+}
+struct Subscription {
+    feed: Arc<Feed>,
+    id: uuid::Uuid,
+}
+impl Feed {
+    fn subscribe(self: &Arc<Self>, interval: u64) -> Subscription {
+        let id = uuid::Uuid::new_v4();
+        let mut viewers = self
+            .viewers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        viewers.insert(id, interval);
+        self.sampling
+            .set_interval_ms(viewers.values().copied().min().unwrap_or(1000));
+        Subscription {
+            feed: self.clone(),
+            id,
+        }
+    }
+}
+impl Drop for Subscription {
+    fn drop(&mut self) {
+        let mut viewers = self
+            .feed
+            .viewers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        viewers.remove(&self.id);
+        self.feed
+            .sampling
+            .set_interval_ms(viewers.values().copied().min().unwrap_or(1000));
+    }
 }
 impl MetricsHub {
     pub fn new() -> Self {
@@ -42,25 +77,32 @@ impl MetricsHub {
         &self,
         servers: &Arc<dyn ServerService>,
         id: &str,
-    ) -> Result<Arc<Feed>, ApiError> {
+        interval: u64,
+    ) -> Result<Subscription, ApiError> {
         let mut feeds = self.feeds.lock().await;
         feeds.retain(|_, feed| feed.strong_count() > 0);
         if let Some(feed) = feeds.get(id).and_then(Weak::upgrade) {
-            return Ok(feed);
+            return Ok(feed.subscribe(interval));
         }
         if feeds.len() >= 16 {
             return Err(busy());
         }
-        let mut stream = servers.metrics_stream(id).await?;
+        let sampling = MetricsSampling::new(interval);
+        let mut stream = servers.metrics_stream_at(id, sampling.clone()).await?;
         let (sender, receiver) = watch::channel(None);
-        let feed = Arc::new(Feed { receiver });
+        let feed = Arc::new(Feed {
+            receiver,
+            sampling,
+            viewers: std::sync::Mutex::default(),
+        });
+        let subscription = feed.subscribe(interval);
         feeds.insert(id.into(), Arc::downgrade(&feed));
         tokio::spawn(async move {
             let mut last_sample = String::new();
             loop {
                 tokio::select! {
                     _=sender.closed()=>break,
-                    sample=tokio::time::timeout(Duration::from_secs(30),stream.next())=> {
+                    sample=tokio::time::timeout(Duration::from_secs(75),stream.next())=> {
                         let frame = match sample {
                             Ok(Some(Ok(sample))) => {
                                 if sample.sampled_at == last_sample { continue; }
@@ -77,7 +119,7 @@ impl MetricsHub {
                 }
             }
         });
-        Ok(feed)
+        Ok(subscription)
     }
 }
 fn busy() -> ApiError {
@@ -86,6 +128,35 @@ fn busy() -> ApiError {
         "metrics.busy",
         "All live metrics slots are occupied.",
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn collection_tracks_fastest_viewer_and_slows_after_disconnect() {
+        let (_sender, receiver) = watch::channel(None);
+        let feed = Arc::new(Feed {
+            receiver,
+            sampling: MetricsSampling::new(1000),
+            viewers: std::sync::Mutex::default(),
+        });
+        let slow = feed.subscribe(5000);
+        assert_eq!(feed.sampling.interval_ms(), 5000);
+        let fast = feed.subscribe(100);
+        let medium = feed.subscribe(250);
+        assert_eq!(feed.sampling.interval_ms(), 100);
+        drop(fast);
+        assert_eq!(feed.sampling.interval_ms(), 250);
+        drop(medium);
+        assert_eq!(feed.sampling.interval_ms(), 5000);
+        let weak = Arc::downgrade(&feed);
+        drop(feed);
+        assert!(weak.upgrade().is_some());
+        drop(slow);
+        assert!(weak.upgrade().is_none());
+    }
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -127,7 +198,10 @@ pub(crate) async fn upgrade(
         .clone()
         .try_acquire_owned()
         .map_err(|_| busy())?;
-    let feed = state.metrics.subscribe(&state.servers, &id).await?;
+    let feed = state
+        .metrics
+        .subscribe(&state.servers, &id, interval)
+        .await?;
     let token = auth::session_cookie(&headers).map(str::to_owned);
     let bearer = auth::bearer(&headers)?.map(str::to_owned);
     Ok(ws
@@ -143,13 +217,13 @@ pub(crate) async fn upgrade(
 async fn serve(
     socket: WebSocket,
     state: AppState,
-    feed: Arc<Feed>,
+    feed: Subscription,
     token: Option<String>,
     bearer: Option<String>,
     interval: u64,
 ) {
     let (mut writer, mut reader) = socket.split();
-    let mut samples = feed.receiver.clone();
+    let mut samples = feed.feed.receiver.clone();
     let mut ticks = tokio::time::interval(Duration::from_millis(interval));
     ticks.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut heartbeat = tokio::time::interval(Duration::from_secs(5));

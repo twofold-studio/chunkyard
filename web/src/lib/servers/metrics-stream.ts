@@ -3,8 +3,8 @@ import type { ServerMetrics } from '#lib/api/index.js';
 /**
  * Live metrics over `GET /api/v1/servers/{id}/metrics/stream?intervalMs=` (same-origin,
  * authenticated WebSocket). Frames: `sample`, `error`, `end`. The backend only sends fresh
- * Docker measurements; the delivery interval is an upper bound on how often, not a promise
- * of new data.
+ * Docker measurements; the interval requests shared one-shot sampling, subject to Docker
+ * response time. Slow responses never cause queued sampling requests.
  */
 export type MetricsFrame =
 	| { type: 'sample'; sample: ServerMetrics }

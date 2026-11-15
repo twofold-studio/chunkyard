@@ -8,7 +8,7 @@ The SvelteKit app in `web/` is a client-rendered SPA for a single owner. It uses
 - **Servers.** List with container status, refreshed every 10 s while the tab is visible. Staged Vanilla/Paper/CurseForge creation with version/build or pack-release selection, automatic verified installation, Java image selection, name, port, heap, CPUs and explicit EULA acceptance. Custom JAR/image fields remain an advanced choice. Management tabs provide lifecycle controls, console, properties, files, exports, launch/network/resources settings and EULA acceptance. Generic file and runtime-setting changes require a stopped instance.
 - **API reference.** Public, searchable local rendering of the live OpenAPI document, including schemas and examples; no request execution.
 - **Integrations.** Create named owner API keys, copy each secret once, and revoke keys. The page includes MCP endpoint and Claude Code setup examples; OAuth-only browser connectors are not supported.
-- **Resources.** Shared metrics WebSockets feed the header, Overview and running server cards. Off through 60-second delivery preferences include 100/250/500 ms, but fresh measurements follow Docker cadence (usually about one second). Charts keep up to 180 samples while viewed, with gaps for missing data. See [monitoring](monitoring.md).
+- **Resources.** Shared metrics WebSockets feed the header, Overview and running server cards. Off through 60-second sampling preferences include genuine 100/250/500 ms Docker one-shot collection, subject to response time. The fastest active viewer controls the shared sampler. Charts keep up to 180 samples while viewed, with gaps for missing data. See [monitoring](monitoring.md).
 - **Docker status** in the sidebar from `/api/v1/system/isolation`.
 
 ## Behaviour to know

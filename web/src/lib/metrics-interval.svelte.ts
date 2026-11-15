@@ -1,10 +1,10 @@
 /**
- * Browser-wide live metrics delivery interval, shared by the server page and the server list
+ * Browser-wide live metrics sampling interval, shared by the server page and the server list
  * and remembered in localStorage. `0` turns live updates off.
  *
- * Sub-second choices only change how often the live stream may deliver; Docker's own
- * statistics usually update about once a second, and the UI never shows more samples than
- * were actually measured. REST fallback never polls faster than once a second.
+ * The fastest active viewer controls shared Docker one-shot collection. Slow requests
+ * may reduce the actual rate; the UI only shows measured samples. REST fallback never
+ * polls faster than once a second.
  */
 
 /** Choices in milliseconds; 0 = off. */
@@ -15,7 +15,7 @@ export const DEFAULT_METRICS_INTERVAL: MetricsIntervalMs = 5000;
 export const METRICS_INTERVAL_KEY = 'chunkyard.metrics.intervalMs';
 /** Earlier versions stored whole seconds under this key. */
 export const LEGACY_METRICS_INTERVAL_KEY = 'chunkyard.metrics.intervalSeconds';
-/** Slowest REST fallback may poll (and the cadence Docker typically measures at). */
+/** Minimum interval for REST fallback. */
 export const MIN_POLL_MS = 1000;
 
 export function parseMetricsInterval(raw: string | null): MetricsIntervalMs {

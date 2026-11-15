@@ -416,6 +416,15 @@ impl ServerService for ServerManager {
             .stream_metrics(&self.local_record(id).await?)
             .await
     }
+    async fn metrics_stream_at(
+        &self,
+        id: &str,
+        sampling: MetricsSampling,
+    ) -> Result<MetricsStream, ServerError> {
+        self.runtime
+            .stream_metrics_at(&self.local_record(id).await?, sampling)
+            .await
+    }
     async fn set_eula(&self, id: &str, accepted: bool) -> Result<ServerView, ServerError> {
         let server = self.local_record(id).await?;
         let lock = self.lock(&server.id)?;

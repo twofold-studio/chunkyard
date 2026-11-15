@@ -124,9 +124,11 @@ Server responses include `icon: {url,source:"custom"|"modpack"}|null`. `GET /api
 
 `GET /api/v1/servers/{id}/metrics` returns a bounded, on-demand container resource snapshot. See [monitoring](monitoring.md) for units, missing measurements, sampling limits and readiness caveats.
 
+`GET /api/v1/servers/{id}/metrics/stream?intervalMs=100` opens a same-origin authenticated WebSocket. The fastest active viewer requests fresh Docker one-shot collection every 100–60000 ms; viewers share one sequential sampler per server. Actual cadence depends on Docker response time. Collection slows after fast viewers leave and stops after the final viewer disconnects. The first sample has no CPU delta; later samples calculate usage from successive Docker counters.
+
 ## Version badge and changelog
 
-`GET /api/v1/system/version` returns `{enabled:true, version:"0.11.1", channel:"development"}` for the current build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
+`GET /api/v1/system/version` returns `{enabled:true, version:"0.12.0", channel:"development"}` for the current build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
 
 `[http] show_version = true` is the default. Set `CHUNKYARD_HTTP__SHOW_VERSION=false`, restart/redeploy, and reload the page to hide the badge: version metadata then returns `{enabled:false, version:null, channel:null}`, and the changelog endpoint returns 404 `version.disabled`. The UI fetches changelog content only when the modal opens. Completed, verified milestones batch notes and bump the project version under the authorized [changelog workflow](changelog.md); in-progress changes remain Unreleased.
 

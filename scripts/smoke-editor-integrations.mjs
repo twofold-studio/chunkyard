@@ -338,7 +338,7 @@ try {
   });
   await page.goto(base + "/servers");
   await page.getByTestId("card-cpu").first().waitFor();
-  for (let i = 0; i < 100 && metricFrames.length < 3; i++)
+  for (let i = 0; i < 100 && metricFrames.length < 20; i++)
     await new Promise((r) => setTimeout(r, 100));
   assert(metricFrames.length >= 2, "Real Docker metrics did not reach card");
   assert.equal(
@@ -347,6 +347,12 @@ try {
     "Duplicate metrics were emitted",
   );
   assert.equal(metricFrames[0].serverId, fixture.id);
+  const metricTimes = metricFrames.map((s) => Date.parse(s.sampledAt));
+  assert(metricTimes.length >= 20, "Insufficient fresh one-shot samples");
+  const cadence = (metricTimes.at(-1) - metricTimes[0]) / (metricTimes.length - 1);
+  assert(cadence < 200, `Docker sampling was not sub-second: ${cadence} ms`);
+  assert(metricFrames.slice(1).some((s) => s.cpuPercent !== null), "CPU deltas missing");
+  console.log(`Real Docker metrics: ${cadence.toFixed(1)} ms average source cadence`);
   await shot("server-cards");
   await page.goto(base + `/servers/${fixture.id}`);
   await page

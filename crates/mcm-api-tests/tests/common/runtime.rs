@@ -6,6 +6,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Mutex};
 pub struct FakeRuntime {
     pub metrics_streams: std::sync::atomic::AtomicUsize,
     pub active_metrics_streams: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    pub metrics_sampling: Mutex<Option<MetricsSampling>>,
     states: Mutex<HashMap<String, ServerState>>,
     commands: Mutex<Vec<String>>,
 }
@@ -26,6 +27,17 @@ impl FakeRuntime {
 }
 #[async_trait]
 impl ServerRuntime for FakeRuntime {
+    async fn stream_metrics_at(
+        &self,
+        server: &Server,
+        sampling: MetricsSampling,
+    ) -> Result<MetricsStream, ServerError> {
+        *self
+            .metrics_sampling
+            .lock()
+            .map_err(|_| ServerError::Busy)? = Some(sampling);
+        self.stream_metrics(server).await
+    }
     async fn stream_metrics(&self, server: &Server) -> Result<MetricsStream, ServerError> {
         if self.status(server).await?.state != ServerState::Running {
             return Err(ServerError::NotRunning);

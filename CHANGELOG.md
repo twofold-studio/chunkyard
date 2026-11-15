@@ -4,6 +4,12 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## 0.12.0 - 2026-11-15
+
+
+### Added
+
+- Live metrics: GET /api/v1/servers/{id}/metrics/stream now uses fresh Docker one-shot readings at the fastest active viewer’s requested interval, including 100 ms sampling. Collection is shared, sequential, slows after fast viewers leave, and stops when nobody is watching.
 ## 0.11.1 - 2026-11-15
 
 

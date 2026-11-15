@@ -64,6 +64,21 @@ async fn multiple_viewers_share_one_native_feed_and_only_fresh_samples() -> Resu
         last = timestamp.into();
     }
     first.send(Message::Close(None)).await?;
+    tokio::time::timeout(std::time::Duration::from_secs(3), async {
+        loop {
+            let interval = app
+                .runtime
+                .metrics_sampling
+                .lock()
+                .ok()
+                .and_then(|sampling| sampling.as_ref().map(|sampling| sampling.interval_ms()));
+            if interval == Some(250) {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+    })
+    .await?;
     second.send(Message::Close(None)).await?;
     tokio::time::timeout(std::time::Duration::from_secs(3), async {
         while app

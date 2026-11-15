@@ -4,6 +4,26 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::{net::IpAddr, path::PathBuf};
 
+/// Shared collection cadence, updated as live metrics viewers join and leave.
+#[derive(Clone)]
+pub struct MetricsSampling(std::sync::Arc<std::sync::atomic::AtomicU64>);
+impl MetricsSampling {
+    pub fn new(interval_ms: u64) -> Self {
+        Self(std::sync::Arc::new(std::sync::atomic::AtomicU64::new(
+            interval_ms.clamp(100, 60000),
+        )))
+    }
+    pub fn interval_ms(&self) -> u64 {
+        self.0.load(std::sync::atomic::Ordering::Relaxed)
+    }
+    pub fn set_interval_ms(&self, interval_ms: u64) {
+        self.0.store(
+            interval_ms.clamp(100, 60000),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Server {
@@ -315,6 +335,13 @@ pub trait ServerRepo: Send + Sync {
 /// the single managed directory belonging to the persisted server.
 #[async_trait]
 pub trait ServerRuntime: Send + Sync {
+    async fn stream_metrics_at(
+        &self,
+        server: &Server,
+        _sampling: MetricsSampling,
+    ) -> Result<MetricsStream, ServerError> {
+        self.stream_metrics(server).await
+    }
     async fn stream_metrics(&self, server: &Server) -> Result<MetricsStream, ServerError> {
         Ok(Box::pin(futures_util::stream::iter([Ok(self
             .metrics(server)
@@ -373,6 +400,13 @@ pub trait ServerRuntime: Send + Sync {
 }
 #[async_trait]
 pub trait ServerService: Send + Sync {
+    async fn metrics_stream_at(
+        &self,
+        id: &str,
+        _sampling: MetricsSampling,
+    ) -> Result<MetricsStream, ServerError> {
+        self.metrics_stream(id).await
+    }
     async fn metrics_stream(&self, id: &str) -> Result<MetricsStream, ServerError> {
         Ok(Box::pin(futures_util::stream::iter([Ok(self
             .metrics(id)
