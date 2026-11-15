@@ -94,6 +94,18 @@ impl Config {
                 "docker.stop_timeout_s must be between 1 and 300".into(),
             ));
         }
+        if self.docker.connect_host.as_ref().is_some_and(|host| {
+            host.is_empty()
+                || host.len() > 253
+                || host.chars().any(|c| {
+                    c.is_whitespace() || c.is_control() || matches!(c, '/' | '\\' | '@' | '?' | '#')
+                })
+        }) {
+            return Err(ConfigError::Invalid(
+                "docker.connect_host must be a host name or IP address, without a URL or path"
+                    .into(),
+            ));
+        }
         if let Some(path) = &self.docker.host_data_dir
             && !path.is_absolute()
         {

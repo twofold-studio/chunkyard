@@ -8,6 +8,12 @@ use mcm_core::server::*;
 use std::{path::PathBuf, time::Duration};
 #[async_trait]
 impl ServerRuntime for DockerRuntime {
+    async fn game_status(
+        &self,
+        server: &Server,
+    ) -> Result<mcm_core::operations::GameStatus, ServerError> {
+        self.game_readiness(server).await
+    }
     async fn run_installer(
         &self,
         server: &Server,

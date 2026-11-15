@@ -4,6 +4,9 @@ use std::{collections::HashMap, path::PathBuf, sync::Mutex};
 
 #[derive(Default)]
 pub struct FakeRuntime {
+    pub starts: std::sync::atomic::AtomicUsize,
+    pub crash_on_start: std::sync::atomic::AtomicBool,
+    crashed: Mutex<std::collections::HashSet<String>>,
     pub metrics_streams: std::sync::atomic::AtomicUsize,
     pub active_metrics_streams: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     pub metrics_sampling: Mutex<Option<MetricsSampling>>,
@@ -17,6 +20,17 @@ impl Drop for MetricsLease {
     }
 }
 impl FakeRuntime {
+    pub fn crash(&self, id: &str) -> Result<(), ServerError> {
+        self.states
+            .lock()
+            .map_err(|_| ServerError::Busy)?
+            .insert(id.into(), ServerState::Stopped);
+        self.crashed
+            .lock()
+            .map_err(|_| ServerError::Busy)?
+            .insert(id.into());
+        Ok(())
+    }
     fn set(&self, server: &Server, state: ServerState) -> Result<(), ServerError> {
         self.states
             .lock()
@@ -120,7 +134,12 @@ impl ServerRuntime for FakeRuntime {
                 .map_err(|_| ServerError::Busy)?
                 .contains_key(&server.id)
                 .then(|| format!("fixture-{}", server.id)),
-            exit_code: None,
+            exit_code: self
+                .crashed
+                .lock()
+                .map_err(|_| ServerError::Busy)?
+                .contains(&server.id)
+                .then_some(1),
             oom_killed: false,
         })
     }
@@ -128,10 +147,27 @@ impl ServerRuntime for FakeRuntime {
         if self.status(server).await?.state == ServerState::Running {
             return Err(ServerError::AlreadyRunning);
         }
-        self.set(server, ServerState::Running)?;
+        self.starts
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if self
+            .crash_on_start
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
+            self.crash(&server.id)?;
+        } else {
+            self.crashed
+                .lock()
+                .map_err(|_| ServerError::Busy)?
+                .remove(&server.id);
+            self.set(server, ServerState::Running)?;
+        }
         self.status(server).await
     }
     async fn stop(&self, server: &Server) -> Result<RuntimeStatus, ServerError> {
+        self.crashed
+            .lock()
+            .map_err(|_| ServerError::Busy)?
+            .remove(&server.id);
         self.set(server, ServerState::Stopped)?;
         self.status(server).await
     }

@@ -335,6 +335,14 @@ pub trait ServerRepo: Send + Sync {
 /// the single managed directory belonging to the persisted server.
 #[async_trait]
 pub trait ServerRuntime: Send + Sync {
+    async fn game_status(
+        &self,
+        _server: &Server,
+    ) -> Result<crate::operations::GameStatus, ServerError> {
+        Err(ServerError::Invalid(
+            "Minecraft status probing is unavailable for this runtime",
+        ))
+    }
     async fn stream_metrics_at(
         &self,
         server: &Server,
@@ -400,6 +408,24 @@ pub trait ServerRuntime: Send + Sync {
 }
 #[async_trait]
 pub trait ServerService: Send + Sync {
+    /// Configuration inventory without mandatory runtime probes.
+    async fn records(&self) -> Result<Vec<Server>, ServerError> {
+        Ok(self
+            .list()
+            .await?
+            .into_iter()
+            .map(|view| view.server)
+            .collect())
+    }
+    /// Internal automation path preserves the persisted retry budget.
+    async fn automatic_start(&self, id: &str) -> Result<ServerView, ServerError> {
+        self.start(id).await
+    }
+    async fn game_status(&self, _id: &str) -> Result<crate::operations::GameStatus, ServerError> {
+        Err(ServerError::Invalid(
+            "Minecraft status probing is unavailable for this runtime",
+        ))
+    }
     async fn metrics_stream_at(
         &self,
         id: &str,

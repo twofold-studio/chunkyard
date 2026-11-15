@@ -12,6 +12,8 @@ pub struct DockerConfig {
     pub user: Option<String>,
     /// Host-visible data path when the manager itself is containerized.
     pub host_data_dir: Option<PathBuf>,
+    /// Optional address hint for clients (for example the host's VPN DNS name).
+    pub connect_host: Option<String>,
 }
 impl Default for DockerConfig {
     fn default() -> Self {
@@ -22,6 +24,7 @@ impl Default for DockerConfig {
             stop_timeout_s: 60,
             user: None,
             host_data_dir: None,
+            connect_host: None,
         }
     }
 }

@@ -3,6 +3,7 @@ pub mod auth;
 pub mod exports;
 pub mod files;
 pub mod jobs;
+pub mod operations;
 pub mod progress;
 pub mod properties;
 pub mod repository;

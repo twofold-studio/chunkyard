@@ -62,6 +62,7 @@ async fn main() -> Result<()> {
             let listener = tokio::net::TcpListener::bind(config.http.listen).await?;
             config.http.listen = listener.local_addr()?;
             let backend = mcm_server::wiring::build_state(&config).await?;
+            backend.start_background();
             tracing::info!(listen = %listener.local_addr()?, "backend listening");
             let result = axum::serve(
                 listener,

@@ -4,6 +4,17 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## 0.14.0 - 2026-11-15
+
+
+### Added
+
+- REST API: add Minecraft status probes and player-list management, with bounded Server List Ping responses, UUID resolution, guarded stopped edits and live command confirmation.
+- Add opt-in manager-startup and bounded crash-recovery policies. Manual stops and kills suppress recovery, clean exits are respected, and the manager never accepts the EULA on the owner’s behalf.
+- Add stopped-only scheduled full S3 backups and opt-in retention of scheduler-created archives after a new backup is verified. Running instances are skipped; manual and pinned archives are protected.
+- Collect bounded historical resource snapshots about once a minute while instances run, independently of open browsers. History defaults on, can be disabled per server, and retains seven days with a manager-wide 100000-row limit and bounded REST aggregation.
+- Web UI: show Minecraft readiness (Server List Ping state, player count, advertised sample, version, latency and suggested address) in the server header and Overview from one shared five-second poll that runs only while the page is visible and focused; add a Players tab for whitelist, operator and ban changes with known-player suggestions, confirmations, live-op level omission and Files links for malformed lists.
+- Web UI: add Settings controls for manager-startup and crash-recovery policies and per-server resource history, an Exports section for stopped-only scheduled S3 backups with explicit retention acknowledgement, and 1h/24h/7d stored usage charts that put the live sampler in standby while shown. Automatic starts, crash restarts, scheduled backups and player changes get Activity labels and result summaries; recovered policy jobs block competing actions like starts and exports.
 ## 0.13.0 - 2026-11-15
 
 

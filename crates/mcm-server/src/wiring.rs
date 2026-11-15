@@ -27,13 +27,18 @@ pub struct Backend {
     pub state: AppState,
     pub database: Database,
     pub jobs: Arc<JobManager>,
+    operations: Arc<mcm_process::Operations>,
     _lock: File,
 }
 impl Backend {
     pub async fn shutdown(&self) {
+        self.operations.shutdown().await;
         self.jobs.shutdown().await;
         self.state.servers.shutdown().await;
         self.database.close().await;
+    }
+    pub fn start_background(&self) {
+        self.operations.start(self.jobs.clone());
     }
 }
 pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
@@ -57,6 +62,7 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
         config.docker.clone(),
         crate::storage::instance_id(&config.data_dir)?,
     ));
+    let operations_repo = Arc::new(mcm_db::SqliteOperationsRepo::new(&database));
     if config.data_dir.join("servers").is_dir()
         && let Err(error) = runtime.recover_installers().await
         && !matches!(error, mcm_core::server::ServerError::DockerUnavailable)
@@ -71,19 +77,36 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
             runtime,
         )
         .with_installers(software.clone())
-        .with_properties(Arc::new(mcm_db::SqlitePropertiesRepo::new(&database))),
+        .with_properties(Arc::new(mcm_db::SqlitePropertiesRepo::new(&database)))
+        .with_operations(operations_repo.clone()),
     );
     servers.recover_transitions().await.map_err(|_| {
         std::io::Error::other(
             "Instance transition recovery failed; original files and journals were retained.",
         )
     })?;
+    let exports = Arc::new(mcm_process::ExportManager::new(
+        config.data_dir.join("exports"),
+        servers.clone(),
+    )?);
+    let connect_host = config.docker.connect_host.clone().unwrap_or_else(|| {
+        url::Url::parse(&config.origin().unwrap_or_default())
+            .ok()
+            .and_then(|u| u.host_str().map(str::to_owned))
+            .unwrap_or_default()
+    });
+    let operations = Arc::new(mcm_process::Operations::new(
+        operations_repo,
+        servers.clone(),
+        servers.clone(),
+        servers.clone(),
+        exports.clone(),
+        connect_host,
+    )?);
     let state = AppState {
+        operations: operations.clone(),
         metrics: Arc::new(mcm_api::MetricsHub::new()),
-        exports: Arc::new(mcm_process::ExportManager::new(
-            config.data_dir.join("exports"),
-            servers.clone(),
-        )?),
+        exports,
         software,
         files: servers.clone(),
         properties: servers.clone(),
@@ -100,6 +123,7 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
         state,
         database,
         jobs,
+        operations,
         _lock: lock,
     })
 }

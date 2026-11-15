@@ -5,6 +5,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct AppState {
     pub metrics: Arc<crate::MetricsHub>,
+    pub operations: Arc<dyn mcm_core::operations::OperationsService>,
     pub health: Arc<dyn mcm_core::system::HealthCheck>,
     pub auth_enabled: bool,
     pub show_version: bool,

@@ -21,6 +21,7 @@ pub struct ServerManager {
     pub(crate) installers: Option<Arc<dyn mcm_core::software::SoftwareService>>,
     pub(crate) install_tasks: tokio_util::task::TaskTracker,
     pub(crate) properties_repo: Option<Arc<dyn mcm_core::properties::PropertiesRepo>>,
+    operations_repo: Option<Arc<dyn mcm_core::operations::OperationsRepo>>,
 }
 impl ServerManager {
     pub fn new(
@@ -40,6 +41,7 @@ impl ServerManager {
             installers: None,
             install_tasks: tokio_util::task::TaskTracker::new(),
             properties_repo: None,
+            operations_repo: None,
         }
     }
     pub fn with_installers(
@@ -52,6 +54,38 @@ impl ServerManager {
     pub fn with_properties(mut self, repo: Arc<dyn mcm_core::properties::PropertiesRepo>) -> Self {
         self.properties_repo = Some(repo);
         self
+    }
+    pub fn with_operations(mut self, repo: Arc<dyn mcm_core::operations::OperationsRepo>) -> Self {
+        self.operations_repo = Some(repo);
+        self
+    }
+    async fn intent(&self, id: &str, running: bool) -> Result<(), ServerError> {
+        if let Some(repo) = &self.operations_repo {
+            repo.patch(id,serde_json::json!({"desiredRunning":running,"intentAt":time::OffsetDateTime::now_utc().unix_timestamp_nanos() as i64,"restartAttempts":0,"nextRetryAt":null,"stableSince":null})).await?;
+        }
+        Ok(())
+    }
+    async fn managed_start(&self, id: &str, manual: bool) -> Result<ServerView, ServerError> {
+        let server = self.local_record(id).await?;
+        let lock = self.lock(&server.id)?;
+        let guard = Arc::new(lock.try_lock_owned().map_err(|_| ServerError::Busy)?);
+        let server = self.local_record(id).await?;
+        if !manual
+            && let Some(repo) = &self.operations_repo
+            && !repo.load(id).await?.desired_running
+        {
+            return Err(ServerError::Busy);
+        }
+        let status = self.start_inner(&server, guard.clone()).await?;
+        if manual {
+            self.intent(id, true).await?;
+        }
+        Ok(ServerView {
+            icon: self.display_icon(&server).await,
+            directory: self.root.join(&server.id),
+            server,
+            status,
+        })
     }
     pub(crate) async fn record(&self, id: &str) -> Result<Server, ServerError> {
         let id = Uuid::parse_str(id)
@@ -172,6 +206,9 @@ impl ServerManager {
 }
 #[async_trait]
 impl ServerService for ServerManager {
+    async fn records(&self) -> Result<Vec<Server>, ServerError> {
+        Ok(self.repo.list().await?)
+    }
     async fn icon(&self, id: &str) -> Result<Vec<u8>, ServerError> {
         self.icon_content(id).await
     }
@@ -411,6 +448,11 @@ impl ServerService for ServerManager {
     async fn metrics(&self, id: &str) -> Result<ServerMetrics, ServerError> {
         self.runtime.metrics(&self.local_record(id).await?).await
     }
+    async fn game_status(&self, id: &str) -> Result<mcm_core::operations::GameStatus, ServerError> {
+        self.runtime
+            .game_status(&self.local_record(id).await?)
+            .await
+    }
     async fn metrics_stream(&self, id: &str) -> Result<MetricsStream, ServerError> {
         self.runtime
             .stream_metrics(&self.local_record(id).await?)
@@ -455,23 +497,17 @@ impl ServerService for ServerManager {
         })
     }
     async fn start(&self, id: &str) -> Result<ServerView, ServerError> {
-        let server = self.local_record(id).await?;
-        let lock = self.lock(&server.id)?;
-        let guard = Arc::new(lock.try_lock_owned().map_err(|_| ServerError::Busy)?);
-        let server = self.local_record(id).await?;
-        let status = self.start_inner(&server, guard).await?;
-        Ok(ServerView {
-            icon: self.display_icon(&server).await,
-            directory: self.root.join(&server.id),
-            server,
-            status,
-        })
+        self.managed_start(id, true).await
+    }
+    async fn automatic_start(&self, id: &str) -> Result<ServerView, ServerError> {
+        self.managed_start(id, false).await
     }
     async fn stop(&self, id: &str) -> Result<ServerView, ServerError> {
         let server = self.local_record(id).await?;
         let lock = self.lock(&server.id)?;
         let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
         let server = self.local_record(id).await?;
+        self.intent(id, false).await?;
         let status = self.runtime.stop(&server).await?;
         Ok(ServerView {
             icon: self.display_icon(&server).await,
@@ -486,7 +522,8 @@ impl ServerService for ServerManager {
         let guard = Arc::new(lock.try_lock_owned().map_err(|_| ServerError::Busy)?);
         let server = self.local_record(id).await?;
         self.runtime.stop(&server).await?;
-        let status = self.start_inner(&server, guard).await?;
+        let status = self.start_inner(&server, guard.clone()).await?;
+        self.intent(id, true).await?;
         Ok(ServerView {
             icon: self.display_icon(&server).await,
             directory: self.root.join(&server.id),
@@ -499,6 +536,7 @@ impl ServerService for ServerManager {
         let lock = self.lock(&server.id)?;
         let _guard = lock.try_lock().map_err(|_| ServerError::Busy)?;
         let server = self.local_record(id).await?;
+        self.intent(id, false).await?;
         let status = self.runtime.kill(&server).await?;
         Ok(ServerView {
             icon: self.display_icon(&server).await,

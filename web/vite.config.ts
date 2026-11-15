@@ -9,6 +9,17 @@ const BACKEND = process.env.CHUNKYARD_DEV_BACKEND ?? 'http://127.0.0.1:8420';
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
 export default defineConfig({
+	optimizeDeps: {
+		include: [
+			'@lucide/svelte/icons/calendar-clock',
+			'@lucide/svelte/icons/ban',
+			'@lucide/svelte/icons/shield',
+			'@lucide/svelte/icons/trash-2',
+			'@lucide/svelte/icons/users',
+			'@lucide/svelte/icons/radio-tower',
+			'@lucide/svelte/icons/chart-line'
+		]
+	},
 	plugins: [
 		tailwindcss(),
 		sveltekit({

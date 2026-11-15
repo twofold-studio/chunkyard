@@ -4,6 +4,7 @@ mod installer;
 mod io;
 mod lifecycle;
 mod metrics;
+mod readiness;
 use crate::DockerConfig;
 use bollard::{Docker, errors::Error, models::ContainerInspectResponse};
 use mcm_core::server::{

@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Chunkyard API",
-    "version": "0.13.0",
+    "version": "0.14.0",
     "description": "Single-owner Docker Minecraft manager. Public API reference; protected controls accept browser sessions or owner bearer API keys. Browser mutations require matching Origin/Referer and X-MCM-CSRF: 1. Valid bearer requests do not need browser CSRF headers; supplied Origin and Host remain validated. Console and shared Docker metrics use same-origin WebSockets."
   },
   "servers": [
@@ -55,6 +55,427 @@
     }
   ],
   "paths": {
+    "/api/v1/servers/{id}/status": {
+      "get": {
+        "operationId": "getMinecraftStatus",
+        "tags": [
+          "Server operations"
+        ],
+        "description": "Bounded Server List Ping of the owned Docker instance. ready means a valid Minecraft status reply; starting/unreachable do not promise Minecraft is ready. Player names are only the advertised sample.",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileServerId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Authenticated owner problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/players": {
+      "get": {
+        "operationId": "getPlayerLists",
+        "tags": [
+          "Server operations"
+        ],
+        "description": "Read whitelist, operators, player bans and cached identities. onlineMode/whitelistEnabled describe desired server.properties.",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileServerId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerLists"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Authenticated owner problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "changePlayerList",
+        "tags": [
+          "Server operations"
+        ],
+        "description": "While running, send the fixed Minecraft command and await observed JSON confirmation. While stopped, resolve explicit/cached/online or offline-mode UUID and atomically edit the guarded file. Live operator changes use the server default level; omit level. Malformed files are retained.",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileServerId"
+          },
+          {
+            "$ref": "#/components/parameters/FileCsrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayerChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Background job accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Authenticated owner problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/automation": {
+      "get": {
+        "operationId": "getServerAutomation",
+        "tags": [
+          "Server operations"
+        ],
+        "description": "Read policy and durable runtime state. Recovery and backup scheduling default off; history defaults on.",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileServerId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationState"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Authenticated owner problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/recovery": {
+      "put": {
+        "operationId": "setRecoveryPolicy",
+        "tags": [
+          "Server operations"
+        ],
+        "description": "Save the recovery policy. Auto-start runs on manager startup; bounded crash recovery honors manual stop/kill and clean exits. Five minutes of stable container uptime resets the crash retry budget.",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileServerId"
+          },
+          {
+            "$ref": "#/components/parameters/FileCsrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryPolicy"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationState"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Authenticated owner problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/backup-schedule": {
+      "put": {
+        "operationId": "setBackupSchedule",
+        "tags": [
+          "Server operations"
+        ],
+        "description": "Stopped-only full verified S3 backups at fixed intervals. Online instances are skipped, never stopped automatically. Retention is optional and prunes only scheduler-created backups after a new verified backup; manual and pinned archives are protected. Changing keepLast to a number requires confirmRetentionDeletion.",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileServerId"
+          },
+          {
+            "$ref": "#/components/parameters/FileCsrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupPolicyWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationState"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Authenticated owner problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/metrics/history-settings": {
+      "put": {
+        "operationId": "setMetricsHistorySettings",
+        "tags": [
+          "Server operations"
+        ],
+        "description": "Enable/disable about one-minute snapshots for running containers even with no browser open. Existing history expires after seven days.",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileServerId"
+          },
+          {
+            "$ref": "#/components/parameters/FileCsrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "enabled"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationState"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Authenticated owner problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/servers/{id}/metrics/history": {
+      "get": {
+        "operationId": "getMetricsHistory",
+        "tags": [
+          "Server operations"
+        ],
+        "description": "Up to 720 aggregate points from bounded one-minute snapshots; averages cover observed samples, not continuous CPU usage. Missing samples remain missing. Seven-day retention and a manager-wide 100000-row cap.",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileServerId"
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 168,
+              "default": 24
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricsHistory"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Authenticated owner problem response",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/servers/{id}/properties": {
       "parameters": [
         {
@@ -3742,6 +4163,460 @@
       }
     },
     "schemas": {
+      "PlayerIdentity": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "name",
+          "uuid"
+        ]
+      },
+      "GameStatus": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "starting",
+              "ready",
+              "unreachable",
+              "stopped",
+              "failed",
+              "archived",
+              "paused",
+              "unknown"
+            ]
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "latencyMs": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "onlinePlayers": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "maxPlayers": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "playerSample": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayerIdentity"
+            },
+            "maxItems": 100
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "connectAddress": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Suggested connection address; external routing/firewall reachability is not established by the probe."
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "observedAt",
+          "latencyMs",
+          "onlinePlayers",
+          "maxPlayers",
+          "playerSample",
+          "version",
+          "connectAddress",
+          "detail"
+        ]
+      },
+      "PlayerLists": {
+        "type": "object",
+        "properties": {
+          "whitelist": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "maxItems": 10000
+          },
+          "operators": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "maxItems": 10000
+          },
+          "bans": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "maxItems": 10000
+          },
+          "knownPlayers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayerIdentity"
+            },
+            "maxItems": 10000
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "onlineMode": {
+            "type": "boolean"
+          },
+          "whitelistEnabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "whitelist",
+          "operators",
+          "bans",
+          "knownPlayers",
+          "running",
+          "onlineMode",
+          "whitelistEnabled"
+        ]
+      },
+      "PlayerChange": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "string",
+            "enum": [
+              "whitelist",
+              "operators",
+              "bans"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "add",
+              "remove"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_]{3,16}$"
+          },
+          "uuid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "level": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 4
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "list",
+          "action",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "RecoveryPolicy": {
+        "type": "object",
+        "properties": {
+          "autoStart": {
+            "type": "boolean",
+            "default": false
+          },
+          "restartOnCrash": {
+            "type": "boolean",
+            "default": false
+          },
+          "maxAttempts": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 3
+          },
+          "retryDelaySeconds": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 300,
+            "default": 30
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "BackupPolicy": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "intervalMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10080,
+            "default": 1440
+          },
+          "keepLast": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 100,
+            "default": null
+          }
+        },
+        "required": [
+          "enabled",
+          "intervalMinutes",
+          "keepLast"
+        ]
+      },
+      "BackupPolicyWrite": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "intervalMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10080,
+            "default": 1440
+          },
+          "keepLast": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 100,
+            "default": null
+          },
+          "confirmRetentionDeletion": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "enabled",
+          "intervalMinutes"
+        ],
+        "additionalProperties": false
+      },
+      "AutomationState": {
+        "type": "object",
+        "properties": {
+          "recovery": {
+            "$ref": "#/components/schemas/RecoveryPolicy"
+          },
+          "backup": {
+            "$ref": "#/components/schemas/BackupPolicy"
+          },
+          "historyEnabled": {
+            "type": "boolean"
+          },
+          "desiredRunning": {
+            "type": "boolean"
+          },
+          "intentAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Internal nanosecond intent revision; not a display timestamp."
+          },
+          "restartAttempts": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nextRetryAt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Unix seconds; lastHistoryAt is the last collection attempt."
+          },
+          "stableSince": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Unix seconds; lastHistoryAt is the last collection attempt."
+          },
+          "nextBackupAt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Unix seconds; lastHistoryAt is the last collection attempt."
+          },
+          "lastBackupAt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Unix seconds; lastHistoryAt is the last collection attempt."
+          },
+          "lastHistoryAt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Unix seconds; lastHistoryAt is the last collection attempt."
+          },
+          "lastBackupJob": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastBackupExportId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastBackupResult": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastBackupError": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "recovery",
+          "backup",
+          "historyEnabled",
+          "desiredRunning",
+          "restartAttempts",
+          "nextRetryAt",
+          "stableSince",
+          "nextBackupAt",
+          "lastBackupAt",
+          "lastHistoryAt",
+          "lastBackupJob",
+          "lastBackupExportId",
+          "lastBackupResult",
+          "lastBackupError"
+        ]
+      },
+      "MetricHistoryPoint": {
+        "type": "object",
+        "properties": {
+          "sampledAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Measured timestamp in Unix seconds."
+          },
+          "cpuPercent": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "memoryWorkingSetBytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "memoryLimitBytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "sampledAt",
+          "cpuPercent",
+          "memoryWorkingSetBytes",
+          "memoryLimitBytes"
+        ]
+      },
+      "MetricsHistory": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "intervalSeconds": {
+            "type": "integer",
+            "const": 60
+          },
+          "retentionDays": {
+            "type": "integer",
+            "const": 7
+          },
+          "resolutionSeconds": {
+            "type": "integer",
+            "minimum": 60
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MetricHistoryPoint"
+            },
+            "maxItems": 720
+          }
+        },
+        "required": [
+          "enabled",
+          "intervalSeconds",
+          "retentionDays",
+          "resolutionSeconds",
+          "items"
+        ]
+      },
       "PropertiesVersion": {
         "type": "object",
         "required": [

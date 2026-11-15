@@ -6,6 +6,8 @@ mod files;
 mod icons;
 mod install;
 mod launch;
+mod operations;
+pub use operations::Operations;
 mod properties;
 mod service;
 mod transitions;

@@ -11,6 +11,7 @@ mod mcp;
 mod metrics_stream;
 pub use metrics_stream::MetricsHub;
 mod openapi;
+mod operations;
 mod properties;
 mod security;
 mod servers;
@@ -35,6 +36,7 @@ pub fn secure_router(router: Router, state: AppState) -> Router {
 /// API routes without global middleware, for composition with a static SPA fallback.
 pub fn routes(state: AppState) -> Router {
     let protected = Router::new()
+        .merge(operations::routes())
         .merge(icons::routes())
         .merge(files::routes())
         .merge(exports::routes())

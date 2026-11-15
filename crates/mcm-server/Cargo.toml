@@ -32,6 +32,7 @@ mcm-core.workspace = true
 mcm-db.workspace = true
 mcm-download.workspace = true
 serde_json.workspace = true
+url.workspace = true
 tokio.workspace = true
 tracing-subscriber.workspace = true
 

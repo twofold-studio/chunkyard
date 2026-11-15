@@ -54,6 +54,9 @@ impl TestApp {
                 runtime.clone(),
             )
             .with_installers(backend.state.software.clone())
+            .with_operations(Arc::new(mcm_db::SqliteOperationsRepo::new(
+                &backend.database,
+            )))
             .with_properties(Arc::new(mcm_db::SqlitePropertiesRepo::new(
                 &backend.database,
             ))),
@@ -63,6 +66,14 @@ impl TestApp {
         backend.state.exports = Arc::new(mcm_process::ExportManager::new(
             directory.path().join("exports"),
             servers.clone(),
+        )?);
+        backend.state.operations = Arc::new(mcm_process::Operations::new(
+            Arc::new(mcm_db::SqliteOperationsRepo::new(&backend.database)),
+            servers.clone(),
+            servers.clone(),
+            servers.clone(),
+            backend.state.exports.clone(),
+            "localhost".into(),
         )?);
         backend.state.servers = servers;
         let base = format!("http://{address}");
