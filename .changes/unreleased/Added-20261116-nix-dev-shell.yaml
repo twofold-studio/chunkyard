@@ -1,3 +1,0 @@
-kind: Added
-body: 'Add a pinned Nix development shell and direnv setup with Rust, Node/pnpm, changelog and Docker client tools, plus system Chromium for browser tests on Linux. Entering the shell does not install project dependencies, start services or load application secrets.'
-time: 2026-11-16T00:30:00Z
