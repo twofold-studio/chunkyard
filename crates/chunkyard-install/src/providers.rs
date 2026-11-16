@@ -37,7 +37,21 @@ impl SoftwareService for Installers {
     }
     fn catalog(&self) -> Value {
         let enabled = self.curseforge_key.is_some();
-        json!({"items":[{"id":"vanilla","name":"Vanilla","available":true,"reason":null},{"id":"paper","name":"Paper","available":true,"reason":null},{"id":"curseforge","name":"CurseForge modpack","available":enabled,"reason":if enabled{None}else{Some("Configure CHUNKYARD_CURSEFORGE__API_KEY on the manager.")}},{"id":"custom","name":"Custom JAR","available":true,"reason":null}]})
+        let mut items: Vec<Value> = [
+            ("vanilla", "Vanilla"),
+            ("paper", "Paper"),
+            ("purpur", "Purpur"),
+            ("fabric", "Fabric"),
+            ("forge", "Forge"),
+            ("neoforge", "NeoForge"),
+            ("custom", "Custom JAR"),
+        ]
+        .into_iter()
+        .map(|(id, name)| json!({"id":id,"name":name,"available":true,"reason":null}))
+        .collect();
+        items.push(json!({"id":"curseforge","name":"CurseForge modpack","available":enabled,
+            "reason":if enabled{None}else{Some("A CurseForge API key is required on the manager.")}}));
+        json!({"items":items})
     }
     async fn search_modpacks(&self, query: &str, index: u32) -> Result<Value, SoftwareError> {
         self.cf_search(query, index).await
@@ -55,6 +69,12 @@ impl SoftwareService for Installers {
         if let Some(profile) = &options.launch {
             profile.validate()?;
         }
+        if matches!(
+            software,
+            Software::Fabric { .. } | Software::Forge { .. } | Software::NeoForge { .. }
+        ) {
+            return self.modded_plan(software, directory, lease).await;
+        }
         if let Software::CurseForge {
             project_id,
             file_id,
@@ -71,6 +91,9 @@ impl SoftwareService for Installers {
         }
     }
     async fn versions(&self, kind: &str) -> Result<Value, SoftwareError> {
+        if matches!(kind, "fabric" | "forge" | "neoforge" | "purpur") {
+            return self.extra_versions(kind).await;
+        }
         let mut ids: Vec<String> = match kind {
             "vanilla" => self.json(MANIFEST).await?["versions"]
                 .as_array()
@@ -97,6 +120,9 @@ impl SoftwareService for Installers {
         Ok(json!({"items":ids.iter().map(|id|json!({"id":id,"stable":true})).collect::<Vec<_>>()}))
     }
     async fn builds(&self, kind: &str, version: &str) -> Result<Value, SoftwareError> {
+        if matches!(kind, "fabric" | "forge" | "neoforge" | "purpur") {
+            return self.extra_builds(kind, version).await;
+        }
         if kind != "paper" {
             return Err(SoftwareError::Invalid);
         }
@@ -131,6 +157,12 @@ impl SoftwareService for Installers {
         directory: &Path,
     ) -> Result<Launch, SoftwareError> {
         software.validate()?;
+        if let Software::Purpur { version, build } = software {
+            if !release(version) {
+                return Err(SoftwareError::Invalid);
+            }
+            return self.purpur(version, build.as_deref(), directory).await;
+        }
         let version = software.version();
         let vanilla = self.vanilla(version).await?;
         let java = vanilla["javaVersion"]["majorVersion"].as_u64().unwrap_or(8);
@@ -139,7 +171,11 @@ impl SoftwareService for Installers {
             return Err(SoftwareError::Upstream);
         }
         let (url, size, checksum, build) = match software {
-            Software::CurseForge { .. } => return Err(SoftwareError::Invalid),
+            Software::CurseForge { .. }
+            | Software::Fabric { .. }
+            | Software::Forge { .. }
+            | Software::NeoForge { .. }
+            | Software::Purpur { .. } => return Err(SoftwareError::Invalid),
             Software::Vanilla { .. } => {
                 let file = &vanilla["downloads"]["server"];
                 (
@@ -183,7 +219,7 @@ impl SoftwareService for Installers {
     }
 }
 impl Installers {
-    async fn vanilla(&self, version: &str) -> Result<Value, SoftwareError> {
+    pub(super) async fn vanilla(&self, version: &str) -> Result<Value, SoftwareError> {
         let manifest = self.json(MANIFEST).await?;
         let entry = manifest["versions"]
             .as_array()
@@ -195,7 +231,7 @@ impl Installers {
     }
 }
 // Paper's published recommended JVM table differs from Vanilla's metadata.
-fn paper_java(version: &str) -> u16 {
+pub(super) fn paper_java(version: &str) -> u16 {
     let parts = version_key(version);
     match parts.as_slice() {
         [major, ..] if *major >= 26 => 25,
@@ -206,13 +242,13 @@ fn paper_java(version: &str) -> u16 {
         _ => 8,
     }
 }
-fn release(version: &str) -> bool {
+pub(super) fn release(version: &str) -> bool {
     !version.is_empty()
         && version
             .split('.')
             .all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()))
 }
-fn version_key(version: &str) -> Vec<u32> {
+pub(super) fn version_key(version: &str) -> Vec<u32> {
     version.split('.').filter_map(|v| v.parse().ok()).collect()
 }
 fn select_paper<'a>(metadata: &'a Value, build: Option<&str>) -> Result<&'a Value, SoftwareError> {

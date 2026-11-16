@@ -500,6 +500,7 @@ version = "0.14.2"
 dependencies = [
  "futures-util",
  "image",
+ "md-5",
  "reqwest",
  "serde",
  "serde_json",

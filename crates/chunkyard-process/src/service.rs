@@ -151,7 +151,12 @@ impl ServerService for ServerManager {
     ) -> Result<ServerView, ServerError> {
         if matches!(
             self.local_record(id).await?.software,
-            Some(chunkyard_core::software::Software::CurseForge { .. })
+            Some(
+                chunkyard_core::software::Software::CurseForge { .. }
+                    | chunkyard_core::software::Software::Fabric { .. }
+                    | chunkyard_core::software::Software::Forge { .. }
+                    | chunkyard_core::software::Software::NeoForge { .. }
+            )
         ) {
             self.install_pack(id, options, progress).await
         } else {

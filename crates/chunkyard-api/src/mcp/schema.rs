@@ -21,7 +21,7 @@ fn build_tools() -> Vec<Value> {
         ),
         (
             "create_server",
-            "Create a stopped instance from a REST CreateServer config. Required name; optional software {type:vanilla|paper,version,build}, memoryMinMb, memoryMaxMb, cpus, port. Never accepts EULA or starts; use install_server then owner UI for consent.",
+            "Create a stopped instance from a REST CreateServer config. Required name; optional software {type:vanilla|paper|purpur|fabric|forge|neoforge,version,build?,loaderVersion?} or CurseForge {type:curseforge,projectId,fileId}, memoryMinMb, memoryMaxMb, cpus, port. Never accepts EULA or starts; use install_server then owner UI for consent.",
             json!({
                 "config": {
                     "type": "object",

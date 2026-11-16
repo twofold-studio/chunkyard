@@ -132,7 +132,11 @@ describe('CodeEditor', () => {
 
 describe('CodeEditor Vim mode', () => {
 	async function ready(label: string) {
-		await vi.waitFor(() => expect(document.querySelector('.cm-vimMode')).not.toBeNull());
+		// Vim loads in a separate lazy chunk; cold browser compilation can exceed
+		// waitFor's one-second default even though the editor initializes correctly.
+		await vi.waitFor(() => expect(document.querySelector('.cm-vimMode')).not.toBeNull(), {
+			timeout: 10_000
+		});
 		await page.getByRole('textbox', { name: label }).click();
 		// Clicking lands past the text; start every case at the first character.
 		await userEvent.keyboard('gg0');

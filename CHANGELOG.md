@@ -4,6 +4,17 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## Unreleased
+
+
+### Added
+
+- Frontend: offer Purpur and NeoForge in the new-server wizard when GET /api/v1/software lists them. POST /api/v1/servers sends {type:'purpur',version,build?} (build omitted = latest stable at install) and {type:'neoforge',version,loaderVersion}; Minecraft and loader versions are chosen separately from the existing /software/{kind}/versions and /builds lists. Server summaries, cards and the software filter show both kinds. Software tiles use bundled official Minecraft, Paper, Purpur, Fabric, Forge, NeoForge and CurseForge logos served same-origin, with an icon fallback.
+- REST API: add managed Fabric, Forge, NeoForge and Purpur selections, provider version/build catalogs and verified automatic downloads. Mod loaders use isolated Docker preparation and retain explicit EULA/start requirements. Purpur checks its published MD5 over HTTPS and records a SHA-256 fingerprint.
+
+### Changed
+
+- Frontend: split a server's Exports tab into Back up now, Automatic schedule and Existing backups. Back up now names the selection (World, Full instance or Selected files) and destination (this manager or the saved S3 bucket) and summarizes them beside Create backup. The schedule shows its fixed scope and target (full instance to the configured S3 bucket, only while stopped, skipped if running) with frequency, next run, last result, last verified backup and retention. Storage & exports adds a short overview and renames its tabs to By server, All backups and S3 storage.
 ## 0.14.2 - 2026-11-16
 
 

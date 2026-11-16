@@ -21,6 +21,26 @@ pub enum Software {
         #[serde(default)]
         build: Option<String>,
     },
+    Purpur {
+        version: String,
+        #[serde(default)]
+        build: Option<String>,
+    },
+    Fabric {
+        version: String,
+        #[serde(rename = "loaderVersion")]
+        loader_version: String,
+    },
+    Forge {
+        version: String,
+        #[serde(rename = "loaderVersion")]
+        loader_version: String,
+    },
+    NeoForge {
+        version: String,
+        #[serde(rename = "loaderVersion")]
+        loader_version: String,
+    },
 }
 impl Software {
     pub fn validate(&self) -> Result<(), SoftwareError> {
@@ -36,7 +56,16 @@ impl Software {
             };
         }
         component(self.version())?;
+        if let Self::Fabric { loader_version, .. }
+        | Self::Forge { loader_version, .. }
+        | Self::NeoForge { loader_version, .. } = self
+        {
+            component(loader_version)?;
+        }
         if let Self::Paper {
+            build: Some(build), ..
+        }
+        | Self::Purpur {
             build: Some(build), ..
         } = self
             && !build
@@ -50,7 +79,12 @@ impl Software {
     pub fn version(&self) -> &str {
         match self {
             Self::CurseForge { .. } => "curseforge",
-            Self::Vanilla { version } | Self::Paper { version, .. } => version,
+            Self::Vanilla { version }
+            | Self::Paper { version, .. }
+            | Self::Purpur { version, .. }
+            | Self::Fabric { version, .. }
+            | Self::Forge { version, .. }
+            | Self::NeoForge { version, .. } => version,
         }
     }
 }
@@ -190,7 +224,7 @@ pub enum SoftwareError {
     FilesConflict,
     #[error("The isolated loader installer failed. Check the install job and resource limits.")]
     InstallFailed,
-    #[error("Select a valid software type, Minecraft release and Paper build.")]
+    #[error("Select a valid software type, Minecraft release and compatible build or loader.")]
     Invalid,
     #[error(
         "The software provider could not be reached or returned invalid metadata. Retry shortly."

@@ -160,3 +160,43 @@ async fn catalogs_require_auth_and_install_requires_csrf() -> Result<(), Box<dyn
     }
     app.close().await
 }
+
+#[tokio::test]
+async fn standalone_software_installs_without_start_or_eula_acceptance()
+-> Result<(), Box<dyn Error>> {
+    let app = TestApp::with_auth(false).await?;
+    for software in [
+        json!({"type":"purpur","version":"1.21.1","build":"2329"}),
+        json!({"type":"fabric","version":"1.21.1","loaderVersion":"0.16.10"}),
+        json!({"type":"forge","version":"1.21.1","loaderVersion":"52.0.28"}),
+        json!({"type":"neoforge","version":"1.21.1","loaderVersion":"21.1.265"}),
+    ] {
+        let response = app
+            .post("/api/v1/servers")
+            .json(&json!({"name":"Standalone","software":software}))
+            .send()
+            .await?;
+        assert_eq!(response.status(), 201);
+        let created: Value = response.json().await?;
+        let id = created["server"]["id"].as_str().ok_or("id")?;
+        let result = job(&app, &format!("/api/v1/servers/{id}/install")).await?;
+        assert_eq!(result["state"], "succeeded", "{result}");
+        let server = &result["result"]["server"];
+        assert_eq!(server["software"], software);
+        assert_eq!(server["status"]["state"], "stopped");
+        assert_eq!(server["acceptEula"], false);
+        assert_eq!(server["launch"]["version"], software["version"]);
+        if software["type"] != "purpur" {
+            assert_eq!(server["launch"]["loader"]["type"], software["type"]);
+            assert_eq!(
+                server["launch"]["loader"]["version"],
+                software["loaderVersion"]
+            );
+        }
+        assert_eq!(
+            job(&app, &format!("/api/v1/servers/{id}/start")).await?["error"]["code"],
+            "server.eula_required"
+        );
+    }
+    app.close().await
+}

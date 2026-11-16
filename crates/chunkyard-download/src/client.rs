@@ -107,6 +107,9 @@ impl SafeHttp {
         size: u64,
         checksum: &str,
     ) -> Result<(), DownloadError> {
+        if !matches!(checksum.len(), 40 | 64) {
+            return Err(DownloadError::Checksum);
+        }
         if size == 0 || size > 2 * 1024 * 1024 * 1024 {
             return Err(DownloadError::Size);
         }
@@ -127,6 +130,9 @@ impl SafeHttp {
         path: &Path,
         checksum: &str,
     ) -> Result<(), DownloadError> {
+        if !matches!(checksum.len(), 40 | 64) {
+            return Err(DownloadError::Checksum);
+        }
         let response = self.get(url).await?;
         let size = response.content_length().ok_or(DownloadError::Size)?;
         write_artifact_progress(
@@ -134,6 +140,32 @@ impl SafeHttp {
             path,
             size,
             checksum,
+            512 * 1024 * 1024,
+            self.progress.as_deref(),
+        )
+        .await
+    }
+    /// Legacy MD5 is restricted to Purpur's authenticated official download origin.
+    /// Other provider entry points retain their SHA-1/SHA-256 requirements.
+    pub async fn purpur_artifact(
+        &self,
+        url: Url,
+        path: &Path,
+        md5: &str,
+    ) -> Result<(), DownloadError> {
+        if url.host_str() != Some("api.purpurmc.org") || !url.path().ends_with("/download") {
+            return Err(DownloadError::ForbiddenUrl);
+        }
+        if md5.len() != 32 {
+            return Err(DownloadError::Checksum);
+        }
+        let response = self.get(url).await?;
+        let size = response.content_length().ok_or(DownloadError::Size)?;
+        write_artifact_progress(
+            response,
+            path,
+            size,
+            md5,
             512 * 1024 * 1024,
             self.progress.as_deref(),
         )
@@ -157,6 +189,12 @@ impl SafeHttp {
             "launcher.mojang.com",
             "fill.papermc.io",
             "fill-data.papermc.io",
+            "api.purpurmc.org",
+            "meta.fabricmc.net",
+            "maven.fabricmc.net",
+            "files.minecraftforge.net",
+            "maven.minecraftforge.net",
+            "maven.neoforged.net",
         ])
     }
 
@@ -230,6 +268,9 @@ impl SafeHttp {
         size: u64,
         checksum: &str,
     ) -> Result<(), DownloadError> {
+        if !matches!(checksum.len(), 40 | 64) {
+            return Err(DownloadError::Checksum);
+        }
         if size == 0 || size > 512 * 1024 * 1024 {
             return Err(DownloadError::Size);
         }

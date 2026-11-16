@@ -2651,7 +2651,11 @@
               "type": "string",
               "enum": [
                 "vanilla",
-                "paper"
+                "paper",
+                "purpur",
+                "fabric",
+                "forge",
+                "neoforge"
               ]
             }
           }
@@ -2695,7 +2699,11 @@
             "schema": {
               "type": "string",
               "enum": [
-                "paper"
+                "paper",
+                "purpur",
+                "fabric",
+                "forge",
+                "neoforge"
               ]
             }
           },
@@ -6033,6 +6041,37 @@
             "type": "object",
             "properties": {
               "type": {
+                "const": "purpur"
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._+\\-]*$"
+              },
+              "build": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]*$",
+                    "description": "Optional stable build number. Omission resolves latest stable once during installation."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "version"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
                 "const": "curseforge"
               },
               "projectId": {
@@ -6051,9 +6090,39 @@
               "fileId"
             ],
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "enum": [
+                  "fabric",
+                  "forge",
+                  "neoforge"
+                ]
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._+\\-]*$"
+              },
+              "loaderVersion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._+\\-]*$"
+              }
+            },
+            "required": [
+              "type",
+              "version",
+              "loaderVersion"
+            ],
+            "additionalProperties": false
           }
         ],
-        "description": "Managed Vanilla/Paper releases or a CurseForge modpack client release. Standalone Forge/Fabric selections are not offered yet."
+        "description": "Managed Vanilla, Paper, Purpur, Fabric, Forge, NeoForge or a CurseForge modpack client release. Loader versions must match the selected Minecraft release."
       },
       "InstalledLaunch": {
         "type": "object",
@@ -6112,6 +6181,11 @@
                   "enum": [
                     "vanilla",
                     "paper",
+                    "purpur",
+                    "fabric",
+                    "forge",
+                    "neoforge",
+                    "curseforge",
                     "custom"
                   ]
                 },

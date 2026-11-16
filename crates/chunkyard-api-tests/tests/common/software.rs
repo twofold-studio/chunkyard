@@ -19,7 +19,28 @@ impl SoftwareService for FakeSoftware {
         _lease: std::sync::Arc<dyn Send + Sync>,
     ) -> Result<chunkyard_core::software::PreparedSoftware, SoftwareError> {
         use chunkyard_core::software::*;
-        if matches!(software, Software::CurseForge { .. }) {
+        if matches!(
+            software,
+            Software::CurseForge { .. }
+                | Software::Fabric { .. }
+                | Software::Forge { .. }
+                | Software::NeoForge { .. }
+        ) {
+            let standalone = match software {
+                Software::Fabric {
+                    version,
+                    loader_version,
+                } => Some((version, LoaderType::Fabric, loader_version)),
+                Software::Forge {
+                    version,
+                    loader_version,
+                } => Some((version, LoaderType::Forge, loader_version)),
+                Software::NeoForge {
+                    version,
+                    loader_version,
+                } => Some((version, LoaderType::NeoForge, loader_version)),
+                _ => None,
+            };
             let pack = directory.join("pack");
             std::fs::create_dir_all(pack.join("mods")).map_err(|_| SoftwareError::Filesystem)?;
             std::fs::write(pack.join("fixture.jar"), "fixture")
@@ -36,18 +57,26 @@ impl SoftwareService for FakeSoftware {
             return Ok(PreparedSoftware {
                 launch: Launch {
                     path: "fixture.jar".into(),
-                    version: options
-                        .minecraft_version
-                        .clone()
+                    version: standalone
+                        .as_ref()
+                        .map(|(version, _, _)| (*version).clone())
+                        .or_else(|| options.minecraft_version.clone())
                         .unwrap_or_else(|| "1.20.1".into()),
                     java_major: options.java_major.unwrap_or(17),
                     build: None,
                     checksum: "0".repeat(64),
                     profile: None,
-                    loader: Some(Loader {
-                        r#type: LoaderType::Forge,
-                        version: "47.4.0".into(),
-                    }),
+                    loader: Some(
+                        standalone
+                            .map(|(_, kind, version)| Loader {
+                                r#type: kind,
+                                version: version.clone(),
+                            })
+                            .unwrap_or_else(|| Loader {
+                                r#type: LoaderType::Forge,
+                                version: "47.4.0".into(),
+                            }),
+                    ),
                 },
                 installer: None,
                 instance_files: true,
@@ -92,7 +121,9 @@ impl SoftwareService for FakeSoftware {
             path: "server.jar".into(),
             version: software.version().into(),
             build: match software {
-                Software::Paper { build, .. } => Some(build.clone().unwrap_or("232".into())),
+                Software::Paper { build, .. } | Software::Purpur { build, .. } => {
+                    Some(build.clone().unwrap_or("232".into()))
+                }
                 _ => None,
             },
             java_major: 21,

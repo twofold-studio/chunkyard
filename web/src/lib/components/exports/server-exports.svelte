@@ -447,12 +447,14 @@
 							class="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
 							>Set up S3 storage</a
 						>
-					{:else if bucket}
+					{:else if destination === 's3' && bucket}
 						<span
 							class="truncate font-mono text-xs text-muted-foreground"
 							title={storage?.endpoint}
 							data-testid="manual-bucket">{bucket}</span
 						>
+					{:else if destination === 'local'}
+						<span class="text-xs text-muted-foreground">Stored on this manager's disk.</span>
 					{/if}
 				</div>
 			</div>

@@ -96,13 +96,13 @@
 			{/if}
 		</ErrorAlert>
 	{:else if catalog === null}
-		<div class="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-busy="true">
+		<div class="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-busy="true">
 			{#each { length: 3 }, i (i)}
 				<Skeleton class="h-[5.5rem] rounded-lg" />
 			{/each}
 		</div>
 	{:else if managed.length > 0}
-		<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+		<div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
 			{#each managed as choice (choice.id)}
 				{@const selected = value === choice.id}
 				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions (keyboard selection stays native radio behaviour; only pointer clicks continue) -->

@@ -36,7 +36,7 @@ pub(super) async fn write_artifact_progress(
     let limit = size;
     if size == 0
         || size > max_size
-        || !matches!(checksum.len(), 40 | 64)
+        || !matches!(checksum.len(), 32 | 40 | 64)
         || !checksum.bytes().all(|b| b.is_ascii_hexdigit())
     {
         return Err(DownloadError::Checksum);
@@ -87,12 +87,15 @@ pub(super) async fn write_artifact_progress(
 }
 
 enum ArtifactHash {
+    Md5(md5::Md5),
     Sha1(sha1::Sha1),
     Sha256(Sha256),
 }
 impl ArtifactHash {
     fn new(length: usize) -> Self {
-        if length == 40 {
+        if length == 32 {
+            Self::Md5(md5::Md5::new())
+        } else if length == 40 {
             Self::Sha1(sha1::Sha1::new())
         } else {
             Self::Sha256(Sha256::new())
@@ -100,12 +103,14 @@ impl ArtifactHash {
     }
     fn update(&mut self, chunk: &[u8]) {
         match self {
+            Self::Md5(hash) => hash.update(chunk),
             Self::Sha1(h) => h.update(chunk),
             Self::Sha256(h) => h.update(chunk),
         }
     }
     fn finish(self) -> String {
         match self {
+            Self::Md5(hash) => format!("{:x}", hash.finalize()),
             Self::Sha1(h) => format!("{:x}", h.finalize()),
             Self::Sha256(h) => format!("{:x}", h.finalize()),
         }
@@ -116,6 +121,62 @@ impl ArtifactHash {
 mod streaming_tests {
     use super::*;
     use reqwest::Client;
+    #[tokio::test]
+    async fn md5_is_not_accepted_by_other_provider_entry_points()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let client = crate::SafeHttp::minecraft()?;
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("never-created");
+        let url = reqwest::Url::parse("https://piston-data.mojang.com/server.jar")?;
+        let md5 = "900150983cd24fb0d6963f7d28e17f72";
+        assert!(matches!(
+            client.artifact(url.clone(), &path, 3, md5).await,
+            Err(DownloadError::Checksum)
+        ));
+        assert!(matches!(
+            client.pack_artifact(url.clone(), &path, 3, md5).await,
+            Err(DownloadError::Checksum)
+        ));
+        assert!(matches!(
+            client.installer_artifact(url.clone(), &path, md5).await,
+            Err(DownloadError::Checksum)
+        ));
+        assert!(matches!(
+            client.purpur_artifact(url, &path, md5).await,
+            Err(DownloadError::ForbiddenUrl)
+        ));
+        assert!(!path.exists());
+        Ok(())
+    }
+    #[tokio::test]
+    async fn legacy_md5_transfer_check_never_weakens_sha256_only_downloads()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let root = tempfile::tempdir()?;
+        let md5 = "900150983cd24fb0d6963f7d28e17f72";
+        write_artifact(response().await?, &root.path().join("valid"), 3, md5, 512).await?;
+        assert!(matches!(
+            write_artifact(
+                response().await?,
+                &root.path().join("corrupt"),
+                3,
+                &"0".repeat(32),
+                512
+            )
+            .await,
+            Err(DownloadError::Checksum)
+        ));
+        assert!(matches!(
+            write_verified(
+                response().await?,
+                &root.path().join("sha256-required"),
+                3,
+                md5
+            )
+            .await,
+            Err(DownloadError::Checksum)
+        ));
+        Ok(())
+    }
     #[tokio::test]
     async fn download_reports_observed_bytes_then_verification()
     -> Result<(), Box<dyn std::error::Error>> {

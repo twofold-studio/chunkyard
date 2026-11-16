@@ -159,6 +159,8 @@ describe('ServerExports', () => {
 		// Manual: the summary names the chosen scope and destination before anything runs.
 		const summary = page.getByTestId('export-summary');
 		await expect.element(summary).toHaveTextContent('World → this manager');
+		await expect.element(page.getByTestId('manual-bucket')).not.toBeInTheDocument();
+		await expect.element(page.getByText("Stored on this manager's disk.")).toBeVisible();
 		await expect
 			.element(page.getByTestId('scope-detail'))
 			.toHaveTextContent('No software, mods or config');
@@ -169,6 +171,9 @@ describe('ServerExports', () => {
 		await s3Choice().click();
 		await expect.element(summary).toHaveTextContent('Full instance → S3 bucket mc/nightly');
 		await expect.element(page.getByTestId('manual-bucket')).toHaveTextContent('mc/nightly');
+		await page.getByRole('radio', { name: 'On this manager' }).click();
+		await expect.element(summary).toHaveTextContent('Full instance → this manager');
+		await expect.element(page.getByTestId('manual-bucket')).not.toBeInTheDocument();
 
 		// Scheduled: fixed to the full instance in the saved bucket, with no scope/destination choice.
 		const fixed = page.getByTestId('schedule-fixed');

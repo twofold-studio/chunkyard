@@ -1,4 +1,4 @@
-//! Stage complete modpacks, run only the loader installer in Docker, then publish
+//! Stage modpacks or standalone loaders, run only the installer in Docker, then publish
 //! new top-level entries while retaining the instance lock through cancellation.
 mod managed;
 use crate::ServerManager;
@@ -72,7 +72,7 @@ impl ServerManager {
         }
         if status.container_id.is_some() {
             return Err(ServerError::Invalid(
-                "Install the pack before creating a game container.",
+                "Install software before creating a game container.",
             ));
         }
         let directory = tokio::fs::canonicalize(self.root.join(&server.id))

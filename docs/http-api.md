@@ -37,9 +37,9 @@ Sessions use a 32-byte random token; only SHA-256 is stored. Cookies are HttpOnl
 | POST | `/api/v1/auth/login` | `{kind: "session", me}` and session cookie; body `{email, password}` |
 | GET | `/api/v1/auth/me` | Current owner/session metadata |
 | POST | `/api/v1/auth/logout` | 204 and cleared cookie |
-| GET | `/api/v1/software` | `{items: [{id, name, available, reason}]}`; Vanilla, Paper, CurseForge (requires key), custom |
-| GET | `/api/v1/software/{kind}/versions` | `{items: [{id, stable}]}`; kind `vanilla` or `paper`; releases newest first |
-| GET | `/api/v1/software/paper/versions/{version}/builds` | `{items: [{id, stable}]}`; stable build IDs are strings, newest first |
+| GET | `/api/v1/software` | `{items: [{id, name, available, reason}]}`; Vanilla, Paper, Purpur, Fabric, Forge, NeoForge, CurseForge (requires key), custom |
+| GET | `/api/v1/software/{kind}/versions` | `{items: [{id, stable}]}`; supported Minecraft releases, newest first, for each standalone provider |
+| GET | `/api/v1/software/{kind}/versions/{version}/builds` | `{items: [{id, stable}]}`; Paper/Purpur build IDs or Fabric/Forge/NeoForge loader versions; strings, newest first |
 | POST | `/api/v1/servers/{id}/install` | 202 `{job}`; empty body or optional installer overrides; installs the persisted software selection |
 | GET | `/api/v1/modpacks/curseforge?query=&index=0` | Minecraft modpack search/popular results with pagination |
 | GET | `/api/v1/modpacks/curseforge/{id}/files` | Recent client releases with linked server packs |
@@ -127,6 +127,10 @@ Server responses include `icon: {url,source:"custom"|"modpack"}|null`. `GET /api
 `GET /api/v1/servers/{id}/metrics` returns a bounded, on-demand container resource snapshot. See [monitoring](monitoring.md) for units, missing measurements, sampling limits and readiness caveats.
 
 `GET /api/v1/servers/{id}/metrics/stream?intervalMs=100` opens a same-origin authenticated WebSocket. The fastest active viewer requests fresh Docker one-shot collection every 100–60000 ms; viewers share one sequential sampler per server. Actual cadence depends on Docker response time. Collection slows after fast viewers leave and stops after the final viewer disconnects. The first sample has no CPU delta; later samples calculate usage from successive Docker counters.
+
+## Standalone modded software
+
+Standalone modded selections use `{type:"fabric"|"forge"|"neoforge",version,loaderVersion}`; both versions are required. Purpur uses `{type:"purpur",version,build?}` and resolves an omitted build once during installation. Loader pins are checked against the provider's catalog for the selected Minecraft release. Forge lists releases from Minecraft 1.12.2 onward; earlier installer layouts are not supported. Installation remains a separate asynchronous action and never accepts the EULA or starts Minecraft. See [managed installation](docker.md#managed-vanilla-and-paper-installation-rest-api) for staging and integrity guarantees.
 
 ## Version badge and changelog
 
