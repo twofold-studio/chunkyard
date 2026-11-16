@@ -1,5 +1,6 @@
 //! Stage complete modpacks, run only the loader installer in Docker, then publish
 //! new top-level entries while retaining the instance lock through cancellation.
+mod managed;
 use crate::ServerManager;
 use chunkyard_core::{server::*, software::*};
 use sha2::{Digest, Sha256};

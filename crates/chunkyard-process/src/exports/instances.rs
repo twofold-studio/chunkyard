@@ -132,15 +132,10 @@ impl ExportManager {
                 .try_lock_owned()
                 .map_err(|_| ExportError::Busy)?,
         );
+        // Preserve the pre-admission record check and recover only under its lock.
         let server = self.servers.record(id).await?;
-        let instance = Arc::new(
-            self.servers
-                .lock(&server.id)?
-                .try_lock_owned()
-                .map_err(|_| ServerError::Busy)?,
-        );
-        self.servers.recover_pending(&server.id).await?;
-        let mut server = self.servers.record(&server.id).await?;
+        let instance = Arc::new(self.servers.archive_instance(&server.id, true).await?);
+        let mut server = instance.record().await?.ok_or(ServerError::NotFound)?;
         if let Some(archive) = &server.archive {
             if archive.export_id == export_id {
                 return Ok(self.servers.view(server).await?);
@@ -152,14 +147,14 @@ impl ExportManager {
         if record.server_id != server.id || record.destination != ExportDestination::S3 {
             return Err(ExportError::BackupRequired);
         }
-        if self.servers.runtime.status(&server).await?.state != ServerState::Stopped {
+        if instance.status(&server).await?.state != ServerState::Stopped {
             return Err(ServerError::AlreadyRunning.into());
         }
         let lease = Arc::new(Lease {
             _operation: operation.clone(),
-            _instance: instance,
+            _instance: instance.guard(),
             _staging: None,
-            _token: self.servers.install_tasks.token(),
+            _token: instance.token(),
         });
         let archive = self.verified_archive(&record, &progress).await?;
         let worker = lease.clone();
@@ -172,7 +167,7 @@ impl ExportManager {
         .map_err(|_| ExportError::InvalidArchive)?
         .map_err(|_| ExportError::InvalidArchive)?;
         manifest(&bytes, &server.id)?;
-        self.servers.runtime.remove(&server).await?;
+        instance.remove_runtime(&server).await?;
         server.archive = Some(ArchiveReference {
             export_id: record.id,
             archived_at: timestamp(),
@@ -184,25 +179,10 @@ impl ExportManager {
             previous: None,
             next: server.archive.clone(),
         };
-        let servers = self.servers.clone();
-        let published = server.clone();
         // A caller cancellation cannot cut a directory/metadata transition in half.
-        self.servers
-            .install_tasks
-            .spawn(async move {
-                let _lease = lease;
-                progress.stage(Stage::Finalize);
-                crate::transitions::publish(
-                    &servers.root,
-                    servers.repo.as_ref(),
-                    &published,
-                    &transition,
-                    operation,
-                )
-                .await
-            })
-            .await
-            .map_err(|_| ExportError::Storage)??;
+        instance
+            .publish(server.clone(), transition, operation, lease, None, progress)
+            .await?;
         Ok(self.servers.view(server).await?)
     }
 
@@ -222,28 +202,21 @@ impl ExportManager {
         Uuid::parse_str(&record.server_id).map_err(|_| ExportError::InvalidArchive)?;
         let instance = Arc::new(
             self.servers
-                .lock(&record.server_id)?
-                .try_lock_owned()
-                .map_err(|_| ServerError::Busy)?,
+                .archive_instance(&record.server_id, true)
+                .await?,
         );
-        self.servers.recover_pending(&record.server_id).await?;
-        let existing = self
-            .servers
-            .repo
-            .get(&record.server_id)
-            .await
-            .map_err(ServerError::Storage)?;
+        let existing = instance.record().await?;
         if existing.as_ref().is_some_and(|s| s.archive.is_none())
-            || tokio::fs::symlink_metadata(self.servers.root.join(&record.server_id))
+            || tokio::fs::symlink_metadata(instance.root().join(&record.server_id))
                 .await
                 .is_ok()
         {
             return Err(ExportError::RestoreConflict);
         }
-        tokio::fs::create_dir_all(&self.servers.root).await?;
+        tokio::fs::create_dir_all(&instance.root()).await?;
         let staging = tempfile::Builder::new()
             .prefix(".chunkyard-restore-")
-            .tempdir_in(&self.servers.root)?;
+            .tempdir_in(instance.root())?;
         let staging_path = staging.path().to_owned();
         let staging_name = staging_path
             .file_name()
@@ -252,9 +225,9 @@ impl ExportManager {
             .to_owned();
         let lease = Arc::new(Lease {
             _operation: operation.clone(),
-            _instance: instance,
+            _instance: instance.guard(),
             _staging: Some(staging),
-            _token: self.servers.install_tasks.token(),
+            _token: instance.token(),
         });
         let archive = self.verified_archive(&record, &progress).await?;
         let files = staging_path.join("files");
@@ -282,25 +255,13 @@ impl ExportManager {
         let mut server = if let Some(existing) = existing {
             existing
         } else {
-            let _creation = self.servers.create_lock.lock().await;
-            if self
-                .servers
-                .repo
-                .list()
-                .await
-                .map_err(ServerError::Storage)?
-                .len()
-                >= 100
-            {
-                return Err(ExportError::RestoreConflict);
-            }
             let mut claimed = snapshot.clone();
             claimed.accept_eula = false;
             claimed.archive = Some(ArchiveReference {
                 export_id: record.id.clone(),
                 archived_at: timestamp(),
             });
-            self.servers.repo.insert(&claimed).await?;
+            instance.claim_restore(&claimed).await?;
             claimed
         };
         let previous = server.archive.clone();
@@ -318,8 +279,6 @@ impl ExportManager {
         )
         .await?;
         crate::transitions::sync_root(&files).await?;
-        let servers = self.servers.clone();
-        let published = server.clone();
         let transition = Transition {
             id: server.id.clone(),
             kind: TransitionKind::Restore,
@@ -327,41 +286,16 @@ impl ExportManager {
             previous,
             next: None,
         };
-        self.servers
-            .install_tasks
-            .spawn(async move {
-                let _lease = lease;
-                progress.stage(Stage::Finalize);
-                if let Some(properties) = &servers.properties_repo {
-                    let state = properties
-                        .state(&published.id)
-                        .await
-                        .map_err(|_| ExportError::Storage)?;
-                    let expected = state
-                        .desired
-                        .as_ref()
-                        .map(|revision| revision.metadata.etag.as_str());
-                    let etag = format!("{:x}", Sha256::digest(content.as_bytes()));
-                    properties
-                        .append(&published.id, &content, &etag, "restore", expected, true)
-                        .await
-                        .map_err(|_| ExportError::Storage)?;
-                    properties
-                        .set_applied(&published.id, None, None)
-                        .await
-                        .map_err(|_| ExportError::Storage)?;
-                }
-                crate::transitions::publish(
-                    &servers.root,
-                    servers.repo.as_ref(),
-                    &published,
-                    &transition,
-                    operation,
-                )
-                .await
-            })
-            .await
-            .map_err(|_| ExportError::Storage)??;
+        instance
+            .publish(
+                server.clone(),
+                transition,
+                operation,
+                lease,
+                Some(content),
+                progress,
+            )
+            .await?;
         Ok(self.servers.view(server).await?)
     }
 }

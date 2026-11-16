@@ -1,4 +1,7 @@
+mod backup;
+mod history;
 mod players;
+mod recovery;
 mod worker;
 use async_trait::async_trait;
 use chunkyard_core::{
@@ -13,18 +16,18 @@ use std::sync::Arc;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 pub struct Operations {
-    pub(crate) repo: Arc<dyn OperationsRepo>,
-    pub(crate) servers: Arc<dyn ServerService>,
-    pub(crate) files: Arc<dyn FileService>,
-    pub(crate) properties: Arc<dyn PropertiesService>,
-    pub(crate) exports: Arc<dyn ExportService>,
+    repo: Arc<dyn OperationsRepo>,
+    servers: Arc<dyn ServerService>,
+    files: Arc<dyn FileService>,
+    properties: Arc<dyn PropertiesService>,
+    exports: Arc<dyn ExportService>,
     connect_host: String,
     probe_slots: tokio::sync::Semaphore,
-    pub(crate) cancel: tokio_util::sync::CancellationToken,
-    pub(crate) tasks: tokio_util::task::TaskTracker,
-    pub(crate) started: std::sync::atomic::AtomicBool,
-    pub(crate) history_slots: Arc<tokio::sync::Semaphore>,
-    pub(crate) in_flight: std::sync::Mutex<std::collections::HashSet<String>>,
+    cancel: tokio_util::sync::CancellationToken,
+    tasks: tokio_util::task::TaskTracker,
+    started: std::sync::atomic::AtomicBool,
+    history_slots: Arc<tokio::sync::Semaphore>,
+    in_flight: std::sync::Mutex<std::collections::HashSet<String>>,
     profile_http: reqwest::Client,
 }
 impl Operations {

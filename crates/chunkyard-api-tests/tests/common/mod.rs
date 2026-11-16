@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 pub mod runtime;
 pub mod software;
-use chunkyard_server::wiring::{Backend, build_state};
+use chunkyard_server::wiring::{Backend, BackendDependencies, build_state_with_dependencies};
 use serde_json::{Value, json};
 use std::{error::Error, sync::Arc};
 use tokio::sync::oneshot;
@@ -43,39 +43,17 @@ impl TestApp {
         config.http.listen = address;
         config.http.show_version = show_version;
         config.auth.enabled = auth_enabled;
-        let mut backend = build_state(&config).await?;
-        backend.state.software = Arc::new(software::FakeSoftware::default());
+        config.docker.runtime_image = "fixture-image".into();
+        config.docker.connect_host = Some("localhost".into());
         let runtime = Arc::new(runtime::FakeRuntime::default());
-        let servers = Arc::new(
-            chunkyard_process::ServerManager::new(
-                directory.path().join("servers"),
-                "fixture-image".into(),
-                Arc::new(chunkyard_db::SqliteServerRepo::new(&backend.database)),
-                runtime.clone(),
-            )
-            .with_installers(backend.state.software.clone())
-            .with_operations(Arc::new(chunkyard_db::SqliteOperationsRepo::new(
-                &backend.database,
-            )))
-            .with_properties(Arc::new(chunkyard_db::SqlitePropertiesRepo::new(
-                &backend.database,
-            ))),
-        );
-        backend.state.files = servers.clone();
-        backend.state.properties = servers.clone();
-        backend.state.exports = Arc::new(chunkyard_process::ExportManager::new(
-            directory.path().join("exports"),
-            servers.clone(),
-        )?);
-        backend.state.operations = Arc::new(chunkyard_process::Operations::new(
-            Arc::new(chunkyard_db::SqliteOperationsRepo::new(&backend.database)),
-            servers.clone(),
-            servers.clone(),
-            servers.clone(),
-            backend.state.exports.clone(),
-            "localhost".into(),
-        )?);
-        backend.state.servers = servers;
+        let backend = build_state_with_dependencies(
+            &config,
+            BackendDependencies {
+                runtime: runtime.clone(),
+                software: Arc::new(software::FakeSoftware::default()),
+            },
+        )
+        .await?;
         let base = format!("http://{address}");
         let router = if ui {
             let assets = directory.path().join("ui");

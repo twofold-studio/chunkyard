@@ -30,6 +30,11 @@ pub struct Backend {
     operations: Arc<chunkyard_process::Operations>,
     _lock: File,
 }
+/// External services shared by HTTP handlers, background operations and shutdown.
+pub struct BackendDependencies {
+    pub runtime: Arc<dyn chunkyard_core::server::ServerRuntime>,
+    pub software: Arc<dyn chunkyard_core::software::SoftwareService>,
+}
 impl Backend {
     pub async fn shutdown(&self) {
         self.operations.shutdown().await;
@@ -42,6 +47,21 @@ impl Backend {
     }
 }
 pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
+    assemble(config, None).await
+}
+
+/// Assemble the complete backend once, using the supplied external services.
+pub async fn build_state_with_dependencies(
+    config: &Config,
+    dependencies: BackendDependencies,
+) -> Result<Backend, WiringError> {
+    assemble(config, Some(dependencies)).await
+}
+
+async fn assemble(
+    config: &Config,
+    dependencies: Option<BackendDependencies>,
+) -> Result<Backend, WiringError> {
     config.validate()?;
     let lock = crate::storage::prepare(&config.data_dir)?;
     let database = Database::open(&config.data_dir.join("mcm.db")).await?;
@@ -55,23 +75,11 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
     };
     let auth = Arc::new(AuthService::new(repo, setup).await?);
     let jobs = Arc::new(JobManager::new(Arc::new(SqliteJobRepo::new(&database)), 4).await?);
-    let software = Arc::new(
-        chunkyard_install::Installers::new()?.with_curseforge(config.curseforge.api_key.clone()),
-    );
-    let runtime = Arc::new(chunkyard_process::DockerRuntime::new(
-        config.docker.clone(),
-        crate::storage::instance_id(&config.data_dir)?,
-    ));
+    let BackendDependencies { runtime, software } = match dependencies {
+        Some(dependencies) => dependencies,
+        None => production_dependencies(config).await?,
+    };
     let operations_repo = Arc::new(chunkyard_db::SqliteOperationsRepo::new(&database));
-    if config.data_dir.join("servers").is_dir()
-        && let Err(error) = runtime.recover_installers().await
-        && !matches!(
-            error,
-            chunkyard_core::server::ServerError::DockerUnavailable
-        )
-    {
-        tracing::warn!(%error,"could not recover interrupted loader installers");
-    }
     let servers = Arc::new(
         chunkyard_process::ServerManager::new(
             config.data_dir.join("servers"),
@@ -129,4 +137,24 @@ pub async fn build_state(config: &Config) -> Result<Backend, WiringError> {
         operations,
         _lock: lock,
     })
+}
+
+async fn production_dependencies(config: &Config) -> Result<BackendDependencies, WiringError> {
+    let software = Arc::new(
+        chunkyard_install::Installers::new()?.with_curseforge(config.curseforge.api_key.clone()),
+    );
+    let runtime = Arc::new(chunkyard_process::DockerRuntime::new(
+        config.docker.clone(),
+        crate::storage::instance_id(&config.data_dir)?,
+    ));
+    if config.data_dir.join("servers").is_dir()
+        && let Err(error) = runtime.recover_installers().await
+        && !matches!(
+            error,
+            chunkyard_core::server::ServerError::DockerUnavailable
+        )
+    {
+        tracing::warn!(%error, "could not recover interrupted loader installers");
+    }
+    Ok(BackendDependencies { runtime, software })
 }

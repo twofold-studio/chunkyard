@@ -4,6 +4,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Mutex};
 
 #[derive(Default)]
 pub struct FakeRuntime {
+    pub shutdowns: std::sync::atomic::AtomicUsize,
     pub starts: std::sync::atomic::AtomicUsize,
     pub crash_on_start: std::sync::atomic::AtomicBool,
     crashed: Mutex<std::collections::HashSet<String>>,
@@ -41,6 +42,10 @@ impl FakeRuntime {
 }
 #[async_trait]
 impl ServerRuntime for FakeRuntime {
+    async fn shutdown(&self) {
+        self.shutdowns
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
     async fn stream_metrics_at(
         &self,
         server: &Server,
