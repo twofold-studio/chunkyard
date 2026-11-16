@@ -1,0 +1,3 @@
+kind: Changed
+body: 'Set release builds to explicit level-3 optimization and one code-generation unit alongside thin LTO and symbol stripping. Remove the obsolete mcm.example.toml; effective configuration remains available through mcm config check.'
+time: 2026-11-16T01:00:00Z

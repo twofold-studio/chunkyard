@@ -4,6 +4,18 @@ Rust packages and directories use the `chunkyard-` prefix (`chunkyard-core`, `ch
 
 Chunkyard runs Minecraft in Docker. Java is supplied by each server's container image; the manager does not discover, install or execute Java on the host. Managed installers choose the Java image required by the selected Minecraft version or mod loader.
 
+## Development shell
+
+With Nix installed, run `nix develop`. For automatic activation, enable direnv's shell hook and run `direnv allow` once in this checkout; `.envrc` uses the same flake shell. `flake.lock` pins the tool versions. Outside Nix, `rust-toolchain.toml` selects stable Rust.
+
+The shell provides the Rust compiler, Cargo, rustfmt, Clippy, rust-analyzer, Node.js 24, pnpm, Changie, SQLite and Docker client tools. On Linux it also provides Chromium and sets `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` for the browser tests. Other platforms can install Playwright's browser with `pnpm --dir web exec playwright install chromium`.
+
+Entering the shell does not run dependency installs, start Docker or load `.env` files. Run `pnpm --dir web install --frozen-lockfile` yourself; Docker integration checks need a host Docker engine and permission to use its socket. No host Java installation is needed.
+
+Release builds use optimization level 3, one code-generation unit, thin LTO and stripped symbols. Build with `cargo build --release -p chunkyard-server`; these settings trade longer compilation for optimization opportunities without changing panic unwinding.
+
+## Running the backend
+
 ```sh
 cargo run -p chunkyard-server -- serve
 cargo run -p chunkyard-server -- config check
@@ -20,10 +32,20 @@ The `java` CLI subcommand, `/api/v1/java/*` routes and `[java]` configuration ar
 
 ## Checks
 
+`node scripts/check-architecture.mjs` enforces the current workspace dependency boundaries and a 400-line budget for Rust source and test files. The policy is in `scripts/architecture-policy.json`; size exceptions need a documented reason and an explicit budget, and stale exceptions fail. Static schemas and recorded non-Rust fixtures are outside this limit. This is a review guardrail: preserve cohesive ownership and readable functions rather than compressing code to satisfy a counter.
+
+The production dependency graph keeps shared contracts in `chunkyard-core`, SQLite implementations in `chunkyard-db`, and HTTP transport in `chunkyard-api`/`chunkyard-server`. The server crate assembles concrete implementations; internal modules remain private unless another crate needs their interface. Test-only packages cannot become production dependencies.
+
+The `chunkyard-api-tests` package is retained as a test-only system suite. Related scenarios are nested modules under the `contracts`, `instances`, `streams` and `storage` test targets; real Docker targets remain separate and opt-in. This compiles shared fixtures fewer times while retaining independent temporary databases and runtimes. CI uses four test threads to bound simultaneous fixture work; use `RUST_TEST_THREADS=4` locally on constrained machines.
+
 ```sh
+node --test scripts/check-architecture.test.mjs
+node scripts/check-architecture.mjs
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --locked
 ```
+
+For a focused HTTP/WS run, use `cargo test -p chunkyard-api-tests --test instances` or filter a nested module, such as `cargo test -p chunkyard-api-tests --test contracts api_keys_mcp::`.
 
 On NixOS, use `nix shell nixpkgs#rustfmt nixpkgs#clippy -c` when those tools are unavailable. Tests use temporary data and local fixtures. Real Docker/download/storage tests are opt-in and must use disposable instances.

@@ -8,7 +8,7 @@ Compressed instance exports and the private S3/RustFS connection are documented 
 
 Start with `cargo run -p chunkyard-server -- serve`, or run `mcm` without a subcommand. The default address is `http://127.0.0.1:8420`. It serves the built UI from `web/build/` alongside the JSON API when available; see [frontend usage](frontend.md) for build and hosting instructions. Set `CHUNKYARD_HTTP__UI_DIR=` for API-only operation.
 
-`mcm config check` prints effective configuration. Sources, in order: defaults, `--config`/`CHUNKYARD_CONFIG` (or `/etc/mcm/mcm.toml` when present), environment, and CLI `--data-dir`/`serve --listen`. Unknown config keys fail validation. See `mcm.example.toml`.
+`mcm config check` prints effective configuration. Sources, in order: defaults, `--config`/`CHUNKYARD_CONFIG` (or `/etc/mcm/mcm.toml` when present), environment, and CLI `--data-dir`/`serve --listen`. Unknown config keys fail validation.
 
 Authentication is enabled by default. To run without login in a trusted local or VPN environment:
 

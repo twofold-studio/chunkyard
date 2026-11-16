@@ -93,7 +93,7 @@ ServerHandle (Clone)             Supervisor task (owns state)
 ## 9. Rust module layout and naming
 
 - Prefer `foo.rs` + `foo/` directory over `foo/mod.rs` (2018-style). `lib.rs` contains only `mod` declarations and re-exports.
-- One concept per file: `supervisor.rs`, `log_ring.rs`, `spawn.rs`. Files over ~400 lines are split.
+- One concept per file: `supervisor.rs`, `log_ring.rs`, `spawn.rs`. Rust source and test files have a 400-line review budget, enforced by `scripts/check-architecture.mjs`; exceptions need a reason and explicit budget in `scripts/architecture-policy.json`. Static schemas are excluded. Extract cohesive responsibilities with their tests; do not compress code or hide tests to meet the limit.
 - Naming: traits are nouns (`Installer`, `StorageTarget`); impls prefixed with backend (`PaperInstaller`, `S3Storage`); async fns are verbs; DTOs suffixed `Dto` only when a domain type of the same name exists (`ServerDto`), requests `CreateServerRequest`, responses `…Response`.
 - Errors `<Crate>Error`, events `Event::ServerStatusChanged { .. }` (past tense).
 - External API clients: `<vendor>/client.rs` (trait + reqwest impl), `<vendor>/model.rs` (serde types, `#[serde(rename_all = "camelCase")]` as the API dictates; unknown fields ignored).
@@ -102,7 +102,7 @@ ServerHandle (Clone)             Supervisor task (owns state)
 
 - Unit tests inline: `#[cfg(test)] mod tests` at the bottom of each file.
 - Integration tests per crate in `crates/<crate>/tests/<area>.rs`; shared helpers in `tests/common/mod.rs`.
-- HTTP/WS-level tests live in **`crates/chunkyard-api-tests/tests/<phase>_<area>.rs`** using `mcm_testkit::TestApp` (see [workspace-layout.md](workspace-layout.md) rule 9). Phase test plans write their location as `chunkyard-api-tests/<file>`.
+- HTTP/WS-level tests live in **`crates/chunkyard-api-tests/tests/`**, grouped under `contracts`, `instances`, `streams` and `storage` entry points with shared `tests/common::TestApp` fixtures. Real Docker checks remain separate targets. The older phase plans describe proposed filenames and a testkit crate; that crate is not part of the implemented workspace.
 - **Time in tests**: `tokio::time::pause()` / `FakeClock` only for pure-logic tests (backoff calculation, cron, retention, rollups, actor logic with a fake spawner). Tests that run real processes (fake-mc-server) use real time with short configured timeouts (e.g. `stop_timeout_s = 2`) and `wait_until` polling — never paused time.
 - Test names: `<unit>_<condition>_<expected>`, e.g. `resolve_dotdot_outside_root_is_rejected`. Phase test plans use these exact names.
 - Recorded fixtures: `crates/<crate>/tests/fixtures/<vendor>/<endpoint>.json`.

@@ -1,4 +1,5 @@
 .git
+/.direnv
 /target
 /data
 *.db

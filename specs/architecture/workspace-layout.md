@@ -120,7 +120,9 @@ flowchart BT
 
 (`chunkyard-config` → domain crates for `*Config` types and `chunkyard-server` → every crate are omitted from the graph for readability.)
 
-## Rules (enforced in CI by `cargo xtask check-deps`)
+## Planned full-scope rules
+
+This page describes the broader phase roadmap. The implemented single-owner Docker workspace is checked by `node scripts/check-architecture.mjs` using `scripts/architecture-policy.json`, as documented in [backend development](../../docs/backend.md). There is no `xtask check-deps` command or standalone testkit crate today. The rules below describe intended boundaries for the full roadmap, not additional implemented services.
 
 1. **No cycles, no undeclared edges.** A crate may only depend on crates in its row. Adding an edge requires updating this file.
 2. **Only `chunkyard-api` and `chunkyard-server` depend on `axum`, `tower`, `utoipa`.** DTOs with `ToSchema` live in `chunkyard-api::dto`.

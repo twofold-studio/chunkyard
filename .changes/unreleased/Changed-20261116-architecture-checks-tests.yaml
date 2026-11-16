@@ -1,0 +1,3 @@
+kind: Changed
+body: 'Group HTTP/WebSocket integration suites into fewer test executables, preserving existing scenarios and opt-in Docker checks. Add CI checks for production crate boundaries and 400-line Rust module budgets with explicit, bounded exceptions; update architecture and runtime documentation to match the implemented workspace.'
+time: 2026-11-16T00:32:00Z

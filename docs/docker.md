@@ -69,9 +69,9 @@ Public images are pulled when absent. Private registry credentials are not wired
 
 By default, rootful Docker uses the manager's UID:GID, while rootless Docker uses container UID 0 mapped to the daemon user. Override with `CHUNKYARD_DOCKER__USER=UID:GID` when needed. Userns-remap requires an explicit mapping. Rootless engines must be operated by the same host user as the manager; remapped ownership requires operator setup.
 
-Stop sends the Minecraft `stop` command, waits up to `CHUNKYARD_DOCKER__STOP_TIMEOUT_S` (default 60), then asks Docker to terminate with a ten-second grace period. Kill forces termination. Containers and data remain after exit so status/logs are available and the same container can restart. A running container means the process is running; Minecraft protocol readiness is not yet checked.
+Stop sends the Minecraft `stop` command, waits up to `CHUNKYARD_DOCKER__STOP_TIMEOUT_S` (default 60), then asks Docker to terminate with a ten-second grace period. Kill forces termination. Containers and data remain after exit so status/logs are available and the same container can restart. A running container means the process is running; the separate Minecraft status probe checks protocol readiness.
 
-Manager shutdown leaves Docker servers running. A stable `instance-id` file plus instance/server ownership labels lets a restarted manager inspect and control the same containers. Losing this file prevents automatic recognition of old containers. Foreign or mismatched containers are never controlled. A missing daemon yields unknown server status and runtime operations fail clearly. There is no automatic crash restart, autostart, resource editor, or orphan cleanup yet.
+Manager shutdown leaves Docker servers running. A stable `instance-id` file plus instance/server ownership labels lets a restarted manager inspect and control the same containers. Losing this file prevents automatic recognition of old containers. Foreign or mismatched containers are never controlled. A missing daemon yields unknown server status and runtime operations fail clearly. Manager-startup and bounded crash recovery are opt-in policies, both off by default; resources are editable while stopped. There is no automatic orphan cleanup. See the [operations contract](operations-contract.md).
 
 ### Ports and stopped-instance deletion
 

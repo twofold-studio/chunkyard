@@ -3,6 +3,12 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
 use std::{path::Path, str::FromStr, time::Duration};
+
+pub(crate) fn storage(
+    error: impl std::fmt::Display,
+) -> chunkyard_core::repository::RepositoryError {
+    chunkyard_core::repository::RepositoryError(error.to_string())
+}
 #[derive(Debug, thiserror::Error)]
 pub enum DatabaseError {
     #[error(transparent)]

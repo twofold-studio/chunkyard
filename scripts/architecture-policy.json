@@ -1,0 +1,23 @@
+{
+  "maxRustFileLines": 400,
+  "allowedDependencies": {
+    "chunkyard-api": ["chunkyard-auth", "chunkyard-core"],
+    "chunkyard-api-tests": [],
+    "chunkyard-auth": ["chunkyard-core"],
+    "chunkyard-config": ["chunkyard-process"],
+    "chunkyard-core": [],
+    "chunkyard-db": ["chunkyard-core"],
+    "chunkyard-download": [],
+    "chunkyard-fs": ["chunkyard-core"],
+    "chunkyard-install": ["chunkyard-core", "chunkyard-download", "chunkyard-fs"],
+    "chunkyard-jobs": ["chunkyard-core"],
+    "chunkyard-process": ["chunkyard-core", "chunkyard-download", "chunkyard-fs"],
+    "chunkyard-server": [
+      "chunkyard-api", "chunkyard-auth", "chunkyard-config", "chunkyard-core",
+      "chunkyard-db", "chunkyard-download", "chunkyard-fs", "chunkyard-install",
+      "chunkyard-jobs", "chunkyard-process"
+    ]
+  },
+  "testOnlyPackages": ["chunkyard-api-tests"],
+  "fileSizeExceptions": {}
+}

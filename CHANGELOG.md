@@ -4,6 +4,19 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## Unreleased
+
+
+### Added
+
+- Add a pinned Nix development shell and direnv setup with Rust, Node/pnpm, changelog and Docker client tools, plus system Chromium for browser tests on Linux. Entering the shell does not install project dependencies, start services or load application secrets.
+
+### Changed
+
+- Group HTTP/WebSocket integration suites into fewer test executables, preserving existing scenarios and opt-in Docker checks. Add CI checks for production crate boundaries and 400-line Rust module budgets with explicit, bounded exceptions; update architecture and runtime documentation to match the implemented workspace.
+- Keep filesystem, authentication, download and installer public Rust paths stable while moving error types, client construction and repository error mapping behind thin crate entry points.
+- Set release builds to explicit level-3 optimization and one code-generation unit alongside thin LTO and symbol stripping. Remove the obsolete mcm.example.toml; effective configuration remains available through mcm config check.
+- Refactored filesystem sandbox, verified downloads and CurseForge pack preparation into cohesive Rust modules while preserving public APIs, safety limits and launch detection behavior.
 ## 0.14.1 - 2026-11-16
 
 
