@@ -18,7 +18,10 @@
 	interface Props {
 		kind: VersionedSoftwareKind;
 		version: string;
-		/** Paper build or Fabric/Forge loader version. Empty = Paper's latest stable build. */
+		/**
+		 * Paper/Purpur build or Fabric/Forge/NeoForge loader version.
+		 * Empty = Paper/Purpur's latest stable build.
+		 */
 		build: string;
 		disabled?: boolean;
 	}

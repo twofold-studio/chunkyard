@@ -103,7 +103,8 @@ afterEach(() => {
 	exportSelection.clear('srv-1');
 });
 
-const exportButton = () => page.getByRole('button', { name: 'Export', exact: true });
+const exportButton = () => page.getByRole('button', { name: 'Create backup', exact: true });
+const s3Choice = () => page.getByRole('radio', { name: 'S3 compatible storage' });
 
 describe('ServerExports', () => {
 	it('lists only this server’s archives and requires a stopped server', async () => {
@@ -117,7 +118,72 @@ describe('ServerExports', () => {
 		await expect.element(page.getByText('survival-b.tar.gz')).not.toBeInTheDocument();
 		await expect.element(page.getByText('Stop the server to export')).toBeVisible();
 		await expect.element(exportButton()).toBeDisabled();
-		await expect.element(page.getByRole('radio', { name: 'S3' })).toBeDisabled();
+		await expect.element(s3Choice()).toBeDisabled();
+	});
+
+	it('separates the manual backup from the fixed automatic schedule', async () => {
+		reply('GET', '/api/v1/storage', {
+			status: 200,
+			body: { ...storage(true), prefix: 'nightly' }
+		});
+		reply('GET', '/api/v1/exports', { status: 200, body: { items: [] } });
+		render(ServerExports, {
+			serverId: 'srv-1',
+			serverState: 'stopped',
+			scheduleApi: {
+				load: async () => ({
+					recovery: {
+						autoStart: false,
+						restartOnCrash: false,
+						maxAttempts: 3,
+						retryDelaySeconds: 30
+					},
+					backup: { enabled: true, intervalMinutes: 1440, keepLast: 5 },
+					historyEnabled: true,
+					desiredRunning: false,
+					restartAttempts: 0,
+					nextRetryAt: null,
+					stableSince: null,
+					nextBackupAt: null,
+					lastBackupAt: null,
+					lastBackupJob: null,
+					lastBackupExportId: null,
+					lastBackupResult: 'skipped_running',
+					lastBackupError: null,
+					lastHistoryAt: null
+				}),
+				save: vi.fn()
+			}
+		});
+
+		// Manual: the summary names the chosen scope and destination before anything runs.
+		const summary = page.getByTestId('export-summary');
+		await expect.element(summary).toHaveTextContent('World → this manager');
+		await expect
+			.element(page.getByTestId('scope-detail'))
+			.toHaveTextContent('No software, mods or config');
+		await page.getByRole('radio', { name: 'Full instance' }).click();
+		await expect
+			.element(page.getByTestId('scope-detail'))
+			.toHaveTextContent('World plus software, mods, plugins and config');
+		await s3Choice().click();
+		await expect.element(summary).toHaveTextContent('Full instance → S3 bucket mc/nightly');
+		await expect.element(page.getByTestId('manual-bucket')).toHaveTextContent('mc/nightly');
+
+		// Scheduled: fixed to the full instance in the saved bucket, with no scope/destination choice.
+		const fixed = page.getByTestId('schedule-fixed');
+		await expect.element(fixed).toHaveTextContent('Full instance');
+		await expect.element(fixed).toHaveTextContent('mc/nightly');
+		await expect.element(fixed).toHaveTextContent('Only while stopped');
+		const schedule = page.getByTestId('backup-schedule');
+		expect(schedule.getByRole('radio', { name: 'World' }).elements()).toHaveLength(0);
+		expect(schedule.getByRole('radio', { name: 'S3 compatible storage' }).elements()).toHaveLength(
+			0
+		);
+		const status = page.getByTestId('schedule-status');
+		await expect.element(status).toHaveTextContent('Daily');
+		await expect.element(status).toHaveTextContent('Keep the newest 5 scheduled backups');
+		await expect.element(status).toHaveTextContent('Skipped: the server was running');
 	});
 
 	it('exports selected paths to S3 and shows the verified archive', async () => {
@@ -133,12 +199,15 @@ describe('ServerExports', () => {
 		);
 		render(ServerExports, { serverId: 'srv-1', serverState: 'stopped', jobIntervalMs: 5 });
 
-		await page.getByRole('radio', { name: 'Selected paths' }).click();
+		await page.getByRole('radio', { name: 'Selected files' }).click();
 		await exportButton().click();
 		await expect.element(page.getByText('Enter at least one path.')).toBeVisible();
 
 		await page.getByRole('textbox').fill('world\n/plugins/\nworld');
-		await page.getByRole('radio', { name: 'S3' }).click();
+		await s3Choice().click();
+		await expect
+			.element(page.getByTestId('export-summary'))
+			.toHaveTextContent('2 selected paths → S3 bucket mc');
 		await exportButton().click();
 		await expect.element(page.getByRole('alertdialog')).toHaveTextContent('To S3 bucket mc');
 		await page.getByRole('button', { name: 'Start export' }).click();
@@ -212,7 +281,7 @@ describe('ServerExports', () => {
 
 			// A pending selection opens the selected scope without typing.
 			await expect
-				.element(page.getByRole('radio', { name: 'Selected paths' }))
+				.element(page.getByRole('radio', { name: 'Selected files' }))
 				.toHaveAttribute('aria-checked', 'true');
 			await expect.element(page.getByTestId('selected-count')).toHaveTextContent('2 selected');
 			await page.getByRole('textbox').fill('plugins/LuckPerms');
@@ -220,7 +289,7 @@ describe('ServerExports', () => {
 
 			const dialog = page.getByRole('alertdialog');
 			await expect.element(dialog).toHaveTextContent('Export 3 paths?');
-			await expect.element(dialog).toHaveTextContent('To the manager host');
+			await expect.element(dialog).toHaveTextContent('To this manager');
 			const listed = [...dialog.element().querySelectorAll('li')].map((li) => li.textContent);
 			expect(listed).toEqual(['ops.json', 'world', 'plugins/LuckPerms']);
 			expect(calls.some((c) => c.method === 'POST')).toBe(false);

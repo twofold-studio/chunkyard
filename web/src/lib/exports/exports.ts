@@ -13,14 +13,34 @@ export const MAX_SELECTED_PATHS = 100;
 
 export const SCOPE_LABELS: Record<ExportScope, string> = {
 	world: 'World',
-	selected: 'Selected paths',
+	selected: 'Selected files',
 	all: 'Full instance'
 };
 
+/** What each scope contains; Full instance is the only one that can rebuild a server. */
+export const SCOPE_DETAILS: Record<ExportScope, string> = {
+	world: 'World folders only (level.dat and dimensions). No software, mods or config.',
+	all: 'World plus software, mods, plugins and config. Can restore the whole server.',
+	selected: 'Only the files and folders you pick.'
+};
+
+/** Short destination names for lists and badges. */
 export const DESTINATION_LABELS: Record<ExportDestination, string> = {
-	local: 'Manager host',
+	local: 'This manager',
 	s3: 'S3'
 };
+
+/** Full destination names for choosing where a backup goes. */
+export const DESTINATION_CHOICES: Record<ExportDestination, string> = {
+	local: 'On this manager',
+	s3: 'S3 compatible storage'
+};
+
+/** "bucket/prefix" of the saved S3 target, or `null` when not configured. */
+export function storageTarget(storage: StorageConnection | null | undefined): string | null {
+	if (!storage?.configured || !storage.bucket) return null;
+	return storage.prefix ? `${storage.bucket}/${storage.prefix}` : storage.bucket;
+}
 
 export type PathsResult = { ok: true; paths: string[] } | { ok: false; error: string };
 

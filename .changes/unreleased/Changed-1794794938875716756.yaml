@@ -1,0 +1,3 @@
+kind: Changed
+body: 'Frontend: split a server''s Exports tab into Back up now, Automatic schedule and Existing backups. Back up now names the selection (World, Full instance or Selected files) and destination (this manager or the saved S3 bucket) and summarizes them beside Create backup. The schedule shows its fixed scope and target (full instance to the configured S3 bucket, only while stopped, skipped if running) with frequency, next run, last result, last verified backup and retention. Storage & exports adds a short overview and renames its tabs to By server, All backups and S3 storage.'
+time: 2026-11-16T04:08:58.875716756+02:00

@@ -195,6 +195,105 @@ describe('NewServerForm', () => {
 		expect(calls.some((c) => c.path.endsWith('/start') || c.path.endsWith('/eula'))).toBe(false);
 	});
 
+	describe('Purpur and NeoForge', () => {
+		const EXTENDED = {
+			items: [
+				...CATALOG.items,
+				{ id: 'purpur', name: 'Purpur', available: true, reason: null },
+				{ id: 'neoforge', name: 'NeoForge', available: true, reason: null }
+			]
+		};
+
+		async function createWith(label: string) {
+			await page.getByText(label, { exact: true }).click();
+			await expect
+				.element(page.getByRole('combobox', { name: 'Minecraft version' }))
+				.toHaveTextContent('1.21.1');
+			return async (expected: unknown) => {
+				await next();
+				await page.getByLabelText('Server name').fill('Survival');
+				reply('POST', '/api/v1/servers', ok({ server: managedServer() }, 201));
+				reply('POST', '/api/v1/servers/srv-1/install', ok({ job: job('queued') }, 202));
+				reply('GET', '/api/v1/jobs/job-1', ok(job('succeeded', { progress: 1 })));
+				await toReview();
+				expect(posts('/api/v1/servers')).toHaveLength(0);
+				await page.getByRole('button', { name: 'Create and install' }).click();
+				await vi.waitFor(() => expect(posts('/api/v1/servers')).toHaveLength(1));
+				expect(posts('/api/v1/servers')[0].body).toMatchObject({ software: expected });
+				expect(calls.some((c) => c.path.endsWith('/start'))).toBe(false);
+			};
+		}
+
+		it('shows catalog tiles with decorative local logos', async () => {
+			reply('GET', '/api/v1/software', ok(EXTENDED));
+			setup();
+			await expect.element(page.getByRole('radio', { name: /Purpur/ })).toBeEnabled();
+			await expect.element(page.getByRole('radio', { name: /NeoForge/ })).toBeEnabled();
+			for (const kind of ['vanilla', 'paper', 'purpur', 'neoforge', 'curseforge']) {
+				const logo = document.querySelector<HTMLImageElement>(`img[data-software-logo="${kind}"]`);
+				expect(logo, kind).not.toBeNull();
+				expect(logo!.getAttribute('alt')).toBe('');
+				// Bundled same-origin (or inlined) asset, never a third-party URL.
+				expect(
+					new URL(logo!.src, location.href).origin === location.origin ||
+						logo!.src.startsWith('data:')
+				).toBe(true);
+			}
+		});
+
+		it('creates Purpur with the latest stable build by omitting build', async () => {
+			reply('GET', '/api/v1/software', ok(EXTENDED));
+			reply(
+				'GET',
+				'/api/v1/software/purpur/versions',
+				ok({ items: [{ id: '1.21.1', stable: true }] })
+			);
+			reply(
+				'GET',
+				'/api/v1/software/purpur/versions/1.21.1/builds',
+				ok({ items: [{ id: '2329', stable: true }] })
+			);
+			setup();
+			const finish = await createWith('Purpur');
+			await expect
+				.element(page.getByRole('combobox', { name: 'Purpur build' }))
+				.toHaveTextContent('Latest stable');
+			await finish({ type: 'purpur', version: '1.21.1' });
+			expect(posts('/api/v1/servers')[0].body).not.toHaveProperty('software.build');
+		});
+
+		it('creates NeoForge with separately chosen Minecraft and loader versions', async () => {
+			reply('GET', '/api/v1/software', ok(EXTENDED));
+			reply(
+				'GET',
+				'/api/v1/software/neoforge/versions',
+				ok({
+					items: [
+						{ id: '1.21.1', stable: true },
+						{ id: '1.20.1', stable: true }
+					]
+				})
+			);
+			reply(
+				'GET',
+				'/api/v1/software/neoforge/versions/1.21.1/builds',
+				ok({
+					items: [
+						{ id: '21.1.80-beta', stable: false },
+						{ id: '21.1.77', stable: true }
+					]
+				})
+			);
+			setup();
+			const finish = await createWith('NeoForge');
+			// The loader defaults to the newest stable entry for that Minecraft version.
+			await expect
+				.element(page.getByRole('combobox', { name: 'NeoForge loader' }))
+				.toHaveTextContent('21.1.77');
+			await finish({ type: 'neoforge', version: '1.21.1', loaderVersion: '21.1.77' });
+		});
+	});
+
 	it('defaults the game port to automatic', async () => {
 		reply('GET', '/api/v1/software', ok(CATALOG));
 		setup();

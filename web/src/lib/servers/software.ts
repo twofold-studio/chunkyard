@@ -3,6 +3,7 @@ import type {
 	BuildSoftwareKind,
 	ServerLaunch,
 	LoaderSoftwareKind,
+	OptionalBuildSoftwareKind,
 	ServerSoftware,
 	ServerView,
 	SoftwareKind,
@@ -13,8 +14,10 @@ import type {
 export const SOFTWARE_ORDER: readonly SoftwareKind[] = [
 	'vanilla',
 	'paper',
+	'purpur',
 	'fabric',
 	'forge',
+	'neoforge',
 	'curseforge',
 	'custom'
 ];
@@ -22,8 +25,10 @@ export const SOFTWARE_ORDER: readonly SoftwareKind[] = [
 export const SOFTWARE_LABELS: Record<SoftwareKind, string> = {
 	vanilla: 'Vanilla',
 	paper: 'Paper',
+	purpur: 'Purpur',
 	fabric: 'Fabric',
 	forge: 'Forge',
+	neoforge: 'NeoForge',
 	curseforge: 'CurseForge modpack',
 	custom: 'Custom JAR'
 };
@@ -31,23 +36,41 @@ export const SOFTWARE_LABELS: Record<SoftwareKind, string> = {
 export const SOFTWARE_BLURBS: Record<SoftwareKind, string> = {
 	vanilla: 'Official Mojang server.',
 	paper: 'Fast, plugin-ready fork.',
+	purpur: 'Paper fork with extra options.',
 	fabric: 'Lightweight mod loader.',
 	forge: 'Classic mod loader.',
+	neoforge: 'Modern Forge successor.',
 	curseforge: 'Install a server pack.',
 	custom: 'Bring your own server JAR.'
 };
 
+const VERSIONED = new Set<SoftwareKind>([
+	'vanilla',
+	'paper',
+	'purpur',
+	'fabric',
+	'forge',
+	'neoforge'
+]);
+const OPTIONAL_BUILD = new Set<SoftwareKind>(['paper', 'purpur']);
+const LOADERS = new Set<SoftwareKind>(['fabric', 'forge', 'neoforge']);
+
 export function isVersioned(kind: SoftwareKind): kind is VersionedSoftwareKind {
-	return kind === 'vanilla' || kind === 'paper' || kind === 'fabric' || kind === 'forge';
+	return VERSIONED.has(kind);
 }
 
 export function hasBuilds(kind: SoftwareKind): kind is BuildSoftwareKind {
-	return kind === 'paper' || kind === 'fabric' || kind === 'forge';
+	return OPTIONAL_BUILD.has(kind) || LOADERS.has(kind);
 }
 
-/** Fabric/Forge need an explicit loader; Paper's build is optional. */
+/** Paper/Purpur builds are optional: omitted means the latest stable build at install time. */
+export function hasOptionalBuild(kind: SoftwareKind): kind is OptionalBuildSoftwareKind {
+	return OPTIONAL_BUILD.has(kind);
+}
+
+/** Fabric/Forge/NeoForge need an explicit loader version. */
 export function needsLoader(kind: SoftwareKind): kind is LoaderSoftwareKind {
-	return kind === 'fabric' || kind === 'forge';
+	return LOADERS.has(kind);
 }
 
 /** A managed server that has not completed a successful install yet. */
@@ -71,14 +94,12 @@ export function buildSoftware(selection: {
 		case 'vanilla':
 			return version ? { type: 'vanilla', version } : null;
 		case 'paper':
+		case 'purpur':
 			// No build means "latest stable at install time".
-			return version
-				? build
-					? { type: 'paper', version, build }
-					: { type: 'paper', version }
-				: null;
+			return version ? (build ? { type: kind, version, build } : { type: kind, version }) : null;
 		case 'fabric':
 		case 'forge':
+		case 'neoforge':
 			return version && build ? { type: kind, version, loaderVersion: build } : null;
 		case 'curseforge':
 			return projectId !== null && fileId !== null
@@ -100,15 +121,17 @@ export function describeSoftware(
 	switch (software.type) {
 		case 'vanilla':
 			return { kind: SOFTWARE_LABELS.vanilla, detail: String(software.version) };
-		case 'paper': {
+		case 'paper':
+		case 'purpur': {
 			const build = software.build || launch?.build;
 			return {
-				kind: SOFTWARE_LABELS.paper,
+				kind: SOFTWARE_LABELS[software.type],
 				detail: build ? `${software.version} build ${build}` : `${software.version} latest build`
 			};
 		}
 		case 'fabric':
 		case 'forge':
+		case 'neoforge':
 			return {
 				kind: SOFTWARE_LABELS[software.type],
 				detail: `${software.version} loader ${software.loaderVersion}`
@@ -182,8 +205,8 @@ export function installedDetails(
 	if (launch.version) rows.push({ label: 'Minecraft', value: launch.version });
 	const loader = installedLoader(server);
 	if (loader) rows.push({ label: 'Loader', value: loader });
-	if (software?.type === 'paper' && launch.build) {
-		rows.push({ label: 'Paper build', value: launch.build });
+	if ((software?.type === 'paper' || software?.type === 'purpur') && launch.build) {
+		rows.push({ label: `${SOFTWARE_LABELS[software.type]} build`, value: launch.build });
 	}
 	const override = server.launchOverride ?? null;
 	rows.push({ label: 'Java', value: `Java ${override?.javaMajor ?? launch.javaMajor}` });
@@ -202,7 +225,7 @@ export function installedLoader(server: Pick<ServerView, 'software' | 'launch'>)
 	const loader = server.launch?.loader;
 	if (loader?.type) return `${loaderLabel(loader.type)} ${loader.version}`.trim();
 	const software = server.software;
-	if (software?.type === 'fabric' || software?.type === 'forge') {
+	if (software && 'loaderVersion' in software) {
 		return `${SOFTWARE_LABELS[software.type]} ${software.loaderVersion}`;
 	}
 	return null;

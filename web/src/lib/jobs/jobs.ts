@@ -167,10 +167,10 @@ function num(value: unknown): number | null {
 
 const SCOPE_TEXT: Record<string, string> = {
 	world: 'World',
-	selected: 'Selected paths',
+	selected: 'Selected files',
 	all: 'Full instance'
 };
-const DESTINATION_TEXT: Record<string, string> = { local: 'Manager host', s3: 'S3' };
+const DESTINATION_TEXT: Record<string, string> = { local: 'This manager', s3: 'S3' };
 
 /**
  * A short, allowlisted description of a succeeded job's `result`. Unknown kinds or shapes

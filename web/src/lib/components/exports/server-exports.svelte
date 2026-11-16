@@ -34,10 +34,14 @@
 		type StorageConnection
 	} from '#lib/api/index.js';
 	import {
+		DESTINATION_CHOICES,
 		MAX_SELECTED_PATHS,
+		SCOPE_DETAILS,
+		SCOPE_LABELS,
 		buildExportRequest,
 		exportFromResult,
 		shortHash,
+		storageTarget,
 		upsertExport
 	} from '#lib/exports/exports.js';
 	import { exportSelection } from '#lib/exports/export-selection.svelte.js';
@@ -194,35 +198,31 @@
 	});
 
 	const scopeOptions = [
-		{
-			value: 'world' as const,
-			label: 'World',
-			icon: GlobeIcon,
-			hint: 'Every world folder with a level.dat, including dimensions'
-		},
-		{
-			value: 'all' as const,
-			label: 'Full instance',
-			icon: FolderTreeIcon,
-			hint: 'All files, server.properties, manifest and managed JAR'
-		},
-		{
-			value: 'selected' as const,
-			label: 'Selected paths',
-			icon: ListChecksIcon,
-			hint: 'Specific files or folders'
-		}
+		{ value: 'world' as const, label: SCOPE_LABELS.world, icon: GlobeIcon },
+		{ value: 'all' as const, label: SCOPE_LABELS.all, icon: FolderTreeIcon },
+		{ value: 'selected' as const, label: SCOPE_LABELS.selected, icon: ListChecksIcon }
 	];
+	const bucket = $derived(storageTarget(storage));
 	const destinationOptions = $derived([
-		{ value: 'local' as const, label: 'Manager host', icon: HardDriveIcon },
+		{ value: 'local' as const, label: DESTINATION_CHOICES.local, icon: HardDriveIcon },
 		{
 			value: 's3' as const,
-			label: 'S3',
+			label: DESTINATION_CHOICES.s3,
 			icon: CloudIcon,
 			disabled: !s3Ready,
-			hint: s3Ready ? `Bucket ${storage?.bucket}` : 'Configure S3 storage first'
+			hint: bucket ? `Bucket ${bucket}` : 'Configure S3 storage first'
 		}
 	]);
+	/** Exactly what "Create backup" will make, shown next to the button. */
+	const pathCount = $derived(built.ok ? (built.request.paths?.length ?? 0) : selected.length);
+	const summaryWhat = $derived(
+		scope === 'selected'
+			? `${pathCount} selected ${pathCount === 1 ? 'path' : 'paths'}`
+			: SCOPE_LABELS[scope]
+	);
+	const summaryWhere = $derived(
+		destination === 's3' ? `S3 bucket ${bucket ?? ''}`.trim() : 'this manager'
+	);
 
 	function start(event: SubmitEvent) {
 		event.preventDefault();
@@ -314,13 +314,14 @@
 		<form
 			class="flex flex-col divide-y divide-border overflow-hidden rounded-lg border border-border bg-card"
 			onsubmit={start}
-			aria-label="New export"
+			aria-labelledby={`${pathsId}-now`}
+			data-testid="backup-now"
 			novalidate
 		>
 			<div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5">
 				<ArchiveIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-				<span class="text-sm font-medium">New export</span>
-				<span class="text-xs text-muted-foreground">Compressed .tar.gz, SHA-256 verified</span>
+				<h2 id={`${pathsId}-now`} class="text-sm font-medium">Back up now</h2>
+				<span class="text-xs text-muted-foreground">One-off .tar.gz, SHA-256 verified</span>
 				{#if !stopped}
 					<span
 						class="ml-auto inline-flex items-center gap-1.5 text-xs text-warning"
@@ -333,14 +334,19 @@
 				{/if}
 			</div>
 
-			<div class="grid gap-x-6 gap-y-3 px-4 py-3 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
-				<span class="text-xs font-medium text-muted-foreground">Contents</span>
-				<ChoiceGroup
-					label="Export contents"
-					options={scopeOptions}
-					bind:value={scope}
-					disabled={exporting}
-				/>
+			<div class="grid gap-x-6 gap-y-3 px-4 py-3 sm:grid-cols-[6rem_minmax(0,1fr)] sm:items-start">
+				<span class="pt-1.5 text-xs font-medium text-muted-foreground">What</span>
+				<div class="flex min-w-0 flex-col items-start gap-1.5">
+					<ChoiceGroup
+						label="What to back up"
+						options={scopeOptions}
+						bind:value={scope}
+						disabled={exporting}
+					/>
+					<p class="text-xs text-muted-foreground" data-testid="scope-detail">
+						{SCOPE_DETAILS[scope]}
+					</p>
+				</div>
 
 				{#if scope === 'selected'}
 					<span class="self-start pt-1 text-xs font-medium text-muted-foreground">From Files</span>
@@ -425,10 +431,10 @@
 					</div>
 				{/if}
 
-				<span class="text-xs font-medium text-muted-foreground">Destination</span>
+				<span class="pt-1.5 text-xs font-medium text-muted-foreground">Where</span>
 				<div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
 					<ChoiceGroup
-						label="Export destination"
+						label="Where to store it"
 						options={destinationOptions}
 						bind:value={destination}
 						disabled={exporting}
@@ -441,25 +447,33 @@
 							class="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
 							>Set up S3 storage</a
 						>
-					{:else if destination === 's3'}
-						<span class="truncate font-mono text-xs text-muted-foreground" title={storage?.endpoint}
-							>{storage?.bucket}{storage?.prefix ? `/${storage.prefix}` : ''}</span
+					{:else if bucket}
+						<span
+							class="truncate font-mono text-xs text-muted-foreground"
+							title={storage?.endpoint}
+							data-testid="manual-bucket">{bucket}</span
 						>
 					{/if}
 				</div>
 			</div>
 
-			<div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
-				<p class="min-w-0 flex-1 text-xs text-muted-foreground">
-					The server stays locked until compression{destination === 's3'
-						? ', upload and read-back verification'
-						: ''} finish. Nothing is stopped, restarted or deleted for you.
-				</p>
+			<div class="flex flex-wrap items-center gap-x-3 gap-y-2 bg-muted/30 px-4 py-2.5">
+				<div class="flex min-w-0 flex-1 flex-col gap-0.5">
+					<p class="text-sm" data-testid="export-summary">
+						<span class="font-medium">{summaryWhat}</span>
+						<span class="text-muted-foreground">→</span>
+						<span class="font-medium">{summaryWhere}</span>
+					</p>
+					<p class="text-xs text-muted-foreground">
+						Locks the server until {destination === 's3' ? 'uploaded and verified' : 'verified'}.
+						Nothing is stopped or deleted for you.
+					</p>
+				</div>
 				<Button type="submit" size="sm" disabled={!canSubmit}>
 					{#if exporting}<Spinner data-icon="inline-start" />{:else}<ArchiveIcon
 							data-icon="inline-start"
 						/>{/if}
-					{exporting ? 'Exporting…' : 'Export'}
+					{exporting ? 'Backing up…' : 'Create backup'}
 				</Button>
 			</div>
 
@@ -541,13 +555,16 @@
 		/>
 	{/if}
 
-	<section class="flex flex-col gap-2" aria-label="Archives of this server">
+	<section class="flex flex-col gap-2" aria-labelledby={`${pathsId}-existing`}>
 		<div class="flex items-center gap-2">
-			<h2 class="text-sm font-medium">Archives</h2>
+			<h2 id={`${pathsId}-existing`} class="text-sm font-medium">Existing backups</h2>
+			{#if archives?.length}
+				<span class="text-xs text-muted-foreground tabular-nums">{archives.length}</span>
+			{/if}
 			<a
 				href={resolve('exports')}
 				class="ml-auto text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-				>All archives</a
+				>All servers' backups</a
 			>
 		</div>
 		{#if loadError}
@@ -607,10 +624,9 @@
 				{confirming?.paths?.length === 1 ? 'path' : 'paths'}?
 			</AlertDialog.Title>
 			<AlertDialog.Description>
-				To {confirming?.destination === 's3'
-					? `S3 bucket ${storage?.bucket ?? ''}${storage?.prefix ? `/${storage.prefix}` : ''}`
-					: 'the manager host'}. Folders are archived with everything inside them. The server stays
-				locked until the archive is verified.
+				To {confirming?.destination === 's3' ? `S3 bucket ${bucket ?? ''}` : 'this manager'}.
+				Folders are archived with everything inside them. The server stays locked until the archive
+				is verified.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<ul

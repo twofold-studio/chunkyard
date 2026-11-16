@@ -1,12 +1,7 @@
 <script lang="ts">
-	import PickaxeIcon from '@lucide/svelte/icons/pickaxe';
-	import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
-	import FeatherIcon from '@lucide/svelte/icons/feather';
-	import AnvilIcon from '@lucide/svelte/icons/anvil';
-	import PackageIcon from '@lucide/svelte/icons/package';
 	import FileArchiveIcon from '@lucide/svelte/icons/file-archive';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
-	import type { Component } from 'svelte';
+	import SoftwareLogo from './software-logo.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { ErrorAlert } from '#lib/components/app/index.js';
@@ -52,15 +47,6 @@
 		value = choice.id;
 		onPicked?.(choice.id);
 	}
-
-	const icons: Record<SoftwareKind, Component> = {
-		vanilla: PickaxeIcon,
-		paper: ScrollTextIcon,
-		fabric: FeatherIcon,
-		forge: AnvilIcon,
-		curseforge: PackageIcon,
-		custom: FileArchiveIcon
-	};
 
 	interface Choice {
 		id: SoftwareKind;
@@ -118,7 +104,6 @@
 	{:else if managed.length > 0}
 		<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
 			{#each managed as choice (choice.id)}
-				{@const Icon = icons[choice.id]}
 				{@const selected = value === choice.id}
 				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions (keyboard selection stays native radio behaviour; only pointer clicks continue) -->
 				<label
@@ -135,11 +120,11 @@
 					{@render radio(choice)}
 					<span
 						class={cn(
-							'flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground',
-							selected && 'border-primary/40 text-primary'
+							'flex size-9 items-center justify-center rounded-md border border-border bg-muted/40',
+							selected && 'border-primary/40'
 						)}
 					>
-						<Icon class="size-4" aria-hidden="true" />
+						<SoftwareLogo kind={choice.id} />
 					</span>
 					<span class="flex flex-col gap-0.5">
 						<span class="text-sm leading-tight font-medium">{SOFTWARE_LABELS[choice.id]}</span>

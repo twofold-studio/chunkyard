@@ -3,7 +3,11 @@ import {
 	buildSoftware,
 	cardSummary,
 	describeSoftware,
+	hasBuilds,
+	hasOptionalBuild,
 	installedDetails,
+	isVersioned,
+	needsLoader,
 	installedLoader,
 	monogram,
 	needsInstall,
@@ -34,6 +38,39 @@ describe('buildSoftware', () => {
 			version: '1.20.1',
 			loaderVersion: '47.4.0'
 		});
+	});
+
+	it('builds Purpur like Paper and NeoForge like the other loaders', () => {
+		expect(buildSoftware({ ...base, kind: 'purpur', version: '1.21.1' })).toEqual({
+			type: 'purpur',
+			version: '1.21.1'
+		});
+		expect(buildSoftware({ ...base, kind: 'purpur', version: '1.21.1', build: '2329' })).toEqual({
+			type: 'purpur',
+			version: '1.21.1',
+			build: '2329'
+		});
+		expect(buildSoftware({ ...base, kind: 'neoforge', version: '1.21.1' })).toBeNull();
+		expect(
+			buildSoftware({ ...base, kind: 'neoforge', version: '1.21.1', build: '21.1.77' })
+		).toEqual({ type: 'neoforge', version: '1.21.1', loaderVersion: '21.1.77' });
+		expect(buildSoftware({ ...base, kind: 'fabric', version: '1.21.1', build: '0.16.9' })).toEqual({
+			type: 'fabric',
+			version: '1.21.1',
+			loaderVersion: '0.16.9'
+		});
+	});
+
+	it('classifies versioned, optional-build and loader kinds', () => {
+		for (const kind of ['vanilla', 'paper', 'purpur', 'fabric', 'forge', 'neoforge'] as const) {
+			expect(isVersioned(kind)).toBe(true);
+		}
+		expect(isVersioned('curseforge')).toBe(false);
+		expect(hasBuilds('vanilla')).toBe(false);
+		expect(hasOptionalBuild('purpur')).toBe(true);
+		expect(hasOptionalBuild('neoforge')).toBe(false);
+		expect(needsLoader('neoforge')).toBe(true);
+		expect(needsLoader('purpur')).toBe(false);
 	});
 
 	it('needs both CurseForge IDs and returns null for custom', () => {
@@ -68,6 +105,23 @@ describe('describeSoftware', () => {
 		expect(describeSoftware({ type: 'paper', version: '1.21.1' })).toEqual({
 			kind: 'Paper',
 			detail: '1.21.1 latest build'
+		});
+		expect(describeSoftware({ type: 'purpur', version: '1.21.1', build: '2329' })).toEqual({
+			kind: 'Purpur',
+			detail: '1.21.1 build 2329'
+		});
+		expect(
+			describeSoftware({ type: 'neoforge', version: '1.21.1', loaderVersion: '21.1.77' })
+		).toEqual({ kind: 'NeoForge', detail: '1.21.1 loader 21.1.77' });
+		expect(
+			installedLoader({
+				software: { type: 'neoforge', version: '1.21.1', loaderVersion: '21.1.77' },
+				launch: null
+			})
+		).toBe('NeoForge 21.1.77');
+		expect(cardSummary({ software: { type: 'purpur', version: '1.21.1' }, launch: null })).toEqual({
+			software: 'Purpur',
+			version: '1.21.1'
 		});
 		expect(describeSoftware({ type: 'quilt' } as never)).toEqual({ kind: 'quilt', detail: '' });
 	});

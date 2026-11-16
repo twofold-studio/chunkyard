@@ -18,7 +18,7 @@
 		</p>
 		<p>
 			<span class="text-foreground">World</span> and
-			<span class="text-foreground">Selected paths</span> archives cannot rebuild an instance.
+			<span class="text-foreground">Selected files</span> archives cannot rebuild an instance.
 			Download them and extract manually into a stopped server's directory, for example
 			<code class="font-mono text-foreground">tar -xzf archive.tar.gz -C &lt;server dir&gt;</code>.
 		</p>

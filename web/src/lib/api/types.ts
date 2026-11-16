@@ -160,16 +160,20 @@ export interface InstallOptions {
 }
 
 /** Software kinds listed by `GET /api/v1/software`. */
-export type SoftwareKind = 'vanilla' | 'paper' | 'fabric' | 'forge' | 'curseforge' | 'custom';
+export type SoftwareKind =
+	'vanilla' | 'paper' | 'purpur' | 'fabric' | 'forge' | 'neoforge' | 'curseforge' | 'custom';
 
 /** Kinds that expose `GET /api/v1/software/{kind}/versions`. */
-export type VersionedSoftwareKind = 'vanilla' | 'paper' | 'fabric' | 'forge';
+export type VersionedSoftwareKind = Exclude<SoftwareKind, 'curseforge' | 'custom'>;
 
 /** Kinds with `GET /api/v1/software/{kind}/versions/{version}/builds`. */
-export type BuildSoftwareKind = 'paper' | 'fabric' | 'forge';
+export type BuildSoftwareKind = Exclude<VersionedSoftwareKind, 'vanilla'>;
 
-/** Kinds that require a loader build (`loaderVersion`). */
-export type LoaderSoftwareKind = 'fabric' | 'forge';
+/** Kinds that require a loader version (`loaderVersion`). */
+export type LoaderSoftwareKind = 'fabric' | 'forge' | 'neoforge';
+
+/** Kinds whose `build` is optional (omitted = latest stable build at install time). */
+export type OptionalBuildSoftwareKind = 'paper' | 'purpur';
 
 export interface SoftwareCatalogItem {
 	id: SoftwareKind;
@@ -187,8 +191,8 @@ export interface SoftwareVersion {
 /** `software` in `POST /api/v1/servers`; omitted for custom/manual JAR servers. */
 export type ServerSoftware =
 	| { type: 'vanilla'; version: string }
-	/** `build` omitted/null selects the latest stable Paper build at install time. */
-	| { type: 'paper'; version: string; build?: string | null }
+	/** `build` omitted/null selects the latest stable build at install time. */
+	| { type: OptionalBuildSoftwareKind; version: string; build?: string | null }
 	| { type: LoaderSoftwareKind; version: string; loaderVersion: string }
 	| { type: 'curseforge'; projectId: number; fileId: number };
 

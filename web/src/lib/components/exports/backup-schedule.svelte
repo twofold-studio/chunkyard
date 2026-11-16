@@ -43,6 +43,7 @@
 		sameBackup,
 		SCHEDULE_LIMITS
 	} from '#lib/servers/automation.js';
+	import { storageTarget } from '#lib/exports/exports.js';
 	import { resolve } from '$app/paths';
 
 	interface Props {
@@ -102,6 +103,7 @@
 	});
 
 	const s3Ready = $derived(storage?.configured === true);
+	const target = $derived(storageTarget(storage));
 	const dirty = $derived(
 		automation !== null && draft !== null && !sameBackup(automation.backup, draft)
 	);
@@ -166,8 +168,7 @@
 >
 	<div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5">
 		<CalendarClockIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-		<h2 id={`${id}-title`} class="text-sm font-medium">Scheduled backups</h2>
-		<span class="text-xs text-muted-foreground">Full instance to S3, only while stopped</span>
+		<h2 id={`${id}-title`} class="text-sm font-medium">Automatic schedule</h2>
 		{#if automation}
 			<Badge variant={automation.backup.enabled ? 'success' : 'outline'} class="ml-auto"
 				>{automation.backup.enabled
@@ -176,6 +177,33 @@
 			>
 		{/if}
 	</div>
+
+	<!-- Fixed by the backend: scheduled backups are always full instances to the saved S3 target. -->
+	<dl
+		class="grid gap-px bg-border sm:grid-cols-3 [&>div]:flex [&>div]:min-w-0 [&>div]:flex-col [&>div]:gap-0.5 [&>div]:bg-card [&>div]:px-4 [&>div]:py-2.5"
+		data-testid="schedule-fixed"
+	>
+		<div>
+			<dt class="text-xs text-muted-foreground">What</dt>
+			<dd class="text-sm font-medium">Full instance</dd>
+			<dd class="text-xs text-muted-foreground">World, software, mods and config</dd>
+		</div>
+		<div>
+			<dt class="text-xs text-muted-foreground">Where</dt>
+			<dd class="text-sm font-medium">S3 compatible storage</dd>
+			<dd
+				class="truncate font-mono text-xs text-muted-foreground"
+				title={storage?.endpoint || undefined}
+			>
+				{#if target}{target}{:else if storage}Not set up{:else}—{/if}
+			</dd>
+		</div>
+		<div>
+			<dt class="text-xs text-muted-foreground">When</dt>
+			<dd class="text-sm font-medium">Only while stopped</dd>
+			<dd class="text-xs text-muted-foreground">Skipped if running, never stopped for you</dd>
+		</div>
+	</dl>
 
 	{#if loadError}
 		<div class="px-4 py-3">
@@ -196,7 +224,14 @@
 			</p>
 		{/if}
 
-		<form class="flex flex-col gap-3 px-4 py-3" onsubmit={save} novalidate>
+		{@render status(automation)}
+
+		<form
+			class="flex flex-col gap-3 px-4 py-3"
+			onsubmit={save}
+			aria-label="Change schedule"
+			novalidate
+		>
 			<label class="flex items-start gap-3">
 				<Switch
 					class="mt-0.5"
@@ -207,8 +242,7 @@
 				<span class="flex min-w-0 flex-col">
 					<span class="text-sm">Back up on a schedule</span>
 					<span id={`${id}-enabled-help`} class="text-xs text-muted-foreground"
-						>Runs only while the server is stopped. A running server is skipped, never stopped for
-						you. Missed runs are not caught up.</span
+						>A running server is skipped, never stopped for you. Missed runs are not caught up.</span
 					>
 				</span>
 			</label>
@@ -324,50 +358,64 @@
 				</Button>
 			</div>
 		</form>
-
-		<dl
-			class="grid gap-x-4 gap-y-1.5 px-4 py-3 text-xs sm:grid-cols-[8rem_minmax(0,1fr)]"
-			data-testid="schedule-status"
-		>
-			<dt class="text-muted-foreground">Next run</dt>
-			<dd>
-				{#if automation.backup.enabled && automation.nextBackupAt}
-					{formatUnix(automation.nextBackupAt)}
-					<span class="text-muted-foreground">({relativeUnix(automation.nextBackupAt, now)})</span>
-				{:else}
-					—
-				{/if}
-			</dd>
-			<dt class="text-muted-foreground">Last result</dt>
-			<dd class="flex min-w-0 flex-wrap items-center gap-2">
-				{#if automation.lastBackupResult}
-					<Badge variant={lastVariant}>{backupResultText(automation.lastBackupResult)}</Badge>
-				{:else}
-					<span>No scheduled backup yet</span>
-				{/if}
-				{#if automation.lastBackupJob}
-					<a
-						href={resolve(`activity/${automation.lastBackupJob}`)}
-						class="underline underline-offset-4"
-						data-testid="schedule-job-link">Job in Activity</a
-					>
-				{/if}
-			</dd>
-			{#if automation.lastBackupAt}
-				<dt class="text-muted-foreground">Last verified</dt>
-				<dd>
-					{formatUnix(automation.lastBackupAt)}
-					{#if automation.lastBackupExportId}<span class="font-mono text-muted-foreground"
-							>· {automation.lastBackupExportId.slice(0, 12)}</span
-						>{/if}
-				</dd>
-			{/if}
-			{#if automation.lastBackupError}
-				<dt class="text-muted-foreground">Note</dt>
-				<dd class={lastTone === 'danger' ? 'text-destructive' : 'text-muted-foreground'}>
-					{automation.lastBackupError}
-				</dd>
-			{/if}
-		</dl>
 	{/if}
 </section>
+
+{#snippet status(automation: AutomationState)}
+	<dl
+		class="grid gap-x-4 gap-y-1.5 px-4 py-3 text-xs sm:grid-cols-[7rem_minmax(0,1fr)]"
+		data-testid="schedule-status"
+	>
+		<dt class="text-muted-foreground">Frequency</dt>
+		<dd>
+			{automation.backup.enabled
+				? formatInterval(automation.backup.intervalMinutes)
+				: 'Off: no automatic backups'}
+		</dd>
+		<dt class="text-muted-foreground">Retention</dt>
+		<dd>
+			{automation.backup.keepLast === null
+				? 'Keep every scheduled backup'
+				: `Keep the newest ${automation.backup.keepLast} scheduled ${automation.backup.keepLast === 1 ? 'backup' : 'backups'}`}
+		</dd>
+		<dt class="text-muted-foreground">Next run</dt>
+		<dd>
+			{#if automation.backup.enabled && automation.nextBackupAt}
+				{formatUnix(automation.nextBackupAt)}
+				<span class="text-muted-foreground">({relativeUnix(automation.nextBackupAt, now)})</span>
+			{:else}
+				—
+			{/if}
+		</dd>
+		<dt class="text-muted-foreground">Last result</dt>
+		<dd class="flex min-w-0 flex-wrap items-center gap-2">
+			{#if automation.lastBackupResult}
+				<Badge variant={lastVariant}>{backupResultText(automation.lastBackupResult)}</Badge>
+			{:else}
+				<span>No scheduled backup yet</span>
+			{/if}
+			{#if automation.lastBackupJob}
+				<a
+					href={resolve(`activity/${automation.lastBackupJob}`)}
+					class="underline underline-offset-4"
+					data-testid="schedule-job-link">Job in Activity</a
+				>
+			{/if}
+		</dd>
+		{#if automation.lastBackupAt}
+			<dt class="text-muted-foreground">Last verified</dt>
+			<dd>
+				{formatUnix(automation.lastBackupAt)}
+				{#if automation.lastBackupExportId}<span class="font-mono text-muted-foreground"
+						>· {automation.lastBackupExportId.slice(0, 12)}</span
+					>{/if}
+			</dd>
+		{/if}
+		{#if automation.lastBackupError}
+			<dt class="text-muted-foreground">Note</dt>
+			<dd class={lastTone === 'danger' ? 'text-destructive' : 'text-muted-foreground'}>
+				{automation.lastBackupError}
+			</dd>
+		{/if}
+	</dl>
+{/snippet}

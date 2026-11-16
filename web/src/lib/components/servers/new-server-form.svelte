@@ -43,6 +43,7 @@
 	import {
 		buildSoftware,
 		describeSoftware,
+		hasOptionalBuild,
 		isVersioned,
 		needsLoader,
 		SOFTWARE_LABELS
@@ -251,8 +252,8 @@
 		if (kind === 'curseforge')
 			return 'Browse CurseForge, choose a pack, then pick a release that ships a server pack.';
 		if (needsLoader(kind)) return `Minecraft version and ${SOFTWARE_LABELS[kind]} loader.`;
-		if (kind === 'paper')
-			return 'Minecraft version and Paper build. Stable releases are listed first.';
+		if (hasOptionalBuild(kind))
+			return `Minecraft version and ${SOFTWARE_LABELS[kind]} build. Stable releases are listed first.`;
 		return 'Minecraft version to install. Stable releases are listed first.';
 	});
 	const stepLabels = $derived(steps.map((step) => stepLabel(step, kind)));

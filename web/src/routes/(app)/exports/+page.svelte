@@ -27,6 +27,7 @@
 		restoreAllowed,
 		type BackupGroup
 	} from '#lib/exports/backups.js';
+	import { storageTarget } from '#lib/exports/exports.js';
 	import { formatBytes } from '#lib/metrics.js';
 	import type { PageProps } from './$types';
 
@@ -105,11 +106,41 @@
 <PageHeader
 	title="Storage & exports"
 	icon={ArchiveIcon}
-	description="Compressed server archives on the manager host or S3. Archives are independent of servers and stay here after a server is deleted. Create new exports from a server's Exports tab."
+	description="Existing backups of every server, on this manager or in S3. They stay here after a server is deleted."
 	meta={exports.length
-		? `${exports.length} ${exports.length === 1 ? 'archive' : 'archives'}`
+		? `${exports.length} ${exports.length === 1 ? 'backup' : 'backups'}`
 		: undefined}
 />
+
+<!-- Where each kind of backup work happens, so this page is not mistaken for the place to create one. -->
+<dl
+	class="grid gap-px overflow-hidden rounded-lg border border-border bg-border text-xs sm:grid-cols-3 [&>div]:flex [&>div]:min-w-0 [&>div]:flex-col [&>div]:gap-0.5 [&>div]:bg-card [&>div]:px-4 [&>div]:py-2.5"
+	data-testid="backup-overview"
+>
+	<div>
+		<dt class="font-medium">Back up now</dt>
+		<dd class="text-muted-foreground">
+			World, full instance or selected files, from a server's Exports tab.
+		</dd>
+	</div>
+	<div>
+		<dt class="font-medium">Automatic schedule</dt>
+		<dd class="text-muted-foreground">
+			Per server, in its Exports tab. Always the full instance to
+			{#if storageTarget(storage)}<span class="font-mono text-foreground"
+					>{storageTarget(storage)}</span
+				>{:else}S3 storage{/if}, only while stopped.
+		</dd>
+	</div>
+	<div>
+		<dt class="font-medium">Existing backups</dt>
+		<dd class="text-muted-foreground">
+			{exports.length
+				? `${exports.length} ${exports.length === 1 ? 'backup' : 'backups'} · ${formatBytes(totalBytes)}`
+				: 'None yet'}. Listed below.
+		</dd>
+	</div>
+</dl>
 
 {#if refreshError}
 	<ErrorAlert error={refreshError} hint="The lists below may be out of date.">
@@ -132,21 +163,21 @@
 			value="servers"
 			class="flex-none px-1 group-data-horizontal/tabs:after:bottom-[-4px]"
 		>
-			<ServerIcon data-icon="inline-start" aria-hidden="true" />Servers
+			<ServerIcon data-icon="inline-start" aria-hidden="true" />By server
 			<span class="text-xs text-muted-foreground tabular-nums">{groups.length}</span>
 		</Tabs.Trigger>
 		<Tabs.Trigger
 			value="archives"
 			class="flex-none px-1 group-data-horizontal/tabs:after:bottom-[-4px]"
 		>
-			<ArchiveIcon data-icon="inline-start" aria-hidden="true" />Archives
+			<ArchiveIcon data-icon="inline-start" aria-hidden="true" />All backups
 			<span class="text-xs text-muted-foreground tabular-nums">{exports.length}</span>
 		</Tabs.Trigger>
 		<Tabs.Trigger
 			value="storage"
 			class="flex-none px-1 group-data-horizontal/tabs:after:bottom-[-4px]"
 		>
-			<CloudCogIcon data-icon="inline-start" aria-hidden="true" />Storage
+			<CloudCogIcon data-icon="inline-start" aria-hidden="true" />S3 storage
 		</Tabs.Trigger>
 	</Tabs.List>
 
@@ -168,16 +199,13 @@
 	<Tabs.Content value="archives">
 		{#if tab === 'archives'}
 			<Reveal class="flex flex-col gap-2">
-				<section class="flex flex-col gap-2" aria-label="All archives">
-					{#if exports.length}
-						<p class="text-xs text-muted-foreground">{formatBytes(totalBytes)} total</p>
-					{/if}
+				<section class="flex flex-col gap-2" aria-label="All backups">
 					<ExportList
 						{exports}
 						showServer
 						{serverIds}
 						{pinnedIds}
-						emptyText="No archives yet. Stop a server and open its Exports tab to create one."
+						emptyText="No backups yet. Stop a server and use Back up now in its Exports tab."
 						ondeleted={removed}
 						onrestore={servers === null ? undefined : askRestoreRecord}
 						restorable={(record) =>
