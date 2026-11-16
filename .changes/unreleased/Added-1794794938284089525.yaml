@@ -1,3 +1,0 @@
-kind: Added
-body: 'Frontend: offer Purpur and NeoForge in the new-server wizard when GET /api/v1/software lists them. POST /api/v1/servers sends {type:''purpur'',version,build?} (build omitted = latest stable at install) and {type:''neoforge'',version,loaderVersion}; Minecraft and loader versions are chosen separately from the existing /software/{kind}/versions and /builds lists. Server summaries, cards and the software filter show both kinds. Software tiles use bundled official Minecraft, Paper, Purpur, Fabric, Forge, NeoForge and CurseForge logos served same-origin, with an icon fallback.'
-time: 2026-11-16T04:08:58.284089525+02:00

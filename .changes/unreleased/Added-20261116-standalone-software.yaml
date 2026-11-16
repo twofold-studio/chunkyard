@@ -1,3 +1,0 @@
-kind: Added
-body: 'REST API: add managed Fabric, Forge, NeoForge and Purpur selections, provider version/build catalogs and verified automatic downloads. Mod loaders use isolated Docker preparation and retain explicit EULA/start requirements. Purpur checks its published MD5 over HTTPS and records a SHA-256 fingerprint.'
-time: 2026-11-16T03:00:00Z
