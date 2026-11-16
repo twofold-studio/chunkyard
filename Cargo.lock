@@ -397,7 +397,6 @@ version = "0.14.1"
 dependencies = [
  "axum",
  "chunkyard-auth",
- "chunkyard-config",
  "chunkyard-core",
  "futures-util",
  "serde",

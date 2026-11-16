@@ -24,7 +24,7 @@ async function api(path, method = 'GET', body) {
     method, headers: { Origin: base, 'X-MCM-CSRF': '1', ...(body ? { 'Content-Type': 'application/json' } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
-  if (!response.ok) throw new Error(`${method} ${path}: ${response.status()} ${await response.text()}`);
+  if (!response.ok) throw new Error(`${method} ${path}: ${response.status} ${await response.text()}`);
   return response.status === 204 ? null : response.json();
 }
 async function until(check, timeout = 240000) {
@@ -111,21 +111,21 @@ try {
   assert(history.items.length > 0, 'Background history must collect without a browser');
   const { chromium } = createRequire(new URL('../web/package.json', import.meta.url))('playwright');
   browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || '/run/current-system/sw/bin/google-chrome-stable' });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto(`${base}/servers/${id}`);
   await page.getByText('Minecraft answered a Server List Ping.', { exact: false }).first().waitFor();
-  await page.screenshot({ path: '/tmp/chunkyard-014-overview.png', fullPage: true });
+  await page.screenshot({ path: '/tmp/chunkyard-refactor-overview.png', fullPage: true });
   await page.getByRole('button', { name: '1h', exact: true }).click();
   await page.getByTestId('stored-history-note').waitFor();
-  await page.screenshot({ path: '/tmp/chunkyard-014-history.png', fullPage: true });
+  await page.screenshot({ path: '/tmp/chunkyard-refactor-history.png', fullPage: true });
   await page.getByRole('tab', { name: 'Players', exact: true }).click();
   await page.getByRole('tab', { name: /^Whitelist/ }).waitFor();
-  await page.screenshot({ path: '/tmp/chunkyard-014-players.png', fullPage: true });
+  await page.screenshot({ path: '/tmp/chunkyard-refactor-players.png', fullPage: true });
   await page.getByRole('tab', { name: 'Settings', exact: true }).click();
   await page.getByText('Crash recovery', { exact: false }).first().waitFor();
-  await page.screenshot({ path: '/tmp/chunkyard-014-settings.png', fullPage: true });
+  await page.screenshot({ path: '/tmp/chunkyard-refactor-settings.png', fullPage: true });
   assert.deepEqual(pageErrors, [], 'Real UI must not report JavaScript errors');
   await browser.close(); browser = null;
   await job(await api(`/servers/${id}/stop`, 'POST'));

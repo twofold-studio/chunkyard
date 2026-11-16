@@ -36,6 +36,8 @@ The `java` CLI subcommand, `/api/v1/java/*` routes and `[java]` configuration ar
 
 The production dependency graph keeps shared contracts in `chunkyard-core`, SQLite implementations in `chunkyard-db`, and HTTP transport in `chunkyard-api`/`chunkyard-server`. The server crate assembles concrete implementations; internal modules remain private unless another crate needs their interface. Test-only packages cannot become production dependencies.
 
+`chunkyard_server::wiring::build_state` assembles production services. Tests use `build_state_with_dependencies` to supply a runtime and software provider before assembly, so HTTP, background operations and shutdown share the same service instances. Export operations acquire a guarded instance interface that retains admission and task leases through snapshotting and publication.
+
 The `chunkyard-api-tests` package is retained as a test-only system suite. Related scenarios are nested modules under the `contracts`, `instances`, `streams` and `storage` test targets; real Docker targets remain separate and opt-in. This compiles shared fixtures fewer times while retaining independent temporary databases and runtimes. CI uses four test threads to bound simultaneous fixture work; use `RUST_TEST_THREADS=4` locally on constrained machines.
 
 ```sh

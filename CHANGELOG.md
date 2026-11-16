@@ -14,9 +14,13 @@ Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fr
 ### Changed
 
 - Group HTTP/WebSocket integration suites into fewer test executables, preserving existing scenarios and opt-in Docker checks. Add CI checks for production crate boundaries and 400-line Rust module budgets with explicit, bounded exceptions; update architecture and runtime documentation to match the implemented workspace.
-- Keep filesystem, authentication, download and installer public Rust paths stable while moving error types, client construction and repository error mapping behind thin crate entry points.
+- Split server contracts, lifecycle, archive operations, scheduling and MCP handling into cohesive modules. Keep public Rust paths stable while moving error types, client construction and repository error mapping behind thin crate entry points; REST and persisted data formats remain unchanged.
 - Set release builds to explicit level-3 optimization and one code-generation unit alongside thin LTO and symbol stripping. Remove the obsolete mcm.example.toml; effective configuration remains available through mcm config check.
 - Refactored filesystem sandbox, verified downloads and CurseForge pack preparation into cohesive Rust modules while preserving public APIs, safety limits and launch detection behavior.
+
+### Fixed
+
+- Backend: assemble injected runtime and software services once so background recovery and shutdown share the services exposed by the API.
 ## 0.14.1 - 2026-11-16
 
 

@@ -1,3 +1,3 @@
 kind: Changed
-body: 'Keep filesystem, authentication, download and installer public Rust paths stable while moving error types, client construction and repository error mapping behind thin crate entry points.'
+body: 'Split server contracts, lifecycle, archive operations, scheduling and MCP handling into cohesive modules. Keep public Rust paths stable while moving error types, client construction and repository error mapping behind thin crate entry points; REST and persisted data formats remain unchanged.'
 time: 2026-11-16T00:35:00Z
