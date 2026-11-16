@@ -17,4 +17,6 @@ In a shared checkout, do not run repository-wide stash/pop/reset/restore/clean o
 
 # Milestone commits
 
+Track elapsed wall-clock time for each requested fix from the first inspection through verified deployment. Record time spent diagnosing, implementing, validating and releasing, and report the breakdown when finished so delivery bottlenecks are visible.
+
 After a requested set of changes is complete and its relevant checks pass, batch its Changie notes into an appropriate next semantic version, update project package versions/lockfiles, regenerate the changelog, commit, push the configured upstream, and verify the Gitadel→Dokploy deployment. New requests received during work join the current set unless explicitly separate. The user has authorized this ongoing workflow. Do not force-push, create tags, publish forge releases, or include secrets, local app data, build output, or unrelated work. If a push or deployment is blocked, report the blocker and retain the local commit.

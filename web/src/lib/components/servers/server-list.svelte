@@ -3,6 +3,7 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
 	import ServerGrid from './server-grid.svelte';
 	import {
 		applyView,
@@ -65,9 +66,6 @@
 		software = 'all';
 		location = 'all';
 	}
-
-	const selectClass =
-		'h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30';
 </script>
 
 {#if servers.length}
@@ -92,36 +90,59 @@
 			/>
 		</div>
 		<div class="flex flex-wrap items-center gap-2">
-			<select class={selectClass} aria-label="Filter by state" bind:value={stateFilter}>
-				<option value="all">All states</option>
-				{#each Object.entries(STATE_LABELS) as [value, label] (value)}
-					<option {value}>{label}</option>
-				{/each}
-			</select>
+			<Select.Root type="single" bind:value={stateFilter}>
+				<Select.Trigger size="sm" aria-label="Filter by state">
+					{stateFilter === 'all' ? 'All states' : STATE_LABELS[stateFilter]}
+				</Select.Trigger>
+				<Select.Content
+					><Select.Group>
+						<Select.Item value="all" label="All states" />
+						{#each Object.entries(STATE_LABELS) as [value, label] (value)}
+							<Select.Item {value} {label} />
+						{/each}
+					</Select.Group></Select.Content
+				>
+			</Select.Root>
 			{#if anyArchived || location !== 'all'}
-				<select class={selectClass} aria-label="Filter by location" bind:value={location}>
-					<option value="all">Local and archived</option>
-					{#each Object.entries(LOCATION_LABELS) as [value, label] (value)}
-						<option {value}>{label}</option>
-					{/each}
-				</select>
+				<Select.Root type="single" bind:value={location}>
+					<Select.Trigger size="sm" aria-label="Filter by location">
+						{location === 'all' ? 'Local and archived' : LOCATION_LABELS[location]}
+					</Select.Trigger>
+					<Select.Content
+						><Select.Group>
+							<Select.Item value="all" label="Local and archived" />
+							{#each Object.entries(LOCATION_LABELS) as [value, label] (value)}
+								<Select.Item {value} {label} />
+							{/each}
+						</Select.Group></Select.Content
+					>
+				</Select.Root>
 			{/if}
-			<select class={selectClass} aria-label="Filter by software" bind:value={software}>
-				<option value="all">All software</option>
-				{#each softwareChoices as value (value)}
-					<option {value}>{softwareFilterLabel(value)}</option>
-				{/each}
-			</select>
-			<select
-				class={selectClass}
-				aria-label="Sort servers"
-				value={sort}
-				onchange={(event) => setSort(event.currentTarget.value as SortKey)}
-			>
-				{#each Object.entries(SORT_LABELS) as [value, label] (value)}
-					<option {value}>Sort: {label}</option>
-				{/each}
-			</select>
+			<Select.Root type="single" bind:value={software}>
+				<Select.Trigger size="sm" aria-label="Filter by software">
+					{software === 'all' ? 'All software' : softwareFilterLabel(software)}
+				</Select.Trigger>
+				<Select.Content
+					><Select.Group>
+						<Select.Item value="all" label="All software" />
+						{#each softwareChoices as value (value)}
+							<Select.Item {value} label={softwareFilterLabel(value)} />
+						{/each}
+					</Select.Group></Select.Content
+				>
+			</Select.Root>
+			<Select.Root type="single" value={sort} onValueChange={(next) => setSort(next as SortKey)}>
+				<Select.Trigger size="sm" aria-label="Sort servers"
+					>Sort: {SORT_LABELS[sort]}</Select.Trigger
+				>
+				<Select.Content
+					><Select.Group>
+						{#each Object.entries(SORT_LABELS) as [value, label] (value)}
+							<Select.Item {value} {label} />
+						{/each}
+					</Select.Group></Select.Content
+				>
+			</Select.Root>
 			{#if filtered}
 				<Button variant="ghost" size="sm" onclick={clearFilters}>
 					<XIcon aria-hidden="true" />Clear

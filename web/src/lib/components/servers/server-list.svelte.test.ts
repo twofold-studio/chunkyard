@@ -96,9 +96,11 @@ describe('ServerList', () => {
 	it('filters by state and persists the sort preference', async () => {
 		const storage = memoryStorage();
 		render(ServerList, { servers, createHref: '/servers/new', storage });
-		await page.getByRole('combobox', { name: 'Filter by state' }).selectOptions('running');
+		await page.getByRole('combobox', { name: 'Filter by state' }).click();
+		await page.getByRole('option', { name: 'Running', exact: true }).click();
 		await expect.element(page.getByText('No loaded servers match these filters.')).toBeVisible();
-		await page.getByRole('combobox', { name: 'Sort servers' }).selectOptions('port');
+		await page.getByRole('combobox', { name: 'Sort servers' }).click();
+		await page.getByRole('option', { name: 'Port', exact: true }).click();
 		expect(storage.getItem('chunkyard.servers.view')).toBe('port');
 	});
 
@@ -109,6 +111,18 @@ describe('ServerList', () => {
 		const items = page.getByRole('listitem').elements();
 		expect(items[1].textContent).toContain('Beta');
 		expect(items[2].textContent).toContain('Alpha');
+	});
+	it('supports keyboard selection and Escape without changing the filter', async () => {
+		render(ServerList, { servers, createHref: '/servers/new', storage: memoryStorage() });
+		const control = page.getByRole('combobox', { name: 'Filter by software' });
+		await control.click();
+		await userEvent.keyboard('Paper{Enter}');
+		await expect.element(control).toHaveTextContent('Paper');
+		await expect.element(page.getByTestId('list-count')).toHaveTextContent('1 of 2 loaded servers');
+		await control.click();
+		await userEvent.keyboard('{ArrowDown}{Escape}');
+		await expect.element(control).toHaveTextContent('Paper');
+		await expect.element(control).toHaveFocus();
 	});
 	it('adds a location filter only when archived servers exist and keeps the create tile', async () => {
 		const first = render(ServerList, {
@@ -131,7 +145,8 @@ describe('ServerList', () => {
 			createHref: '/servers/new',
 			storage: memoryStorage()
 		});
-		await page.getByRole('combobox', { name: 'Filter by location' }).selectOptions('archived');
+		await page.getByRole('combobox', { name: 'Filter by location' }).click();
+		await page.getByRole('option', { name: 'Archived', exact: true }).click();
 		await expect.element(page.getByTestId('list-count')).toHaveTextContent('1 of 3 loaded servers');
 		await expect.element(page.getByText('Gamma')).toBeVisible();
 		await expect.element(page.getByRole('link', { name: /Create server/ })).toBeVisible();

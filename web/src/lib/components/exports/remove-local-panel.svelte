@@ -10,6 +10,7 @@
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import * as Select from '#lib/components/ui/select/index.js';
 	import { ErrorAlert } from '#lib/components/app/index.js';
 	import JobWorkProgress from '#lib/components/jobs/job-work-progress.svelte';
 	import { isJobActive, type ExportRecord, type Job } from '#lib/api/index.js';
@@ -61,9 +62,6 @@
 		confirming = false;
 		onConfirm(choice.id);
 	}
-
-	const selectClass =
-		'h-8 min-w-0 max-w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 dark:bg-input/30';
 </script>
 
 <section
@@ -90,21 +88,30 @@
 			</p>
 		{:else}
 			<label for={selectId} class="text-xs font-medium text-muted-foreground">Backup</label>
-			<select
-				id={selectId}
-				class={selectClass}
-				value={choice?.id}
-				onchange={(event) => (chosen = event.currentTarget.value)}
+			<Select.Root
+				type="single"
+				value={choice?.id ?? ''}
+				onValueChange={(next) => (chosen = next)}
 				disabled={working}
 			>
-				{#each candidates as candidate (candidate.id)}
-					<option value={candidate.id}
-						>{formatExportTime(candidate.createdAt)} · {formatAge(candidate.createdAt, now)} · {formatBytes(
-							candidate.size
-						)}</option
+				<Select.Trigger id={selectId} size="sm" class="max-w-full min-w-0">
+					<span class="truncate"
+						>{#if choice}{formatExportTime(choice.createdAt)} · {formatAge(choice.createdAt, now)} · {formatBytes(
+								choice.size
+							)}{/if}</span
 					>
-				{/each}
-			</select>
+				</Select.Trigger>
+				<Select.Content class="max-h-72 max-w-[calc(100vw-2rem)]"
+					><Select.Group>
+						{#each candidates as candidate (candidate.id)}
+							<Select.Item
+								value={candidate.id}
+								label={`${formatExportTime(candidate.createdAt)} · ${formatAge(candidate.createdAt, now)} · ${formatBytes(candidate.size)}`}
+							/>
+						{/each}
+					</Select.Group></Select.Content
+				>
+			</Select.Root>
 			<Button
 				size="sm"
 				variant="outline"

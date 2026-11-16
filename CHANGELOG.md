@@ -4,6 +4,12 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## 0.15.1 - 2026-11-16
+
+
+### Fixed
+
+- Use themed, keyboard-accessible Select menus for server filters, sorting and backup selection instead of native browser dropdowns.
 ## 0.15.0 - 2026-11-16
 
 

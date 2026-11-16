@@ -487,8 +487,9 @@ describe('ServerExports recovered export', () => {
 			const select = page.getByRole('combobox', { name: 'Backup' });
 			await expect.element(select).toBeVisible();
 			// Only full S3 backups are offered.
-			expect(select.element().querySelectorAll('option')).toHaveLength(2);
-			await select.selectOptions('old');
+			await select.click();
+			expect(page.getByRole('option').elements()).toHaveLength(2);
+			await page.getByRole('option').nth(1).click();
 			await page.getByRole('button', { name: 'Remove local files…' }).click();
 			const confirm = page.getByRole('button', { name: 'Remove local files', exact: true });
 			await expect.element(confirm).toBeDisabled();
