@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { ServerView } from '#lib/api/index.js';
-import { createServerSource, searchDestinations, serverHref } from './palette.js';
+import {
+	createServerSource,
+	EXPORTS_TABS,
+	exportsHref,
+	INTEGRATIONS_TABS,
+	integrationsHref,
+	parseTab,
+	searchDestinations,
+	serverHref
+} from './palette.js';
 
 const server = (id: string, extra: Partial<ServerView> = {}): ServerView => ({
 	archive: null,
@@ -52,6 +61,27 @@ describe('palette destinations', () => {
 		expect(console[0].href).toMatch(/\/servers\/p1\?tab=console$/);
 		expect(searchDestinations(list, '25570 files')[0].href).toMatch(/\?tab=files$/);
 		expect(searchDestinations(list, 'zzz')).toEqual([]);
+	});
+
+	it('links settings and the storage/integrations tabs directly', () => {
+		const href = (query: string) => searchDestinations([], query)[0]?.href;
+		expect(href('settings')).toMatch(/\/settings$/);
+		expect(href('s3')).toMatch(/\/exports\?tab=storage$/);
+		expect(href('mcp server')).toMatch(/\/integrations\?tab=mcp$/);
+		expect(searchDestinations([], 'all backups').map((d) => d.href)).toEqual([
+			exportsHref('exports')
+		]);
+		expect(exportsHref('servers')).toMatch(/\/exports$/);
+		expect(integrationsHref('api-keys')).toMatch(/\/integrations$/);
+	});
+
+	it('parses tab queries with a default and legacy aliases', () => {
+		expect(parseTab(EXPORTS_TABS, null)).toBe('servers');
+		expect(parseTab(EXPORTS_TABS, 'storage')).toBe('storage');
+		expect(parseTab(EXPORTS_TABS, 'archives')).toBe('exports');
+		expect(parseTab(EXPORTS_TABS, 'nope')).toBe('servers');
+		expect(parseTab(INTEGRATIONS_TABS, 'mcp')).toBe('mcp');
+		expect(parseTab(INTEGRATIONS_TABS, 'storage')).toBe('api-keys');
 	});
 
 	it('percent-encodes server IDs so a hostile ID cannot change the route', () => {

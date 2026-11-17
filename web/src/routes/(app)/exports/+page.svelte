@@ -29,6 +29,9 @@
 	} from '#lib/exports/backups.js';
 	import { storageTarget } from '#lib/exports/exports.js';
 	import { formatBytes } from '#lib/metrics.js';
+	import { EXPORTS_TABS, parseTab, type ExportsTab } from '#lib/navigation/palette.js';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -43,8 +46,32 @@
 	const pinnedIds = $derived(groups.flatMap((g) => (g.pinned ? [g.pinned.id] : [])));
 	const serverIds = $derived(servers ? servers.map((s) => s.id) : null);
 
-	type TabValue = 'servers' | 'archives' | 'storage';
-	let tab = $state<TabValue>('servers');
+	let tab = $state<ExportsTab>(parseTab(EXPORTS_TABS, page.url.searchParams.get('tab')));
+	/** S3 storage stays mounted after its first visit so unsaved connection edits survive tab switches. */
+	let storageVisited = $state(untrack(() => tab) === 'storage');
+
+	// Palette links and history navigation select the tab named in the query.
+	$effect(() => {
+		const url = page.shallow?.url ?? page.url;
+		const requested = parseTab(EXPORTS_TABS, url.searchParams.get('tab'));
+		untrack(() => selectTab(requested, false));
+	});
+
+	function selectTab(next: string, updateUrl = true) {
+		const value = parseTab(EXPORTS_TABS, next);
+		tab = value;
+		if (value === 'storage') storageVisited = true;
+		if (!updateUrl) return;
+		const current = page.shallow?.url ?? page.url;
+		const url = new URL(current.href);
+		if (value === EXPORTS_TABS[0][0]) url.searchParams.delete('tab');
+		else url.searchParams.set('tab', value);
+		if (url.href !== current.href) {
+			// Same page; a shallow entry keeps the storage form and running restores mounted.
+			// eslint-disable-next-line svelte/no-navigation-without-resolve
+			void goto(url, { shallow: true, replace: true, reset: false, state: page.state });
+		}
+	}
 
 	const abort = new AbortController();
 	$effect(() => () => abort.abort());
@@ -154,7 +181,7 @@
 	/>
 {/if}
 
-<Tabs.Root bind:value={tab} class="gap-4">
+<Tabs.Root bind:value={() => tab, (next) => selectTab(next)} class="gap-4">
 	<Tabs.List
 		variant="line"
 		class="scrollbar-none w-full justify-start gap-4 overflow-x-auto overflow-y-hidden rounded-none border-b border-border"
@@ -167,10 +194,10 @@
 			<span class="text-xs text-muted-foreground tabular-nums">{groups.length}</span>
 		</Tabs.Trigger>
 		<Tabs.Trigger
-			value="archives"
+			value="exports"
 			class="flex-none px-1 group-data-horizontal/tabs:after:bottom-[-4px]"
 		>
-			<ArchiveIcon data-icon="inline-start" aria-hidden="true" />All backups
+			<ArchiveIcon data-icon="inline-start" aria-hidden="true" />Exports
 			<span class="text-xs text-muted-foreground tabular-nums">{exports.length}</span>
 		</Tabs.Trigger>
 		<Tabs.Trigger
@@ -196,10 +223,10 @@
 		{/if}
 	</Tabs.Content>
 
-	<Tabs.Content value="archives">
-		{#if tab === 'archives'}
+	<Tabs.Content value="exports">
+		{#if tab === 'exports'}
 			<Reveal class="flex flex-col gap-2">
-				<section class="flex flex-col gap-2" aria-label="All backups">
+				<section class="flex flex-col gap-2" aria-label="All exports">
 					<ExportList
 						{exports}
 						showServer
@@ -219,7 +246,7 @@
 	</Tabs.Content>
 
 	<Tabs.Content value="storage">
-		{#if tab === 'storage' && storage}
+		{#if storageVisited && storage}
 			<Reveal>
 				<StorageForm connection={storage} {s3Archives} onSaved={(saved) => (storage = saved)} />
 			</Reveal>

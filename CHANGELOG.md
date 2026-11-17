@@ -7,6 +7,10 @@ Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fr
 ## Unreleased
 
 
+### Added
+
+- Settings page (sidebar and quick navigation) with browser-only live refresh (Off to 60s) and server list order preferences, plus read-only account, version, Docker, host and S3 storage details. Integrations splits API keys and MCP into tabs, and Storage & exports labels its Exports and S3 storage tabs; both deep-link with ?tab= (exports, storage, mcp) and keep unsaved storage edits and new key secrets across tab switches.
+
 ### Fixed
 
 - Show bundled software logos on server cards when no custom or modpack icon applies. Enlarge quick navigation and add a slash shortcut that preserves typing in inputs and editors.

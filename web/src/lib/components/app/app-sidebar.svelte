@@ -4,6 +4,7 @@
 	import PlugIcon from '@lucide/svelte/icons/plug';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import HistoryIcon from '@lucide/svelte/icons/history';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import PanelLeftCloseIcon from '@lucide/svelte/icons/panel-left-close';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import ShieldOffIcon from '@lucide/svelte/icons/shield-off';
@@ -32,7 +33,8 @@
 		{ label: 'Activity', href: resolve('activity'), icon: HistoryIcon },
 		{ label: 'Storage & exports', href: resolve('exports'), icon: ArchiveIcon },
 		{ label: 'Integrations', href: resolve('integrations'), icon: PlugIcon },
-		{ label: 'API reference', href: resolve('api-docs'), icon: BookOpenIcon }
+		{ label: 'API reference', href: resolve('api-docs'), icon: BookOpenIcon },
+		{ label: 'Settings', href: resolve('settings'), icon: SettingsIcon }
 	];
 
 	function isActive(href: string) {

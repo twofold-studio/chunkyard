@@ -54,7 +54,8 @@ describe('app sidebar', () => {
 			'Activity',
 			'Storage & exports',
 			'Integrations',
-			'API reference'
+			'API reference',
+			'Settings'
 		]);
 	});
 
