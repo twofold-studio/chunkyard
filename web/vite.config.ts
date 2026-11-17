@@ -11,6 +11,10 @@ const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 export default defineConfig({
 	optimizeDeps: {
 		include: [
+			'@lucide/svelte/icons/settings',
+			'@lucide/svelte/icons/server-cog',
+			'@lucide/svelte/icons/arrow-down-up',
+			'@lucide/svelte/icons/monitor',
 			'@lucide/svelte/icons/calendar-clock',
 			'@lucide/svelte/icons/ban',
 			'@lucide/svelte/icons/shield',

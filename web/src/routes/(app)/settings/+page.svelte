@@ -107,8 +107,9 @@
 		</div>
 		<p class="text-xs text-muted-foreground" aria-live="polite">{refreshSummary(refresh)}</p>
 		<p class="text-xs text-muted-foreground">
-			Shared by every Chunkyard tab in this browser and also changeable from a server's usage panel.
-			Sub-second rates are only available there, per visit.
+			Used across the app in this browser and also changeable from a server's usage panel. Reload
+			other open windows to pick up changes made here. Sub-second rates are only available from a
+			server's usage panel, per visit.
 		</p>
 	</SettingsSection>
 

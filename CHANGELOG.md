@@ -4,7 +4,7 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
-## Unreleased
+## 0.17.0 - 2026-11-17
 
 
 ### Added

@@ -434,7 +434,7 @@ dependencies = [
 
 [[package]]
 name = "chunkyard-api"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "axum",
  "chunkyard-auth",
@@ -454,7 +454,7 @@ dependencies = [
 
 [[package]]
 name = "chunkyard-api-tests"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -484,7 +484,7 @@ dependencies = [
 
 [[package]]
 name = "chunkyard-auth"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "argon2",
  "base64 0.22.1",
@@ -501,7 +501,7 @@ dependencies = [
 
 [[package]]
 name = "chunkyard-config"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "chunkyard-process",
  "serde",
@@ -514,7 +514,7 @@ dependencies = [
 
 [[package]]
 name = "chunkyard-core"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -527,7 +527,7 @@ dependencies = [
 
 [[package]]
 name = "chunkyard-db"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "async-trait",
  "chunkyard-core",
@@ -541,7 +541,7 @@ dependencies = [
 
 [[package]]
 name = "chunkyard-download"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "futures-util",
  "image",
@@ -558,7 +558,7 @@ dependencies = [
 
 [[package]]
 name = "chunkyard-fs"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -575,7 +575,7 @@ dependencies = [
 
 [[package]]
 name = "chunkyard-install"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "async-trait",
  "chunkyard-core",
@@ -593,7 +593,7 @@ dependencies = [
 
 [[package]]
 name = "chunkyard-jobs"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -610,7 +610,7 @@ dependencies = [
 
 [[package]]
 name = "chunkyard-process"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "async-trait",
  "bollard",
@@ -637,7 +637,7 @@ dependencies = [
 
 [[package]]
 name = "chunkyard-server"
-version = "0.16.0"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "axum",
