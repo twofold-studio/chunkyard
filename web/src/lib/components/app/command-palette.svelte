@@ -81,9 +81,20 @@
 	});
 
 	function onWindowKeydown(event: KeyboardEvent) {
+		if (event.defaultPrevented || event.isComposing) return;
 		if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'k') {
 			event.preventDefault();
 			open = !open;
+		} else if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !open) {
+			const target = event.target instanceof Element ? event.target : document.activeElement;
+			if (
+				target?.closest(
+					'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"], [role="dialog"], .cm-editor'
+				)
+			)
+				return;
+			event.preventDefault();
+			open = true;
 		}
 	}
 

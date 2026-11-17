@@ -3,6 +3,7 @@
 	import { cn } from '#lib/utils.js';
 	import { serverIconUrl } from '#lib/servers/icons.js';
 	import type { ServerView } from '#lib/api/index.js';
+	import SoftwareLogo from './software-logo.svelte';
 
 	interface Props {
 		server: Pick<ServerView, 'icon' | 'software'>;
@@ -13,7 +14,7 @@
 
 	let { server, class: className, iconClass = 'size-[18px]' }: Props = $props();
 
-	// Custom upload, then the CurseForge pack logo (both resolved by the backend), then generic.
+	// Preserve custom/pack icons; bundled software marks fill the remaining avatars.
 	const url = $derived(serverIconUrl(server));
 	let failedFor = $state<string | null>(null);
 	const showImage = $derived(url !== null && failedFor !== url);
@@ -26,7 +27,11 @@
 	)}
 	aria-hidden="true"
 	data-slot="server-avatar"
-	data-source={showImage ? (server.icon?.source ?? 'modpack') : 'generic'}
+	data-source={showImage
+		? (server.icon?.source ?? 'modpack')
+		: server.software
+			? 'software'
+			: 'generic'}
 >
 	{#if showImage}
 		<img
@@ -37,6 +42,8 @@
 			referrerpolicy="same-origin"
 			onerror={() => (failedFor = url)}
 		/>
+	{:else if server.software}
+		<SoftwareLogo kind={server.software.type} class="size-7" />
 	{:else}
 		<ServerIcon class={iconClass} />
 	{/if}

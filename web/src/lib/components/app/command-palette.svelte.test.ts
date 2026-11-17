@@ -37,6 +37,32 @@ function setup(load: (signal: AbortSignal) => Promise<ServerView[]>) {
 }
 
 describe('CommandPalette', () => {
+	it('opens with slash outside editors and leaves slash typing alone in the search', async () => {
+		setup(async () => []);
+		await userEvent.keyboard('/');
+		const input = page.getByRole('combobox', { name: 'Search pages and servers' });
+		await expect.element(input).toHaveFocus();
+		await userEvent.keyboard('/');
+		await expect.element(input).toHaveValue('/');
+	});
+
+	it('does not intercept slash in text inputs or editable content', async () => {
+		setup(async () => []);
+		for (const element of [
+			document.createElement('input'),
+			document.createElement('textarea'),
+			document.createElement('div')
+		]) {
+			if (element instanceof HTMLDivElement) element.contentEditable = 'true';
+			document.body.append(element);
+			element.focus();
+			await userEvent.keyboard('/');
+			await expect.element(page.getByRole('combobox')).not.toBeInTheDocument();
+			expect(element instanceof HTMLDivElement ? element.textContent : element.value).toBe('/');
+			element.remove();
+		}
+	});
+
 	it('opens with Ctrl+K, selects with arrows and Enter, and navigates via the callback', async () => {
 		const { navigate } = setup(async () => [server('srv-1', 'Survival')]);
 		await userEvent.keyboard('{Control>}k{/Control}');

@@ -108,15 +108,19 @@
 				{#snippet actions()}
 					<Button
 						variant="outline"
-						size="sm"
+						size="default"
+						class="min-w-9 md:w-44 md:justify-start"
 						onclick={() => (paletteOpen = true)}
 						aria-label="Quick navigation"
-						aria-keyshortcuts="Control+K Meta+K"
-						title="Quick navigation (Ctrl/⌘ K)"
+						aria-keyshortcuts="/ Control+K Meta+K"
+						title="Quick navigation (/ or Ctrl/⌘ K)"
 					>
 						<SearchIcon data-icon="inline-start" />
 						<span class="hidden md:inline">Go to</span>
-						<kbd class="hidden font-mono text-[10px] text-muted-foreground md:inline">⌘K</kbd>
+						<kbd
+							class="ml-auto hidden rounded border px-1.5 font-mono text-xs text-muted-foreground md:inline"
+							>/</kbd
+						>
 					</Button>
 					{#if !onCreatePage}
 						<Button href={resolve('servers/new')} size="sm">

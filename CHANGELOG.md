@@ -4,6 +4,12 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## Unreleased
+
+
+### Fixed
+
+- Show bundled software logos on server cards when no custom or modpack icon applies. Enlarge quick navigation and add a slash shortcut that preserves typing in inputs and editors.
 ## 0.16.0 - 2026-11-17
 
 
