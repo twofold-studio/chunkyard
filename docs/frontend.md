@@ -115,6 +115,10 @@ The server list searches names/software/versions/ports, filters by state/softwar
 
 Management tabs stay synchronized with URL deep links and palette navigation. Clicking a tab updates its URL through same-server shallow routing, keeping editors mounted and preserving unsaved edits.
 
+The Settings page provides browser-wide live refresh and default server sorting preferences, with read-only account and manager information. These preferences are local to the browser; they do not change server configuration. Reload other open windows to pick up changes made there.
+
+Integrations separates API keys from MCP connection instructions (`/integrations?tab=mcp`). Storage & exports separates the server backup overview, the export catalog (`/exports?tab=exports`), and S3 configuration (`/exports?tab=storage`). Switching tabs preserves a newly created API key's one-time secret and unsaved S3 form edits; leaving the page does not save those edits.
+
 ## File destinations and drops
 
 Move and Copy offer a destination folder picker with breadcrumbs, root/up navigation, a filename and an exact destination summary. Only folders are shown; protected folders and a directory’s own subtree cannot be selected. Manual relative paths remain available. Listings load one folder at a time with cancellation and stale-response protection, and truncated results are labelled. Existing destinations are never overwritten; server errors leave the dialog open and the source intact. Rename retains its simple name input.
