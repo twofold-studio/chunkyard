@@ -35,6 +35,7 @@ const archive = (id: string, serverId = 'srv-1', destination = 'local') => ({
 });
 
 const job = (state: Job['state'], extra: Partial<Job> = {}): Job => ({
+	work: null,
 	id: 'job-x',
 	kind: 'server.export',
 	serverId: 'srv-1',
@@ -51,6 +52,7 @@ const job = (state: Job['state'], extra: Partial<Job> = {}): Job => ({
 });
 
 const DEFAULT_AUTOMATION = {
+	intentAt: 0,
 	recovery: { autoStart: false, restartOnCrash: false, maxAttempts: 3, retryDelaySeconds: 30 },
 	backup: { enabled: false, intervalMinutes: 1440, keepLast: null },
 	historyEnabled: true,
@@ -132,6 +134,7 @@ describe('ServerExports', () => {
 			serverState: 'stopped',
 			scheduleApi: {
 				load: async () => ({
+					intentAt: 0,
 					recovery: {
 						autoStart: false,
 						restartOnCrash: false,

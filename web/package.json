@@ -1,6 +1,6 @@
 {
 	"name": "chunkyard-web",
-	"version": "0.15.1",
+	"version": "0.16.0",
 	"private": true,
 	"type": "module",
 	"imports": {
@@ -9,7 +9,7 @@
 	},
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build",
+		"build": "pnpm check && vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -18,7 +18,11 @@
 		"format": "prettier --write .",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run",
-		"test:e2e": "node e2e/files-history.e2e.mjs && node e2e/public-docs.e2e.mjs"
+		"test:e2e": "node e2e/files-history.e2e.mjs && node e2e/public-docs.e2e.mjs",
+		"api:generate": "node ../scripts/api-contract.mjs && openapi-ts",
+		"api:check": "node ../scripts/api-contract.mjs --check && pnpm api:sdk:check",
+		"api:sdk:check": "node ../scripts/sdk-contract.mjs",
+		"api:test-types": "node ../scripts/api-negative-types.mjs"
 	},
 	"devDependencies": {
 		"@codemirror/commands": "^6.11.1",
@@ -30,6 +34,7 @@
 		"@codemirror/view": "^6.43.15",
 		"@eslint/js": "^10.0.1",
 		"@fontsource-variable/inter": "^5.3.0",
+		"@hey-api/openapi-ts": "0.99.0",
 		"@internationalized/date": "^3.12.4",
 		"@lezer/highlight": "^1.2.5",
 		"@lucide/svelte": "^1.72.0",

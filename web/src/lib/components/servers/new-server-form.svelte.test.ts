@@ -34,6 +34,10 @@ const CATALOG = {
 };
 
 const managedServer = (extra: Record<string, unknown> = {}) => ({
+	archive: null,
+	launchOverride: null,
+	publishIp: null,
+	icon: null,
 	id: 'srv-1',
 	name: 'Survival',
 	runtime: 'docker',
@@ -53,6 +57,7 @@ const managedServer = (extra: Record<string, unknown> = {}) => ({
 });
 
 const job = (state: string, extra: Record<string, unknown> = {}) => ({
+	work: null,
 	id: 'job-1',
 	kind: 'server.install',
 	serverId: 'srv-1',

@@ -3,6 +3,7 @@ import { waitForJob } from './jobs';
 import type { Job } from './types';
 
 const job = (state: Job['state'], extra: Partial<Job> = {}): Job => ({
+	work: null,
 	id: 'j1',
 	kind: 'java.install',
 	serverId: null,

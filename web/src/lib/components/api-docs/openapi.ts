@@ -155,8 +155,11 @@ export interface OperationGroup {
 export const UNTAGGED = 'Other';
 
 /** Fetches the document through the shared same-origin client (cookies, problem+json errors). */
-export function fetchOpenApi(options: Pick<RequestOptions, 'signal' | 'fetch'> = {}) {
-	return request<OpenApiDocument>(OPENAPI_PATH, options);
+export async function fetchOpenApi(options: Pick<RequestOptions, 'signal' | 'fetch'> = {}) {
+	const document = await request(OPENAPI_PATH, options);
+	if (!isOpenApiDocument(document))
+		throw new Error('The backend returned an invalid OpenAPI document.');
+	return document;
 }
 
 /** Rejects payloads that are clearly not an OpenAPI 3.x document. */

@@ -3,6 +3,11 @@ import { ApiError, type Job, type ServerView } from '#lib/api/index.js';
 import { CreateServerFlow } from './create-flow.svelte.js';
 
 const server = (extra: Partial<ServerView> = {}): ServerView => ({
+	archive: null,
+	autoJava: false,
+	launchOverride: null,
+	publishIp: null,
+	icon: null,
 	id: 's1',
 	name: 'Survival',
 	runtime: 'docker',
@@ -21,6 +26,7 @@ const server = (extra: Partial<ServerView> = {}): ServerView => ({
 });
 
 const job = (state: Job['state'], extra: Partial<Job> = {}): Job => ({
+	work: null,
 	id: 'j1',
 	kind: 'server.install',
 	serverId: 's1',

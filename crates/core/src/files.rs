@@ -45,7 +45,7 @@ impl From<std::io::Error> for FileError {
         }
     }
 }
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum FileKind {
     File,
@@ -53,17 +53,18 @@ pub enum FileKind {
     Symlink,
     Other,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FileEntry {
     pub name: String,
     pub path: String,
     pub kind: FileKind,
     pub size: u64,
+    #[schema(required = true)]
     pub modified_at: Option<String>,
     pub read_only: bool,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FileListing {
     pub path: String,
@@ -71,7 +72,7 @@ pub struct FileListing {
     pub truncated: bool,
     pub can_write: bool,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FileContent {
     pub path: String,
@@ -81,7 +82,7 @@ pub struct FileContent {
     pub read_only: bool,
     pub can_write: bool,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct SavedFile {
     pub path: String,
     pub etag: String,
@@ -92,13 +93,13 @@ pub struct Download {
     pub name: String,
     pub size: u64,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct WriteContent {
     pub content: String,
     pub etag: Option<String>,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Transfer {
     pub from: String,

@@ -21,6 +21,9 @@ const detected = {
 };
 
 const server = (state: ServerState = 'stopped', extra: Partial<ServerView> = {}): ServerView => ({
+	archive: null,
+	publishIp: null,
+	icon: null,
 	id: 'srv-1',
 	name: 'Pack',
 	runtime: 'docker',

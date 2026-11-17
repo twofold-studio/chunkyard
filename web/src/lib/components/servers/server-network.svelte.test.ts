@@ -20,6 +20,13 @@ const status = (state: ServerState) => ({
 });
 
 const server = (state: ServerState = 'stopped', extra: Record<string, unknown> = {}) => ({
+	archive: null,
+	autoJava: false,
+	launchOverride: null,
+	publishIp: null,
+	icon: null,
+	software: null,
+	launch: null,
 	id: 'srv-1',
 	name: 'Survival',
 	runtime: 'docker',

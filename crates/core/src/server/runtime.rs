@@ -21,7 +21,7 @@ impl MetricsSampling {
         );
     }
 }
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ServerState {
     Stopped,
@@ -29,12 +29,16 @@ pub enum ServerState {
     Paused,
     Unknown,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RuntimeStatus {
+    #[schema(required = true)]
     pub state: ServerState,
+    #[schema(required = true)]
     pub container_id: Option<String>,
+    #[schema(required = true)]
     pub exit_code: Option<i64>,
+    #[schema(required = true)]
     pub oom_killed: bool,
 }
 impl RuntimeStatus {
@@ -55,42 +59,64 @@ impl RuntimeStatus {
 }
 /// Point-in-time container measurements. Missing measurements are null, never
 /// invented zeroes. CPU is percent of one logical core and may exceed 100.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerMetrics {
+    #[schema(required = true)]
     pub server_id: String,
+    #[schema(required = true)]
     pub status: RuntimeStatus,
+    #[schema(required = true)]
     pub sampled_at: String,
+    #[schema(required = true)]
     pub started_at: Option<String>,
+    #[schema(required = true)]
     pub uptime_seconds: Option<u64>,
+    #[schema(required = true)]
     pub cpu_percent: Option<f64>,
+    #[schema(required = true)]
     pub memory_usage_bytes: Option<u64>,
+    #[schema(required = true)]
     pub memory_working_set_bytes: Option<u64>,
+    #[schema(required = true)]
     pub memory_limit_bytes: Option<u64>,
+    #[schema(required = true)]
     pub network_rx_bytes: Option<u64>,
+    #[schema(required = true)]
     pub network_tx_bytes: Option<u64>,
+    #[schema(required = true)]
     pub block_read_bytes: Option<u64>,
+    #[schema(required = true)]
     pub block_write_bytes: Option<u64>,
+    #[schema(required = true)]
     pub pids: Option<u64>,
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DockerInfo {
+    #[schema(required = true)]
     pub available: bool,
+    #[schema(required = true)]
     pub version: Option<String>,
+    #[schema(required = true)]
     pub reason: Option<String>,
+    #[schema(required = true)]
     pub capacity: Option<HostCapacity>,
 }
 /// Docker engine totals, not free resources or the manager container's limits.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct HostCapacity {
+    #[schema(required = true)]
     pub logical_cpus: Option<u64>,
+    #[schema(required = true)]
     pub memory_total_bytes: Option<u64>,
+    #[schema(required = true)]
     pub architecture: Option<String>,
+    #[schema(required = true)]
     pub operating_system: Option<String>,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct ConsoleLine {
     pub stream: String,
     pub text: String,

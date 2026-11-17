@@ -158,11 +158,13 @@ mod tests {
         assert!(weak.upgrade().is_none());
     }
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[into_params(parameter_in = Query)]
 pub(crate) struct Settings {
     interval_ms: Option<u64>,
 }
+#[utoipa::path(get, path = "/api/v1/servers/{id}/metrics/stream", operation_id = "metrics_stream_upgrade", tag = "metrics_stream", params(("id" = String, Path), Settings), responses((status = 101, description = "Success"), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 pub(crate) async fn upgrade(
     State(state): State<AppState>,
     Path(id): Path<String>,

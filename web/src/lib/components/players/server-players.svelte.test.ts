@@ -19,6 +19,7 @@ const lists = (extra: Partial<PlayerLists> = {}): PlayerLists => ({
 });
 
 const job = (state: Job['state'], extra: Partial<Job> = {}): Job => ({
+	work: null,
 	id: 'pj1',
 	kind: 'server.players',
 	serverId: 's1',

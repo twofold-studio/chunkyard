@@ -7,6 +7,9 @@ import type { ExportRecord, ServerView } from '#lib/api/index.js';
 
 const now = Date.parse('2026-11-14T12:00:00Z');
 const server = {
+	autoJava: false,
+	launchOverride: null,
+	publishIp: null,
 	id: 'srv-1',
 	name: 'Survival',
 	runtime: 'docker',

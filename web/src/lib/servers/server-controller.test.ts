@@ -7,6 +7,13 @@ const server = (
 	state: ServerView['status']['state'] = 'stopped',
 	extra: Partial<ServerView> = {}
 ): ServerView => ({
+	archive: null,
+	autoJava: false,
+	launchOverride: null,
+	publishIp: null,
+	icon: null,
+	software: null,
+	launch: null,
 	id: 's1',
 	name: 'Survival',
 	runtime: 'docker',
@@ -23,6 +30,7 @@ const server = (
 });
 
 const job = (state: Job['state'], extra: Partial<Job> = {}): Job => ({
+	work: null,
 	id: 'j1',
 	kind: 'server.start',
 	serverId: 's1',

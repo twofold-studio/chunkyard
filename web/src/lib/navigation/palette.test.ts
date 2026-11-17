@@ -3,6 +3,11 @@ import type { ServerView } from '#lib/api/index.js';
 import { createServerSource, searchDestinations, serverHref } from './palette.js';
 
 const server = (id: string, extra: Partial<ServerView> = {}): ServerView => ({
+	archive: null,
+	autoJava: false,
+	launchOverride: null,
+	publishIp: null,
+	icon: null,
 	id,
 	name: id,
 	runtime: 'docker',

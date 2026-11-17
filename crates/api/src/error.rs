@@ -12,8 +12,8 @@ pub(crate) struct ApiError {
     pub(crate) code: &'static str,
     pub(crate) detail: &'static str,
 }
-#[derive(Serialize)]
-struct Problem {
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct Problem {
     #[serde(rename = "type")]
     type_url: String,
     title: &'static str,

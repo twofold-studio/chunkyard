@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{future::Future, pin::Pin};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum JobState {
     Queued,
@@ -14,39 +14,54 @@ pub enum JobState {
     Failed,
     Cancelled,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct JobFailure {
     pub code: String,
     pub detail: String,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Job {
+    #[schema(required = true)]
     pub id: String,
+    #[schema(required = true)]
     pub kind: String,
+    #[schema(required = true)]
     pub server_id: Option<String>,
+    #[schema(required = true)]
     pub state: JobState,
+    #[schema(required = true)]
     pub progress: Option<f64>,
     #[serde(default)]
+    #[schema(required = true)]
     pub work: Option<crate::progress::WorkProgress>,
+    #[schema(required = true)]
     pub message: Option<String>,
+    #[schema(required = true)]
     pub error: Option<JobFailure>,
+    #[schema(required = true)]
     pub result: Option<Value>,
+    #[schema(required = true)]
     pub created_by: Option<String>,
+    #[schema(required = true)]
     pub created_at: String,
+    #[schema(required = true)]
     pub started_at: Option<String>,
+    #[schema(required = true)]
     pub finished_at: Option<String>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JobCursor {
     pub created_at: String,
     pub id: String,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct JobPage {
+    #[schema(required = true)]
     pub items: Vec<Job>,
+    #[schema(required = true)]
     pub next_cursor: Option<String>,
 }
 pub type JobTask = Pin<Box<dyn Future<Output = Result<Value, JobFailure>> + Send + 'static>>;

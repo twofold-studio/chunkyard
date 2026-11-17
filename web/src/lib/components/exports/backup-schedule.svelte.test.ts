@@ -19,6 +19,7 @@ const storage = (configured: boolean): StorageConnection => ({
 });
 
 const automation = (extra: Partial<AutomationState> = {}): AutomationState => ({
+	intentAt: 0,
 	recovery: { autoStart: false, restartOnCrash: false, maxAttempts: 3, retryDelaySeconds: 30 },
 	backup: { enabled: false, intervalMinutes: 1440, keepLast: null },
 	historyEnabled: true,

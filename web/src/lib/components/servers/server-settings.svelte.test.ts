@@ -6,6 +6,10 @@ import ServerSettings from './server-settings.svelte';
 import type { ServerView } from '#lib/api/index.js';
 
 const server = {
+	archive: null,
+	autoJava: false,
+	launchOverride: null,
+	publishIp: null,
 	id: 'srv-1',
 	name: 'Survival',
 	runtime: 'docker',

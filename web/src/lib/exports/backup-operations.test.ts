@@ -4,6 +4,7 @@ import { waitForJob } from '#lib/api/jobs.js';
 import { BackupOperations } from './backup-operations.svelte.js';
 
 const job = (id: string, kind: string, state: Job['state'], extra: Partial<Job> = {}): Job => ({
+	work: null,
 	id,
 	kind,
 	serverId: 's1',

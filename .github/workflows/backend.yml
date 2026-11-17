@@ -48,6 +48,11 @@ jobs:
       - run: npm install --global pnpm@12.9.0
       - run: pnpm --dir web install --frozen-lockfile
       - run: pnpm --dir web exec playwright install --with-deps chromium
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fetch --locked
+      - run: pnpm --dir web api:check
+      - run: pnpm --dir web api:test-types
       - run: pnpm --dir web check
       - run: pnpm --dir web lint
       - run: pnpm --dir web test

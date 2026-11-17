@@ -1,33 +1,27 @@
 use crate::{AppState, error::ApiError, json::ApiJson};
 use axum::{
-    Json, Router,
+    Json,
     extract::{DefaultBodyLimit, Path, Query, State},
     http::StatusCode,
-    routing::{get, post},
 };
 use chunkyard_core::properties::*;
 use serde::Deserialize;
-pub(crate) fn routes() -> Router<AppState> {
-    Router::new()
-        .route(
-            "/api/v1/servers/{id}/properties",
-            get(read)
-                .put(save)
-                .layer(DefaultBodyLimit::max(8 * 1024 * 1024)),
-        )
-        .route("/api/v1/servers/{id}/properties/versions", get(history))
-        .route(
-            "/api/v1/servers/{id}/properties/versions/{version}",
-            get(revision),
-        )
-        .route("/api/v1/servers/{id}/properties/restore", post(restore))
+use utoipa_axum::router::UtoipaMethodRouterExt;
+pub(crate) fn routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
+    utoipa_axum::router::OpenApiRouter::new()
+        .routes(utoipa_axum::routes!(read, save).layer(DefaultBodyLimit::max(8 * 1024 * 1024)))
+        .routes(utoipa_axum::routes!(history))
+        .routes(utoipa_axum::routes!(revision))
+        .routes(utoipa_axum::routes!(restore))
 }
+#[utoipa::path(get, path = "/api/v1/servers/{id}/properties", operation_id = "properties_read", tag = "properties", params(("id" = String, Path)), responses((status = 200, description = "Success", body = PropertiesDocument), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 async fn read(
     State(s): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<PropertiesDocument>, ApiError> {
     Ok(Json(s.properties.properties(&id).await?))
 }
+#[utoipa::path(put, path = "/api/v1/servers/{id}/properties", operation_id = "properties_save", tag = "properties", params(("id" = String, Path)), request_body = PropertiesWrite, responses((status = 200, description = "Success", body = PropertiesDocument), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 async fn save(
     State(s): State<AppState>,
     Path(id): Path<String>,
@@ -35,8 +29,9 @@ async fn save(
 ) -> Result<Json<PropertiesDocument>, ApiError> {
     Ok(Json(s.properties.save_properties(&id, body).await?))
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
 #[serde(deny_unknown_fields)]
+#[into_params(parameter_in = Query)]
 struct HistoryQuery {
     before: Option<i64>,
     #[serde(default = "limit")]
@@ -45,6 +40,7 @@ struct HistoryQuery {
 fn limit() -> u32 {
     50
 }
+#[utoipa::path(get, path = "/api/v1/servers/{id}/properties/versions", operation_id = "properties_history", tag = "properties", params(("id" = String, Path), HistoryQuery), responses((status = 400, description = "Axum path or query rejection", body = String, content_type = "text/plain"), (status = 200, description = "Success", body = PropertiesHistory), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 async fn history(
     State(s): State<AppState>,
     Path(id): Path<String>,
@@ -56,12 +52,14 @@ async fn history(
             .await?,
     ))
 }
+#[utoipa::path(get, path = "/api/v1/servers/{id}/properties/versions/{version}", operation_id = "properties_revision", tag = "properties", params(("id" = String, Path), ("version" = i64, Path)), responses((status = 200, description = "Success", body = PropertiesRevision), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 async fn revision(
     State(s): State<AppState>,
     Path((id, version)): Path<(String, i64)>,
 ) -> Result<Json<PropertiesRevision>, ApiError> {
     Ok(Json(s.properties.properties_revision(&id, version).await?))
 }
+#[utoipa::path(post, path = "/api/v1/servers/{id}/properties/restore", operation_id = "properties_restore", tag = "properties", params(("id" = String, Path)), request_body = PropertiesRestore, responses((status = 200, description = "Success", body = PropertiesDocument), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 async fn restore(
     State(s): State<AppState>,
     Path(id): Path<String>,

@@ -212,7 +212,7 @@ describe('installed software labels', () => {
 				version: '1.20.1',
 				build: '5555',
 				javaMajor: 17,
-				loader: { type: 'forge', version: '47.3.0' },
+				loader: { type: 'forge' as const, version: '47.3.0' },
 				profile: { mode: 'args' as const, jvmArgs: [], args: [] }
 			}
 		};

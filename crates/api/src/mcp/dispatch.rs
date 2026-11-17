@@ -98,7 +98,7 @@ pub(super) async fn call(
             };
             let (_, Json(result)) =
                 servers::action(state.clone(), actor, id.into(), action).await?;
-            result
+            serde_json::to_value(result).map_err(ApiError::internal)?
         }
         _ => return Err(invalid("Unknown tool.")),
     })

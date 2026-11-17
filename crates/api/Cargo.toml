@@ -8,6 +8,8 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+utoipa.workspace = true
+utoipa-axum.workspace = true
 chunkyard-core.workspace = true
 chunkyard-auth.workspace = true
 axum = {workspace=true, features=["ws"]}

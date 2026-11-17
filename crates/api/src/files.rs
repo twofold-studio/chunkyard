@@ -1,16 +1,17 @@
+use crate::dto::*;
 use crate::{AppState, error::ApiError, json::ApiJson};
 use axum::{
-    Json, Router,
+    Json,
     body::Body,
     extract::{DefaultBodyLimit, Path, Query, State},
     http::{StatusCode, header},
     response::{IntoResponse, Response},
-    routing::{get, post},
 };
 use chunkyard_core::files::*;
 use futures_util::{StreamExt, stream};
 use serde::Deserialize;
-use serde_json::json;
+use utoipa_axum::router::UtoipaMethodRouterExt;
+
 use std::{io, sync::Arc, time::Duration};
 use tokio::io::AsyncReadExt;
 use tokio::sync::Semaphore;
@@ -22,36 +23,33 @@ static UPLOADS: std::sync::LazyLock<Arc<Semaphore>> =
 static DOWNLOADS: std::sync::LazyLock<Arc<Semaphore>> =
     std::sync::LazyLock::new(|| Arc::new(Semaphore::new(4)));
 
-pub(crate) fn routes() -> Router<AppState> {
-    Router::new()
-        .route("/api/v1/servers/{id}/files", get(list))
-        .route(
-            "/api/v1/servers/{id}/files/content",
-            get(content)
-                .put(save)
-                .layer(DefaultBodyLimit::max(8 * 1024 * 1024)),
-        )
-        .route("/api/v1/servers/{id}/files/download", get(download))
-        .route("/api/v1/servers/{id}/files/upload", post(upload))
-        .route("/api/v1/servers/{id}/files/mkdir", post(mkdir))
-        .route("/api/v1/servers/{id}/files/move", post(move_entry))
-        .route("/api/v1/servers/{id}/files/copy", post(copy))
-        .route("/api/v1/servers/{id}/files/delete", post(delete))
+pub(crate) fn routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
+    utoipa_axum::router::OpenApiRouter::new()
+        .routes(utoipa_axum::routes!(list))
+        .routes(utoipa_axum::routes!(content, save).layer(DefaultBodyLimit::max(8 * 1024 * 1024)))
+        .routes(utoipa_axum::routes!(download))
+        .routes(utoipa_axum::routes!(upload))
+        .routes(utoipa_axum::routes!(mkdir))
+        .routes(utoipa_axum::routes!(move_entry))
+        .routes(utoipa_axum::routes!(copy))
+        .routes(utoipa_axum::routes!(delete))
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(deny_unknown_fields)]
+#[into_params(parameter_in = Query)]
 pub(crate) struct FilePath {
     #[serde(default)]
     path: String,
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
 #[serde(deny_unknown_fields)]
+#[into_params(parameter_in = Query)]
 pub(crate) struct UploadQuery {
     path: String,
     #[serde(default)]
     overwrite: bool,
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct DeleteRequest {
     path: String,
@@ -59,6 +57,7 @@ pub(crate) struct DeleteRequest {
     recursive: bool,
 }
 
+#[utoipa::path(get, path = "/api/v1/servers/{id}/files", operation_id = "files_list", tag = "files", params(("id" = String, Path), FilePath), responses((status = 400, description = "Axum path or query rejection", body = String, content_type = "text/plain"), (status = 200, description = "Success", body = FileListing), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 pub(crate) async fn list(
     State(s): State<AppState>,
     Path(id): Path<String>,
@@ -66,6 +65,7 @@ pub(crate) async fn list(
 ) -> Result<Json<FileListing>, ApiError> {
     Ok(Json(s.files.list(&id, q.path).await?))
 }
+#[utoipa::path(get, path = "/api/v1/servers/{id}/files/content", operation_id = "files_content", tag = "files", params(("id" = String, Path), FilePath), responses((status = 400, description = "Axum path or query rejection", body = String, content_type = "text/plain"), (status = 200, description = "Success", body = FileContent), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 pub(crate) async fn content(
     State(s): State<AppState>,
     Path(id): Path<String>,
@@ -73,6 +73,7 @@ pub(crate) async fn content(
 ) -> Result<Json<FileContent>, ApiError> {
     Ok(Json(s.files.content(&id, q.path).await?))
 }
+#[utoipa::path(put, path = "/api/v1/servers/{id}/files/content", operation_id = "files_save", tag = "files", params(("id" = String, Path), FilePath), request_body = WriteContent, responses((status = 400, description = "Axum path or query rejection", body = String, content_type = "text/plain"), (status = 200, description = "Success", body = SavedFile), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 pub(crate) async fn save(
     State(s): State<AppState>,
     Path(id): Path<String>,
@@ -81,34 +82,40 @@ pub(crate) async fn save(
 ) -> Result<Json<SavedFile>, ApiError> {
     Ok(Json(s.files.save(&id, q.path, body).await?))
 }
+#[utoipa::path(post, path = "/api/v1/servers/{id}/files/mkdir", operation_id = "files_mkdir", tag = "files", params(("id" = String, Path)), request_body = FilePath, responses((status = 201, description = "Success", body = EntryResponse), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 pub(crate) async fn mkdir(
     State(s): State<AppState>,
     Path(id): Path<String>,
     ApiJson(body): ApiJson<FilePath>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<(StatusCode, Json<EntryResponse>), ApiError> {
     Ok((
         StatusCode::CREATED,
-        Json(json!({"entry":s.files.mkdir(&id, body.path).await?})),
+        Json(EntryResponse {
+            entry: s.files.mkdir(&id, body.path).await?,
+        }),
     ))
 }
+#[utoipa::path(post, path = "/api/v1/servers/{id}/files/move", operation_id = "files_move_entry", tag = "files", params(("id" = String, Path)), request_body = Transfer, responses((status = 200, description = "Success", body = EntryResponse), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 pub(crate) async fn move_entry(
     State(s): State<AppState>,
     Path(id): Path<String>,
     ApiJson(body): ApiJson<Transfer>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    Ok(Json(
-        json!({"entry":s.files.transfer(&id, body, false).await?}),
-    ))
+) -> Result<Json<EntryResponse>, ApiError> {
+    Ok(Json(EntryResponse {
+        entry: s.files.transfer(&id, body, false).await?,
+    }))
 }
+#[utoipa::path(post, path = "/api/v1/servers/{id}/files/copy", operation_id = "files_copy", tag = "files", params(("id" = String, Path)), request_body = Transfer, responses((status = 200, description = "Success", body = EntryResponse), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 pub(crate) async fn copy(
     State(s): State<AppState>,
     Path(id): Path<String>,
     ApiJson(body): ApiJson<Transfer>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    Ok(Json(
-        json!({"entry":s.files.transfer(&id, body, true).await?}),
-    ))
+) -> Result<Json<EntryResponse>, ApiError> {
+    Ok(Json(EntryResponse {
+        entry: s.files.transfer(&id, body, true).await?,
+    }))
 }
+#[utoipa::path(post, path = "/api/v1/servers/{id}/files/delete", operation_id = "files_delete", tag = "files", params(("id" = String, Path)), request_body = DeleteRequest, responses((status = 204, description = "Success"), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 pub(crate) async fn delete(
     State(s): State<AppState>,
     Path(id): Path<String>,
@@ -126,12 +133,13 @@ impl<R: io::Read> io::Read for UploadReader<R> {
         self.source.read(bytes)
     }
 }
+#[utoipa::path(post, path = "/api/v1/servers/{id}/files/upload", operation_id = "files_upload", tag = "files", params(("id" = String, Path), UploadQuery), request_body(content = crate::dto::BinaryBody, content_type = "application/octet-stream"), responses((status = 400, description = "Axum path or query rejection", body = String, content_type = "text/plain"), (status = 201, description = "Success", body = EntryResponse), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 pub(crate) async fn upload(
     State(s): State<AppState>,
     Path(id): Path<String>,
     Query(q): Query<UploadQuery>,
     body: Body,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<(StatusCode, Json<EntryResponse>), ApiError> {
     let permit = UPLOADS
         .clone()
         .try_acquire_owned()
@@ -153,8 +161,9 @@ pub(crate) async fn upload(
         .files
         .upload(&id, q.path, q.overwrite, Box::new(source))
         .await?;
-    Ok((StatusCode::CREATED, Json(json!({"entry":entry}))))
+    Ok((StatusCode::CREATED, Json(EntryResponse { entry })))
 }
+#[utoipa::path(get, path = "/api/v1/servers/{id}/files/download", operation_id = "files_download", tag = "files", params(("id" = String, Path), FilePath), responses((status = 400, description = "Axum path or query rejection", body = String, content_type = "text/plain"), (status = 200, description = "Binary response", body = crate::dto::BinaryBody, content_type = "application/octet-stream"), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 pub(crate) async fn download(
     State(s): State<AppState>,
     Path(id): Path<String>,

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::Path;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "type", rename_all = "lowercase", deny_unknown_fields)]
 pub enum Software {
     CurseForge {
@@ -100,7 +100,7 @@ pub fn component(value: &str) -> Result<(), SoftwareError> {
     }
     Ok(())
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Launch {
     pub path: String,
@@ -113,14 +113,14 @@ pub struct Launch {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub loader: Option<Loader>,
 }
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum LaunchMode {
     Jar,
     Args,
     Script,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LaunchOptions {
     pub mode: LaunchMode,
@@ -129,7 +129,7 @@ pub struct LaunchOptions {
     #[serde(default)]
     pub args: Vec<String>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LaunchProfile {
     pub mode: LaunchMode,
@@ -178,20 +178,20 @@ impl LaunchProfile {
         Ok(())
     }
 }
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum LoaderType {
     Forge,
     NeoForge,
     Fabric,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Loader {
     pub r#type: LoaderType,
     pub version: String,
 }
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct InstallOptions {
     pub minecraft_version: Option<String>,

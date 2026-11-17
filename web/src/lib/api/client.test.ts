@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, onAuthLost, request } from './client';
 import { describeError } from './errors';
-import { createServer, serverAction, getConsole } from './endpoints';
+import { createServer, serverAction, getConsole, logout } from './endpoints';
 
 function json(status: number, body: unknown, type = 'application/json') {
 	return new Response(status === 204 ? null : JSON.stringify(body), {
@@ -19,7 +19,7 @@ describe('request', () => {
 		const [path, init] = fetch.mock.calls[0];
 		expect(path).toBe('/api/v1/servers');
 		expect(init.credentials).toBe('same-origin');
-		expect(init.headers['X-MCM-CSRF']).toBeUndefined();
+		expect(new Headers(init.headers).get('X-MCM-CSRF')).toBeNull();
 	});
 
 	it('adds X-MCM-CSRF and JSON body to mutations', async () => {
@@ -29,8 +29,8 @@ describe('request', () => {
 		const [path, init] = fetch.mock.calls[0];
 		expect(path).toBe('/api/v1/servers');
 		expect(init.method).toBe('POST');
-		expect(init.headers['X-MCM-CSRF']).toBe('1');
-		expect(init.headers['Content-Type']).toBe('application/json');
+		expect(new Headers(init.headers).get('X-MCM-CSRF')).toBe('1');
+		expect(new Headers(init.headers).get('Content-Type')).toBe('application/json');
 		expect(JSON.parse(init.body)).toEqual({ name: 'Survival', port: 25565, acceptEula: true });
 	});
 
@@ -40,7 +40,7 @@ describe('request', () => {
 		await serverAction('abc/def', 'kill');
 		const [path, init] = fetch.mock.calls[0];
 		expect(path).toBe('/api/v1/servers/abc%2Fdef/kill');
-		expect(init.headers['X-MCM-CSRF']).toBe('1');
+		expect(new Headers(init.headers).get('X-MCM-CSRF')).toBe('1');
 		expect(init.body).toBeUndefined();
 	});
 
@@ -54,9 +54,10 @@ describe('request', () => {
 		expect(items).toHaveLength(1);
 	});
 
-	it('returns undefined for 204', async () => {
+	it('returns undefined for 204 from both native and generated callers', async () => {
 		const fetch = vi.fn().mockResolvedValue(json(204, null));
 		await expect(request('/x', { method: 'POST', fetch })).resolves.toBeUndefined();
+		await expect(logout({ fetch })).resolves.toBeUndefined();
 	});
 
 	it('parses problem+json into ApiError with stable code', async () => {

@@ -21,6 +21,11 @@ afterAll(() => metricsHub.configure({}));
 import { BackupOperations } from '#lib/exports/backup-operations.svelte.js';
 
 const server = (extra: Partial<ServerView>): ServerView => ({
+	archive: null,
+	autoJava: false,
+	launchOverride: null,
+	publishIp: null,
+	icon: null,
 	id: 'srv-1',
 	name: 'Survival',
 	runtime: 'docker',

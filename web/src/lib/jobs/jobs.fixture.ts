@@ -1,6 +1,7 @@
 import type { Job } from '#lib/api/index.js';
 
 export const job = (id: string, extra: Partial<Job> = {}): Job => ({
+	work: null,
 	id,
 	kind: 'server.start',
 	serverId: 'srv-1',

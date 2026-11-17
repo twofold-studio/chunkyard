@@ -5,6 +5,7 @@ import ServerAutomation, { type AutomationApi } from './server-automation.svelte
 import type { AutomationState } from '#lib/api/index.js';
 
 const automation = (extra: Partial<AutomationState> = {}): AutomationState => ({
+	intentAt: 0,
 	recovery: { autoStart: false, restartOnCrash: false, maxAttempts: 3, retryDelaySeconds: 30 },
 	backup: { enabled: false, intervalMinutes: 1440, keepLast: null },
 	historyEnabled: true,

@@ -84,8 +84,8 @@ export function formatInterval(minutes: number): string {
 	return `Every ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
 }
 
-function inRange(value: number, { min, max }: { min: number; max: number }) {
-	return Number.isInteger(value) && value >= min && value <= max;
+function inRange(value: number | undefined, { min, max }: { min: number; max: number }) {
+	return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
 }
 
 export function validateRecovery(policy: RecoveryPolicy): string | null {

@@ -1,39 +1,56 @@
 use super::RuntimeStatus;
 use serde::{Deserialize, Serialize};
 use std::{net::IpAddr, path::PathBuf};
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Server {
     #[serde(default)]
+    #[schema(required = true)]
     pub archive: Option<ArchiveReference>,
+    #[schema(required = true)]
     pub id: String,
+    #[schema(required = true)]
     pub name: String,
+    #[schema(required = true)]
     pub runtime: String,
+    #[schema(required = true)]
     pub jar: String,
+    #[schema(required = true)]
     pub docker_image: String,
+    #[schema(required = true)]
     pub port: u16,
+    #[schema(required = true)]
     pub memory_min_mb: u32,
+    #[schema(required = true)]
     pub memory_max_mb: u32,
+    #[schema(required = true)]
     pub cpus: f64,
+    #[schema(required = true)]
     pub accept_eula: bool,
     #[serde(default)]
+    #[schema(required = true)]
     pub software: Option<crate::software::Software>,
     #[serde(default)]
+    #[schema(required = true)]
     pub launch: Option<crate::software::Launch>,
     #[serde(default)]
+    #[schema(required = true)]
     pub auto_java: bool,
     #[serde(default)]
+    #[schema(value_type = Option<String>)]
+    #[schema(required = true)]
     pub publish_ip: Option<IpAddr>,
     #[serde(default)]
+    #[schema(required = true)]
     pub launch_override: Option<crate::software::LaunchProfile>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ArchiveReference {
     pub export_id: String,
     pub archived_at: String,
 }
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LaunchSettings {
     pub detected: crate::software::LaunchProfile,
@@ -42,10 +59,11 @@ pub struct LaunchSettings {
     pub docker_image: String,
     pub auto_java: bool,
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LaunchUpdate {
     #[serde(deserialize_with = "deserialize_profile")]
+    #[schema(required = true)]
     pub profile: Option<crate::software::LaunchProfile>,
     #[serde(default, deserialize_with = "deserialize_image")]
     pub docker_image: Option<Option<String>>,
@@ -61,11 +79,13 @@ fn deserialize_image<'de, D: serde::Deserializer<'de>>(
     Ok(Some(Option::<String>::deserialize(d)?))
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct NetworkSettings {
     pub port: u16,
+    #[schema(value_type = Option<String>)]
     pub publish_ip: Option<IpAddr>,
+    #[schema(value_type = String)]
     pub effective_publish_ip: IpAddr,
     pub bound_publish_ip: Option<String>,
     pub bound_port: Option<u16>,
@@ -73,20 +93,21 @@ pub struct NetworkSettings {
     pub status: RuntimeStatus,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NetworkUpdate {
     pub port: u16,
+    #[schema(value_type = Option<String>)]
     pub publish_ip: Option<IpAddr>,
 }
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResourceUpdate {
     pub memory_min_mb: u32,
     pub memory_max_mb: u32,
     pub cpus: f64,
 }
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateServer {
     #[serde(default = "default_runtime")]
@@ -125,25 +146,31 @@ fn default_max() -> u32 {
 fn default_cpus() -> f64 {
     2.0
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerView {
     #[serde(flatten)]
+    #[schema(required = true)]
     pub server: Server,
+    #[schema(value_type = String)]
+    #[schema(required = true)]
     pub directory: PathBuf,
+    #[schema(required = true)]
     pub status: RuntimeStatus,
+    #[schema(required = true)]
     pub icon: Option<DisplayIcon>,
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct DisplayIcon {
     pub url: String,
     pub source: &'static str,
 }
 /// Completed deletion. Retained files are never implicitly adopted by a new instance.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DeletedServer {
     pub id: String,
     pub files_deleted: bool,
+    #[schema(value_type = Option<String>)]
     pub retained_directory: Option<PathBuf>,
 }

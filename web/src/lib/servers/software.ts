@@ -74,7 +74,7 @@ export function needsLoader(kind: SoftwareKind): kind is LoaderSoftwareKind {
 }
 
 /** A managed server that has not completed a successful install yet. */
-export function needsInstall(server: Pick<ServerView, 'software' | 'launch'>): boolean {
+export function needsInstall(server: Partial<Pick<ServerView, 'software' | 'launch'>>): boolean {
 	return server.software != null && server.launch == null;
 }
 
@@ -196,7 +196,7 @@ export interface DetailRow {
  * mode. Build numbers are only labelled as Paper builds for Paper servers.
  */
 export function installedDetails(
-	server: Pick<ServerView, 'software' | 'launch' | 'launchOverride'>
+	server: Partial<Pick<ServerView, 'software' | 'launch' | 'launchOverride'>>
 ): DetailRow[] {
 	const launch = server.launch ?? null;
 	if (!launch) return [];
@@ -221,7 +221,9 @@ export function installedDetails(
 }
 
 /** "NeoForge 21.1.77" from the installed loader, or the requested Fabric/Forge loader. */
-export function installedLoader(server: Pick<ServerView, 'software' | 'launch'>): string | null {
+export function installedLoader(
+	server: Partial<Pick<ServerView, 'software' | 'launch'>>
+): string | null {
 	const loader = server.launch?.loader;
 	if (loader?.type) return `${loaderLabel(loader.type)} ${loader.version}`.trim();
 	const software = server.software;
@@ -236,7 +238,7 @@ export function installedLoader(server: Pick<ServerView, 'software' | 'launch'>)
  * Minecraft version and loader instead of raw IDs.
  */
 export function softwareHeadline(
-	server: Pick<ServerView, 'software' | 'launch'>,
+	server: Partial<Pick<ServerView, 'software' | 'launch'>>,
 	packName: string | null = null
 ): string | null {
 	const software = server.software ?? null;
@@ -261,7 +263,7 @@ export function softwareHeadline(
  * Short labels for a server card: software type ("Paper", "Vanilla", "Custom", …) and the
  * Minecraft version, preferring the installed launch version over the requested selection.
  */
-export function cardSummary(server: Pick<ServerView, 'software' | 'launch'>): {
+export function cardSummary(server: Partial<Pick<ServerView, 'software' | 'launch'>>): {
 	software: string;
 	version: string | null;
 } {

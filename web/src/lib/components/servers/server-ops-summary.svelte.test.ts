@@ -19,6 +19,7 @@ const record = (id: string, extra: Partial<ExportRecord> = {}): ExportRecord => 
 	...extra
 });
 const job = (id: string, kind: string, state: Job['state'], finishedAt: string | null): Job => ({
+	work: null,
 	id,
 	kind,
 	serverId: 'srv-1',

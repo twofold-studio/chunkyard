@@ -3,6 +3,7 @@ import type { Job } from '#lib/api/index.js';
 import { deleteAndWait, deletedFromResult } from './delete';
 
 const job = (state: Job['state'], extra: Partial<Job> = {}): Job => ({
+	work: null,
 	id: 'job-d',
 	kind: 'server.delete',
 	serverId: 'srv-1',

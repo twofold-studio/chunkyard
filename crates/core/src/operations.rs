@@ -4,40 +4,56 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerIdentity {
     pub name: String,
     pub uuid: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GameStatus {
+    #[schema(required = true)]
     pub state: String,
+    #[schema(required = true)]
     pub observed_at: String,
+    #[schema(required = true)]
     pub latency_ms: Option<u64>,
+    #[schema(required = true)]
     pub online_players: Option<u32>,
+    #[schema(required = true)]
     pub max_players: Option<u32>,
+    #[schema(required = true)]
     pub player_sample: Vec<PlayerIdentity>,
+    #[schema(required = true)]
     pub version: Option<String>,
+    #[schema(required = true)]
     pub connect_address: Option<String>,
+    #[schema(required = true)]
     pub detail: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerLists {
+    #[schema(required = true)]
     pub whitelist: Vec<Value>,
+    #[schema(required = true)]
     pub operators: Vec<Value>,
+    #[schema(required = true)]
     pub bans: Vec<Value>,
+    #[schema(required = true)]
     pub known_players: Vec<PlayerIdentity>,
+    #[schema(required = true)]
     pub running: bool,
+    #[schema(required = true)]
     pub online_mode: bool,
+    #[schema(required = true)]
     pub whitelist_enabled: bool,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PlayerChange {
     pub list: String,
@@ -48,12 +64,16 @@ pub struct PlayerChange {
     pub reason: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct RecoveryPolicy {
+    #[schema(required = true)]
     pub auto_start: bool,
+    #[schema(required = true)]
     pub restart_on_crash: bool,
+    #[schema(required = true)]
     pub max_attempts: u32,
+    #[schema(required = true)]
     pub retry_delay_seconds: u32,
 }
 impl Default for RecoveryPolicy {
@@ -67,11 +87,14 @@ impl Default for RecoveryPolicy {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct BackupPolicy {
+    #[schema(required = true)]
     pub enabled: bool,
+    #[schema(required = true)]
     pub interval_minutes: u32,
+    #[schema(required = true)]
     pub keep_last: Option<u32>,
 }
 impl Default for BackupPolicy {
@@ -83,7 +106,7 @@ impl Default for BackupPolicy {
         }
     }
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BackupPolicyWrite {
     pub enabled: bool,
@@ -93,23 +116,38 @@ pub struct BackupPolicyWrite {
     pub confirm_retention_deletion: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AutomationState {
+    #[schema(required = true)]
     pub recovery: RecoveryPolicy,
+    #[schema(required = true)]
     pub backup: BackupPolicy,
+    #[schema(required = true)]
     pub history_enabled: bool,
+    #[schema(required = true)]
     pub desired_running: bool,
+    #[schema(required = true)]
     pub intent_at: i64,
+    #[schema(required = true)]
     pub restart_attempts: u32,
+    #[schema(required = true)]
     pub next_retry_at: Option<i64>,
+    #[schema(required = true)]
     pub stable_since: Option<i64>,
+    #[schema(required = true)]
     pub next_backup_at: Option<i64>,
+    #[schema(required = true)]
     pub last_backup_at: Option<i64>,
+    #[schema(required = true)]
     pub last_backup_job: Option<String>,
+    #[schema(required = true)]
     pub last_backup_export_id: Option<String>,
+    #[schema(required = true)]
     pub last_backup_result: Option<String>,
+    #[schema(required = true)]
     pub last_backup_error: Option<String>,
+    #[schema(required = true)]
     pub last_history_at: Option<i64>,
 }
 impl Default for AutomationState {
@@ -134,21 +172,30 @@ impl Default for AutomationState {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryPoint {
+    #[schema(required = true)]
     pub sampled_at: i64,
+    #[schema(required = true)]
     pub cpu_percent: Option<f64>,
+    #[schema(required = true)]
     pub memory_working_set_bytes: Option<u64>,
+    #[schema(required = true)]
     pub memory_limit_bytes: Option<u64>,
 }
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MetricsHistory {
+    #[schema(required = true)]
     pub enabled: bool,
+    #[schema(required = true)]
     pub interval_seconds: u32,
+    #[schema(required = true)]
     pub retention_days: u32,
+    #[schema(required = true)]
     pub resolution_seconds: u32,
+    #[schema(required = true)]
     pub items: Vec<HistoryPoint>,
 }
 

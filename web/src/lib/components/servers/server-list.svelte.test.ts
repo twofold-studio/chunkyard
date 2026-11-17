@@ -20,6 +20,11 @@ beforeAll(() =>
 afterAll(() => metricsHub.configure({}));
 
 const server = (id: string, extra: Partial<ServerView> = {}): ServerView => ({
+	archive: null,
+	autoJava: false,
+	launchOverride: null,
+	publishIp: null,
+	icon: null,
 	id,
 	name: id,
 	runtime: 'docker',

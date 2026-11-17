@@ -24,44 +24,59 @@ pub enum PropertiesError {
     #[error(transparent)]
     Storage(#[from] RepositoryError),
 }
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PropertiesVersion {
+    #[schema(required = true)]
     pub version: i64,
+    #[schema(required = true)]
     pub etag: String,
+    #[schema(required = true)]
     pub created_at: String,
+    #[schema(required = true)]
     pub source: String,
 }
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
 pub struct PropertiesRevision {
     #[serde(flatten)]
+    #[schema(required = true)]
     pub metadata: PropertiesVersion,
+    #[schema(required = true)]
     pub content: String,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PropertiesDocument {
+    #[schema(required = true)]
     pub content: String,
+    #[schema(required = true)]
     pub etag: String,
+    #[schema(required = true)]
     pub version: i64,
+    #[schema(required = true)]
     pub applied_version: Option<i64>,
+    #[schema(required = true)]
     pub restart_required: bool,
+    #[schema(required = true)]
     pub status: RuntimeStatus,
+    #[schema(required = true)]
     pub updated_at: String,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PropertiesHistory {
+    #[schema(required = true)]
     pub items: Vec<PropertiesVersion>,
+    #[schema(required = true)]
     pub next_before: Option<i64>,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PropertiesWrite {
     pub content: String,
     pub etag: String,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PropertiesRestore {
     pub version: i64,

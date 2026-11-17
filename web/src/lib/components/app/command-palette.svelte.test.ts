@@ -5,6 +5,11 @@ import CommandPalette from './command-palette.svelte';
 import type { ServerView } from '#lib/api/index.js';
 
 const server = (id: string, name: string): ServerView => ({
+	archive: null,
+	autoJava: false,
+	launchOverride: null,
+	publishIp: null,
+	icon: null,
 	id,
 	name,
 	runtime: 'docker',

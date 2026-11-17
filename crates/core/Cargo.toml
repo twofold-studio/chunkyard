@@ -8,6 +8,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+utoipa.workspace = true
 async-trait.workspace = true
 futures-util.workspace = true
 serde.workspace = true

@@ -109,7 +109,14 @@ export interface EntryView {
 }
 
 /** Reads only the known native fields; unknown fields are kept by the backend, never shown. */
-export function entryView(entry: PlayerEntry, index: number): EntryView {
+function entryFields(value: unknown): Record<string, unknown> {
+	return value !== null && typeof value === 'object' && !Array.isArray(value)
+		? Object.fromEntries(Object.entries(value))
+		: {};
+}
+
+export function entryView(value: PlayerEntry, index: number): EntryView {
+	const entry = entryFields(value);
 	const name = text(entry.name, 32);
 	const uuid = text(entry.uuid, 40);
 	const level =
@@ -144,7 +151,8 @@ export function listsFromResult(result: unknown): PlayerLists | null {
 export function suggestions(lists: PlayerLists, list: PlayerListName): string[] {
 	const present = new Set(
 		lists[list]
-			.map((entry) => (typeof entry.name === 'string' ? entry.name.toLowerCase() : null))
+			.map((entry) => entryFields(entry).name)
+			.map((name) => (typeof name === 'string' ? name.toLowerCase() : null))
 			.filter((name): name is string => name !== null)
 	);
 	return lists.knownPlayers

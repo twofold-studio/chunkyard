@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Stage {
     Resolve,
@@ -20,12 +20,16 @@ pub enum Stage {
     Restore,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkProgress {
+    #[schema(required = true)]
     pub stage: Stage,
+    #[schema(required = true)]
     pub completed_bytes: Option<u64>,
+    #[schema(required = true)]
     pub total_bytes: Option<u64>,
+    #[schema(required = true)]
     pub completed_stages: Vec<Stage>,
 }
 

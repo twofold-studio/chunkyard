@@ -16,6 +16,13 @@ const GiB = 1024 ** 3;
 let isolation: unknown;
 
 const server = (state: ServerState = 'stopped', extra: Partial<ServerView> = {}): ServerView => ({
+	archive: null,
+	autoJava: false,
+	launchOverride: null,
+	publishIp: null,
+	icon: null,
+	software: null,
+	launch: null,
 	id: 'srv-1',
 	name: 'Survival',
 	runtime: 'docker',

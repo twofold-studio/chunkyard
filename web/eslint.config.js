@@ -9,6 +9,7 @@ import ts from 'typescript-eslint';
 const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 
 export default defineConfig(
+	{ ignores: ['src/lib/api/generated/**'] },
 	includeIgnoreFile(gitignorePath),
 	js.configs.recommended,
 	ts.configs.recommended,

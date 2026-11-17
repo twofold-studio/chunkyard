@@ -1,35 +1,36 @@
+use crate::dto::*;
 use crate::{AppState, error::ApiError, json::ApiJson};
 use axum::{
-    Extension, Json, Router,
+    Extension, Json,
     body::Body,
     extract::{Path, State},
     http::{StatusCode, header},
     response::{IntoResponse, Response},
-    routing::{get, post},
 };
 use chunkyard_core::{auth::Actor, exports::*, jobs::JobFailure};
 use futures_util::StreamExt;
-use serde_json::{Value, json};
+use serde_json::json;
 use std::sync::Arc;
 static DOWNLOADS: std::sync::LazyLock<Arc<tokio::sync::Semaphore>> =
     std::sync::LazyLock::new(|| Arc::new(tokio::sync::Semaphore::new(4)));
-pub(crate) fn routes() -> Router<AppState> {
-    Router::new()
-        .route("/api/v1/storage", get(storage).put(set_storage))
-        .route("/api/v1/storage/test", post(test_storage))
-        .route("/api/v1/exports", get(list))
-        .route("/api/v1/servers/{id}/exports", post(create))
-        .route("/api/v1/servers/{id}/archive", post(archive_instance))
-        .route("/api/v1/exports/{id}/restore", post(restore_instance))
-        .route("/api/v1/exports/{id}/download", get(download))
-        .route("/api/v1/exports/{id}", axum::routing::delete(delete))
+pub(crate) fn routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
+    utoipa_axum::router::OpenApiRouter::new()
+        .routes(utoipa_axum::routes!(storage, set_storage))
+        .routes(utoipa_axum::routes!(test_storage))
+        .routes(utoipa_axum::routes!(list))
+        .routes(utoipa_axum::routes!(create))
+        .routes(utoipa_axum::routes!(archive_instance))
+        .routes(utoipa_axum::routes!(restore_instance))
+        .routes(utoipa_axum::routes!(download))
+        .routes(utoipa_axum::routes!(delete))
 }
+#[utoipa::path(post, path = "/api/v1/servers/{id}/archive", operation_id = "exports_archive_instance", tag = "exports", params(("id" = String, Path)), request_body = ArchiveRequest, responses((status = 202, description = "Success", body = JobResponse), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 async fn archive_instance(
     State(s): State<AppState>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     ApiJson(body): ApiJson<ArchiveRequest>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<(StatusCode, Json<JobResponse>), ApiError> {
     s.servers.get(&id).await?;
     let service = s.exports.clone();
     let server = id.clone();
@@ -49,13 +50,14 @@ async fn archive_instance(
         .jobs
         .submit_progress_for_server("server.archive", &id, actor.user_id(), task, progress)
         .await?;
-    Ok((StatusCode::ACCEPTED, Json(json!({"job":job}))))
+    Ok((StatusCode::ACCEPTED, Json(JobResponse { job })))
 }
+#[utoipa::path(post, path = "/api/v1/exports/{id}/restore", operation_id = "exports_restore_instance", tag = "exports", params(("id" = String, Path)), responses((status = 202, description = "Success", body = JobResponse), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 async fn restore_instance(
     State(s): State<AppState>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<(StatusCode, Json<JobResponse>), ApiError> {
     let record = s.exports.get(&id).await?;
     let service = s.exports.clone();
     let progress = chunkyard_core::progress::ProgressReporter::default();
@@ -80,30 +82,37 @@ async fn restore_instance(
             progress,
         )
         .await?;
-    Ok((StatusCode::ACCEPTED, Json(json!({"job":job}))))
+    Ok((StatusCode::ACCEPTED, Json(JobResponse { job })))
 }
+#[utoipa::path(get, path = "/api/v1/storage", operation_id = "exports_storage", tag = "exports", responses((status = 200, description = "Success", body = StorageView), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 async fn storage(State(s): State<AppState>) -> Result<Json<StorageView>, ApiError> {
     Ok(Json(s.exports.storage().await?))
 }
+#[utoipa::path(put, path = "/api/v1/storage", operation_id = "exports_set_storage", tag = "exports", request_body = StorageConnection, responses((status = 200, description = "Success", body = StorageView), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 async fn set_storage(
     State(s): State<AppState>,
     ApiJson(body): ApiJson<StorageConnection>,
 ) -> Result<Json<StorageView>, ApiError> {
     Ok(Json(s.exports.set_storage(body).await?))
 }
-async fn test_storage(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
+#[utoipa::path(post, path = "/api/v1/storage/test", operation_id = "exports_test_storage", tag = "exports", responses((status = 200, description = "Success", body = StorageTest), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
+async fn test_storage(State(s): State<AppState>) -> Result<Json<StorageTest>, ApiError> {
     s.exports.test_storage().await?;
-    Ok(Json(json!({"ok":true})))
+    Ok(Json(StorageTest { ok: true }))
 }
-async fn list(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
-    Ok(Json(json!({"items":s.exports.list().await?})))
+#[utoipa::path(get, path = "/api/v1/exports", operation_id = "exports_list", tag = "exports", responses((status = 200, description = "Success", body = Items<Export>), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
+async fn list(State(s): State<AppState>) -> Result<Json<Items<Export>>, ApiError> {
+    Ok(Json(Items {
+        items: s.exports.list().await?,
+    }))
 }
+#[utoipa::path(post, path = "/api/v1/servers/{id}/exports", operation_id = "exports_create", tag = "exports", params(("id" = String, Path)), request_body = ExportRequest, responses((status = 202, description = "Success", body = JobResponse), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 async fn create(
     State(s): State<AppState>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     ApiJson(body): ApiJson<ExportRequest>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<(StatusCode, Json<JobResponse>), ApiError> {
     // Check the instance exists before accepting a durable job.
     s.servers.get(&id).await?;
     let service = s.exports.clone();
@@ -127,8 +136,9 @@ async fn create(
         .jobs
         .submit_progress_for_server("server.export", &id, actor.user_id(), task, progress)
         .await?;
-    Ok((StatusCode::ACCEPTED, Json(json!({"job":job}))))
+    Ok((StatusCode::ACCEPTED, Json(JobResponse { job })))
 }
+#[utoipa::path(get, path = "/api/v1/exports/{id}/download", operation_id = "exports_download", tag = "exports", params(("id" = String, Path)), responses((status = 200, description = "Binary response", body = crate::dto::BinaryBody, content_type = "application/gzip"), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 async fn download(State(s): State<AppState>, Path(id): Path<String>) -> Result<Response, ApiError> {
     let permit = DOWNLOADS
         .clone()
@@ -153,6 +163,7 @@ async fn download(State(s): State<AppState>, Path(id): Path<String>) -> Result<R
     )
         .into_response())
 }
+#[utoipa::path(delete, path = "/api/v1/exports/{id}", operation_id = "exports_delete", tag = "exports", params(("id" = String, Path)), responses((status = 204, description = "Success"), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 async fn delete(State(s): State<AppState>, Path(id): Path<String>) -> Result<StatusCode, ApiError> {
     s.exports.delete(&id).await?;
     Ok(StatusCode::NO_CONTENT)

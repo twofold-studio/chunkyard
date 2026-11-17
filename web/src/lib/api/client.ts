@@ -1,3 +1,4 @@
+import { createClient } from './generated/client';
 /**
  * Minimal same-origin JSON client for the Rust backend.
  *
@@ -109,7 +110,7 @@ async function parseProblem(response: Response): Promise<ApiError> {
 	);
 }
 
-export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
 	const method = options.method ?? 'GET';
 	const headers: Record<string, string> = { Accept: 'application/json' };
 	if (method !== 'GET') headers['X-MCM-CSRF'] = '1';
@@ -142,11 +143,66 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 		if (isAuthLost(error)) authListener?.(error);
 		throw error;
 	}
-	if (response.status === 204) return undefined as T;
+	if (response.status === 204) return undefined;
 	try {
-		return (await response.json()) as T;
+		return await response.json();
 	} catch (error) {
 		if (isAbortError(error)) throw error;
 		throw new ApiError(response.status, UNEXPECTED_RESPONSE, 'The backend returned invalid JSON.');
 	}
+}
+
+/** Per-call client keeps SvelteKit fetch and cancellation isolated between requests. */
+export function sdkOptions(options: { fetch?: Fetch; signal?: AbortSignal; rawBody?: Blob } = {}) {
+	const origin = typeof location === 'undefined' ? 'http://chunkyard.invalid' : location.origin;
+	const client = createClient({
+		baseUrl: origin,
+		headers: { Accept: 'application/json' },
+		parseAs: 'json',
+		credentials: 'same-origin',
+		fetch: async (input) => {
+			if (!(input instanceof Request)) throw new TypeError('SDK must supply a Request');
+			const url = new URL(input.url);
+			if (url.origin !== origin) throw new TypeError('API requests must be same-origin');
+			const headers = new Headers(input.headers);
+			if (input.method !== 'GET') headers.set('X-MCM-CSRF', '1');
+			else headers.delete('X-MCM-CSRF');
+			let response: Response;
+			try {
+				response = await (options.fetch ?? fetch)(url.pathname + url.search, {
+					method: input.method,
+					headers,
+					credentials: 'same-origin',
+					signal: options.signal,
+					body:
+						options.rawBody ??
+						(input.body === null
+							? undefined
+							: headers.get('Content-Type')?.includes('json')
+								? await input.text()
+								: await input.blob())
+				});
+			} catch (error) {
+				if (isAbortError(error)) throw error;
+				throw new ApiError(0, NETWORK_UNAVAILABLE, 'The Chunkyard backend is unreachable.');
+			}
+			if (!response.ok) {
+				const error = await parseProblem(response);
+				if (isAuthLost(error)) authListener?.(error);
+				throw error;
+			}
+			return response;
+		}
+	});
+	client.interceptors.error.use((error) => {
+		if (error instanceof SyntaxError)
+			return new ApiError(200, UNEXPECTED_RESPONSE, 'The backend returned invalid JSON.');
+		return error;
+	});
+	return {
+		client,
+		signal: options.signal,
+		headers: { 'X-MCM-CSRF': '1' as const },
+		throwOnError: true as const
+	};
 }

@@ -45,7 +45,7 @@ export function curseForgeLogoUrl(projectId: number): string | null {
  * `null` means the generic icon.
  */
 export function serverIconUrl(
-	server: Pick<ServerView, 'icon' | 'software'>,
+	server: Partial<Pick<ServerView, 'icon' | 'software'>>,
 	origin = globalThis.location?.origin
 ): string | null {
 	if (server.icon !== undefined) return safeImageUrl(server.icon?.url, origin);

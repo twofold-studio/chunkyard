@@ -74,8 +74,8 @@ export function profileToForm(profile: LaunchProfile): LaunchForm {
 		mode: profile.mode,
 		path: profile.path,
 		javaMajor: profile.javaMajor,
-		jvmArgs: formatLines(profile.jvmArgs),
-		args: formatLines(profile.args)
+		jvmArgs: formatLines(profile.jvmArgs ?? []),
+		args: formatLines(profile.args ?? [])
 	};
 }
 
@@ -97,8 +97,8 @@ export function sameProfile(a: LaunchProfile, b: LaunchProfile): boolean {
 		a.mode === b.mode &&
 		a.path === b.path &&
 		a.javaMajor === b.javaMajor &&
-		list(a.jvmArgs, b.jvmArgs) &&
-		list(a.args, b.args)
+		list(a.jvmArgs ?? [], b.jvmArgs ?? []) &&
+		list(a.args ?? [], b.args ?? [])
 	);
 }
 

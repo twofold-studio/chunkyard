@@ -3,6 +3,111 @@ use serde_json::{Value, json};
 use std::collections::HashSet;
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
+#[test]
+fn offline_contract_is_deterministic_and_matches_the_checked_in_artifact() -> Result {
+    let generated = chunkyard_api::openapi::generate()?;
+    assert_eq!(generated, chunkyard_api::openapi::generate()?);
+    let checked_in: Value = serde_json::from_str(include_str!("../../../api/src/openapi.json"))?;
+    assert_eq!(generated, checked_in);
+    // The intentionally dynamic JSON fields remain honest, rather than invented DTOs.
+    assert_eq!(
+        generated["components"]["schemas"]["Job"]["properties"]["result"],
+        json!({})
+    );
+    assert_eq!(
+        generated["components"]["schemas"]["BinaryBody"]["format"],
+        "binary"
+    );
+    Ok(())
+}
+
+fn validate_response(doc: &Value, path: &str, method: &str, status: u16, body: &Value) -> Result {
+    let responses = &doc["paths"][path][method]["responses"];
+    let response = responses
+        .get(status.to_string())
+        .unwrap_or(&responses["default"]);
+    let media = response["content"]
+        .as_object()
+        .ok_or("missing response content")?;
+    let schema = &media.values().next().ok_or("missing media type")?["schema"];
+    let mut root = schema.clone();
+    root["components"] = doc["components"].clone();
+    let validator = jsonschema::validator_for(&root)?;
+    let errors = validator
+        .iter_errors(body)
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>();
+    assert!(errors.is_empty(), "{method} {path} ({status}): {errors:?}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn actual_rest_successes_and_errors_match_the_generated_schemas() -> Result {
+    let app = TestApp::new().await?;
+    let doc = chunkyard_api::openapi::generate()?;
+    app.setup().await?;
+    let response = app
+        .post("/api/v1/servers")
+        .json(&json!({"name":"Schema fixture"}))
+        .send()
+        .await?;
+    assert_eq!(response.status(), 201);
+    let body: Value = response.json().await?;
+    validate_response(&doc, "/api/v1/servers", "post", 201, &body)?;
+    let id = body["server"]["id"].as_str().ok_or("missing server ID")?;
+    let response = app
+        .client
+        .put(format!("{}/api/v1/servers/{id}/recovery", app.base))
+        .header("Origin", &app.base)
+        .header("X-MCM-CSRF", "1")
+        .json(&json!({}))
+        .send()
+        .await?;
+    assert_eq!(response.status(), 200);
+    let policy: Value = response.json().await?;
+    assert_eq!(policy["recovery"]["maxAttempts"], 3);
+    validate_response(&doc, "/api/v1/servers/{id}/recovery", "put", 200, &policy)?;
+    for path in [
+        "/api/v1/servers",
+        "/api/v1/auth/me",
+        "/api/v1/setup/status",
+        "/api/v1/system/version",
+        "/api/v1/software",
+        "/api/v1/jobs",
+        "/api/v1/storage",
+        "/api/v1/exports",
+        "/api/v1/servers/{id}",
+        "/api/v1/servers/{id}/network",
+        "/api/v1/servers/{id}/metrics",
+        "/api/v1/servers/{id}/automation",
+        "/api/v1/servers/{id}/players",
+        "/api/v1/servers/{id}/metrics/history",
+    ] {
+        let response = app
+            .client
+            .get(format!("{}{}", app.base, path.replace("{id}", id)))
+            .send()
+            .await?;
+        let status = response.status().as_u16();
+        assert_eq!(status, 200, "{path}");
+        validate_response(&doc, path, "get", status, &response.json::<Value>().await?)?;
+    }
+    let response = app
+        .client
+        .get(format!("{}/api/v1/jobs/invalid", app.base))
+        .send()
+        .await?;
+    assert_eq!(response.status(), 404);
+    validate_response(
+        &doc,
+        "/api/v1/jobs/{id}",
+        "get",
+        404,
+        &response.json::<Value>().await?,
+    )?;
+    app.close().await
+}
+
 #[tokio::test]
 async fn engine_capacity_requires_setup_and_reports_totals_in_bytes() -> Result {
     let app = TestApp::new().await?;

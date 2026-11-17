@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "3"
 
 [workspace.package]
-version = "0.15.1"
+version = "0.16.0"
 edition = "2024"
 rust-version = "1.88"
 
@@ -19,6 +19,8 @@ chunkyard-jobs = { path = "crates/jobs" }
 chunkyard-process = { path = "crates/process" }
 argon2 = "0.5"
 axum = "0.8"
+utoipa = { version = "=5.4.0", features = ["axum_extras", "uuid"] }
+utoipa-axum = "=0.2.0"
 base64 = "0.22"
 rand = "0.8"
 subtle = "2"

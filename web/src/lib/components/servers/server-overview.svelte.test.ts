@@ -9,6 +9,10 @@ import { GameStatusSource } from '#lib/servers/game-status.svelte.js';
 import { DocumentAttention } from '#lib/attention.svelte.js';
 
 const server = (extra: Partial<ServerView> = {}): ServerView => ({
+	archive: null,
+	autoJava: false,
+	launchOverride: null,
+	publishIp: null,
 	id: 'srv-1',
 	name: 'ATM',
 	runtime: 'docker',

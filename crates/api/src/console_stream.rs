@@ -18,6 +18,7 @@ use std::{
 use tokio::sync::Semaphore;
 
 static CONNECTIONS: LazyLock<Arc<Semaphore>> = LazyLock::new(|| Arc::new(Semaphore::new(16)));
+#[utoipa::path(get, path = "/api/v1/servers/{id}/console/stream", operation_id = "console_stream_upgrade", tag = "console_stream", params(("id" = String, Path)), responses((status = 101, description = "Success"), (status = "default", description = "Request rejected", body = crate::error::Problem, content_type = "application/problem+json"))) ]
 pub(crate) async fn upgrade(
     State(state): State<AppState>,
     Path(id): Path<String>,

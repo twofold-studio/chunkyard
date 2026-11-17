@@ -3,12 +3,16 @@ use crate::repository::RepositoryError;
 use async_trait::async_trait;
 use serde::Serialize;
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
+    #[schema(required = true)]
     pub id: String,
+    #[schema(required = true)]
     pub email: String,
+    #[schema(required = true)]
     pub role: String,
+    #[schema(required = true)]
     pub created_at: String,
 }
 pub struct Credentials {
@@ -28,13 +32,18 @@ pub struct Session {
 }
 
 /// Public metadata only. The bearer secret is never stored or returned here.
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiKey {
+    #[schema(required = true)]
     pub id: String,
+    #[schema(required = true)]
     pub name: String,
+    #[schema(required = true)]
     pub prefix: String,
+    #[schema(required = true)]
     pub created_at: String,
+    #[schema(required = true)]
     pub last_used_at: Option<String>,
 }
 

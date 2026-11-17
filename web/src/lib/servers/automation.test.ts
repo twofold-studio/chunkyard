@@ -111,6 +111,7 @@ describe('policies', () => {
 
 	it('summarises recovery runtime state only when a policy is on', () => {
 		const base: AutomationState = {
+			intentAt: 0,
 			recovery: DEFAULT_RECOVERY,
 			backup: DEFAULT_BACKUP,
 			historyEnabled: true,

@@ -14,6 +14,11 @@ let calls: Call[];
 let replies: { status: number; body: unknown }[];
 
 const server = (extra: Partial<ServerView> = {}): ServerView => ({
+	archive: null,
+	autoJava: false,
+	launchOverride: null,
+	publishIp: null,
+	launch: null,
 	id: 'srv-1',
 	name: 'ATM',
 	runtime: 'docker',

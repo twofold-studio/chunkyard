@@ -1,6 +1,7 @@
 //! HTTP transport. Services and configuration arrive through the composition root.
 mod auth;
 mod console_stream;
+mod dto;
 mod error;
 mod exports;
 mod files;
@@ -10,7 +11,7 @@ mod json;
 mod mcp;
 mod metrics_stream;
 pub use metrics_stream::MetricsHub;
-mod openapi;
+pub mod openapi;
 mod operations;
 mod properties;
 mod security;

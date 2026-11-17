@@ -4,12 +4,13 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
-## Unreleased
+## 0.16.0 - 2026-11-17
 
 
 ### Changed
 
 - Use short Rust crate directories under crates/ while preserving chunkyard-prefixed Cargo package and binary names.
+- REST API: derive OpenAPI from registered Axum handlers and concrete Rust DTOs; generate a pinned frontend SDK and block packaging on contract drift or TypeScript incompatibilities. Binary transfers, WebSockets, and authentication retain their existing behavior.
 ## 0.15.1 - 2026-11-16
 
 

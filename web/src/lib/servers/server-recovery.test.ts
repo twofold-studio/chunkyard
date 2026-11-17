@@ -9,6 +9,13 @@ import {
 } from './server-controller.svelte.js';
 
 const server = (id = 's1', extra: Partial<ServerView> = {}): ServerView => ({
+	archive: null,
+	autoJava: false,
+	launchOverride: null,
+	publishIp: null,
+	icon: null,
+	software: null,
+	launch: null,
 	id,
 	name: `Server ${id}`,
 	runtime: 'docker',
@@ -25,6 +32,7 @@ const server = (id = 's1', extra: Partial<ServerView> = {}): ServerView => ({
 });
 
 const job = (id: string, kind: string, state: Job['state'], extra: Partial<Job> = {}): Job => ({
+	work: null,
 	id,
 	kind,
 	serverId: 's1',

@@ -20,6 +20,7 @@ describe('ServerInstallPanel', () => {
 		render(ServerInstallPanel, {
 			software,
 			job: {
+				work: null,
 				id: 'j',
 				kind: 'server.install',
 				serverId: 's',

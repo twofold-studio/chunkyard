@@ -11,6 +11,7 @@ const reply = (method: string, path: string, ...queue: Reply[]) =>
 	(replies[`${method} ${path}`] = queue);
 
 const job = (state: string, extra: Record<string, unknown> = {}) => ({
+	work: null,
 	id: 'job-d',
 	kind: 'server.delete',
 	serverId: 'srv-1',

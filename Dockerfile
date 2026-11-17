@@ -1,10 +1,20 @@
+FROM rust:1.88-bookworm AS contract
+WORKDIR /app
+COPY Cargo.toml Cargo.lock CHANGELOG.md ./
+COPY crates ./crates
+RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/app/target,sharing=locked \
+    cargo run --locked --quiet -p chunkyard-api --example export-openapi > /tmp/openapi.json && \
+    cmp /tmp/openapi.json crates/api/src/openapi.json
+
 FROM node:24-bookworm-slim AS web-build
 WORKDIR /web
 RUN npm install --global pnpm@12.9.0
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 RUN --mount=type=cache,target=/pnpm/store pnpm install --frozen-lockfile --store-dir /pnpm/store
 COPY web ./
-RUN pnpm build
+COPY scripts/sdk-contract.mjs /scripts/sdk-contract.mjs
+COPY --from=contract /tmp/openapi.json /crates/api/src/openapi.json
+RUN pnpm api:sdk:check && pnpm build
 
 FROM rust:1.88-bookworm AS build
 WORKDIR /app

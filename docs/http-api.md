@@ -1,5 +1,7 @@
 # Current backend HTTP API
 
+The REST contract and TypeScript SDK are generated from registered Rust handlers. See [contract generation and checks](api-contract-generation.md) before changing request, response, or error DTOs.
+
 Owner API keys, public documentation and MCP are documented in [integrations](integrations-contract.md). Valid bearer-key requests bypass browser CSRF headers but retain Host and supplied-Origin checks.
 
 Minecraft readiness and player lists, startup/crash policies, stopped-only backup schedules and persistent metrics history are documented in [operations](operations-contract.md). These owner endpoints use the same authentication and CSRF rules; automatic starts never accept the EULA.
@@ -134,7 +136,7 @@ Standalone modded selections use `{type:"fabric"|"forge"|"neoforge",version,load
 
 ## Version badge and changelog
 
-`GET /api/v1/system/version` returns `{enabled:true, version:"0.15.1", channel:"development"}` for the current build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
+`GET /api/v1/system/version` returns `{enabled:true, version:"0.16.0", channel:"development"}` for the current build. `GET /api/v1/system/changelog` returns `{version, markdown}` with the generated project changelog bundled at build time. These public endpoints let setup and login pages show the version without an owner session. Host/origin checks and no-store still apply; no per-user or server data is included.
 
 `[http] show_version = true` is the default. Set `CHUNKYARD_HTTP__SHOW_VERSION=false`, restart/redeploy, and reload the page to hide the badge: version metadata then returns `{enabled:false, version:null, channel:null}`, and the changelog endpoint returns 404 `version.disabled`. The UI fetches changelog content only when the modal opens. Completed, verified milestones batch notes and bump the project version under the authorized [changelog workflow](changelog.md); in-progress changes remain Unreleased.
 

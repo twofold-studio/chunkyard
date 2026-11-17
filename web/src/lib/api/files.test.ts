@@ -32,9 +32,9 @@ describe('file endpoints', () => {
 		const fetch = stub(json(200, { path: '', entries: [], truncated: false, canWrite: true }));
 		await listFiles('srv/1', 'world #1/a&b=c?');
 		const [url, init] = fetch.mock.calls[0];
-		expect(url).toBe('/api/v1/servers/srv%2F1/files?path=world+%231%2Fa%26b%3Dc%3F');
+		expect(url).toBe('/api/v1/servers/srv%2F1/files?path=world%20%231%2Fa%26b%3Dc%3F');
 		expect(init.method).toBe('GET');
-		expect(init.headers['X-MCM-CSRF']).toBeUndefined();
+		expect(new Headers(init.headers).get('X-MCM-CSRF')).toBeNull();
 		expect(new URL(url, 'http://x').searchParams.get('path')).toBe('world #1/a&b=c?');
 	});
 
@@ -48,8 +48,8 @@ describe('file endpoints', () => {
 		const [url, init] = fetch.mock.calls[0];
 		expect(url).toBe('/api/v1/servers/s/files/content?path=server.properties');
 		expect(init.method).toBe('PUT');
-		expect(init.headers['X-MCM-CSRF']).toBe('1');
-		expect(init.headers['Content-Type']).toBe('application/json');
+		expect(new Headers(init.headers).get('X-MCM-CSRF')).toBe('1');
+		expect(new Headers(init.headers).get('Content-Type')).toBe('application/json');
 		expect(JSON.parse(init.body)).toEqual({ content: 'motd=hi\n', etag: 'e1' });
 	});
 
@@ -58,13 +58,13 @@ describe('file endpoints', () => {
 		const blob = new Blob(['PK'], { type: 'application/java-archive' });
 		await uploadFile('s', 'plugins/a b.jar', blob, false);
 		const [url, init] = fetch.mock.calls[0];
-		expect(url).toBe('/api/v1/servers/s/files/upload?path=plugins%2Fa+b.jar&overwrite=false');
+		expect(url).toBe('/api/v1/servers/s/files/upload?path=plugins%2Fa%20b.jar&overwrite=false');
 		expect(init.method).toBe('POST');
 		expect(init.credentials).toBe('same-origin');
-		expect(init.headers['Content-Type']).toBe('application/octet-stream');
-		expect(init.headers['X-MCM-CSRF']).toBe('1');
+		expect(new Headers(init.headers).get('Content-Type')).toBe('application/octet-stream');
+		expect(new Headers(init.headers).get('X-MCM-CSRF')).toBe('1');
 		// The file itself is the body: no multipart, JSON or Base64 wrapping.
-		expect(init.body).toBe(blob);
+		expect(await init.body.text()).toBe(await blob.text());
 
 		const confirmed = stub(json(201, { entry: {} }));
 		await uploadFile('s', 'a.jar', blob, true);
@@ -86,7 +86,7 @@ describe('file endpoints', () => {
 			const [url, init] = fetch.mock.calls[0];
 			expect(url).toBe(`/api/v1/servers/s/files${suffix}`);
 			expect(init.method).toBe('POST');
-			expect(init.headers['X-MCM-CSRF']).toBe('1');
+			expect(new Headers(init.headers).get('X-MCM-CSRF')).toBe('1');
 			expect(JSON.parse(init.body)).toEqual(body);
 		}
 	});
@@ -105,7 +105,7 @@ describe('network endpoint', () => {
 		const [url, init] = fetch.mock.calls[0];
 		expect(url).toBe('/api/v1/servers/s/network');
 		expect(init.method).toBe('PATCH');
-		expect(init.headers['X-MCM-CSRF']).toBe('1');
+		expect(new Headers(init.headers).get('X-MCM-CSRF')).toBe('1');
 		expect(JSON.parse(init.body)).toEqual({ port: 25570, publishIp: null });
 	});
 });
