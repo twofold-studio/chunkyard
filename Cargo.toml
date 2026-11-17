@@ -8,15 +8,15 @@ edition = "2024"
 rust-version = "1.88"
 
 [workspace.dependencies]
-chunkyard-core = { path = "crates/chunkyard-core" }
-chunkyard-download = { path = "crates/chunkyard-download" }
-chunkyard-fs = { path = "crates/chunkyard-fs" }
-chunkyard-db = { path = "crates/chunkyard-db" }
-chunkyard-config = { path = "crates/chunkyard-config" }
-chunkyard-auth = { path = "crates/chunkyard-auth" }
-chunkyard-api = { path = "crates/chunkyard-api" }
-chunkyard-jobs = { path = "crates/chunkyard-jobs" }
-chunkyard-process = { path = "crates/chunkyard-process" }
+chunkyard-core = { path = "crates/core" }
+chunkyard-download = { path = "crates/download" }
+chunkyard-fs = { path = "crates/fs" }
+chunkyard-db = { path = "crates/db" }
+chunkyard-config = { path = "crates/config" }
+chunkyard-auth = { path = "crates/auth" }
+chunkyard-api = { path = "crates/api" }
+chunkyard-jobs = { path = "crates/jobs" }
+chunkyard-process = { path = "crates/process" }
 argon2 = "0.5"
 axum = "0.8"
 base64 = "0.22"
@@ -40,7 +40,7 @@ serde_json = "1"
 sha2 = "0.10"
 sha1 = "0.10"
 md-5 = "0.10"
-chunkyard-install = { path = "crates/chunkyard-install" }
+chunkyard-install = { path = "crates/install" }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
 tar = "0.4"
 tempfile = "3"

@@ -1,6 +1,6 @@
 # Readiness, player controls and automation
 
-These authenticated owner endpoints are implemented for the next release. Normal Host/Origin/CSRF and bearer-key rules apply. No new scopes, OAuth or multi-user roles are introduced. The exact DTOs are in `crates/chunkyard-core/src/operations.rs`; schemas are in `crates/chunkyard-api/src/openapi.json`.
+These authenticated owner endpoints are implemented for the next release. Normal Host/Origin/CSRF and bearer-key rules apply. No new scopes, OAuth or multi-user roles are introduced. The exact DTOs are in `crates/core/src/operations.rs`; schemas are in `crates/api/src/openapi.json`.
 
 ## Readiness
 

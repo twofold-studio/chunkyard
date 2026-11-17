@@ -1,6 +1,6 @@
 # `server.properties` schema
 
-Lives in `crates/chunkyard-fs/src/properties/schema.rs` as a static table, exported through `GET /api/v1/meta/server-properties-schema` so the UI renders forms from the same source. Version bounds use the MC release ordering from the Mojang manifest (phase 3); before phase 3, bounds are informational only.
+Lives in `crates/fs/src/properties/schema.rs` as a static table, exported through `GET /api/v1/meta/server-properties-schema` so the UI renders forms from the same source. Version bounds use the MC release ordering from the Mojang manifest (phase 3); before phase 3, bounds are informational only.
 
 ## Field model
 

@@ -2,7 +2,7 @@
 
 Time: `FakeClock`/paused time only where marked and only for logic without real processes (P0 has none).
 
-Kinds: U = unit, P = property, I = crate integration, A = API integration (`crates/chunkyard-api-tests/tests/p0_*.rs` via `TestApp`, built with `test-hooks`), S = snapshot, C = frontend component, V = Vitest unit, E = Playwright E2E, X = xtask/CI.
+Kinds: U = unit, P = property, I = crate integration, A = API integration (`crates/api-tests/tests/p0_*.rs` via `TestApp`, built with `test-hooks`), S = snapshot, C = frontend component, V = Vitest unit, E = Playwright E2E, X = xtask/CI.
 
 ## Rust
 
@@ -17,140 +17,140 @@ Kinds: U = unit, P = property, I = crate integration, A = API integration (`crat
 | `check_deps_axum_outside_api_fails` | `xtask/src/check_deps.rs` | 02 | U |
 | `check_deps_current_workspace_passes` | `xtask/tests/workspace.rs` | 02 | X |
 | `coverage_gate_below_threshold_fails` | `xtask/src/coverage_gate.rs` | 02 | U |
-| `config_defaults_are_valid` | `chunkyard-config/src/lib.rs` | 04 | U |
-| `config_env_overrides_file` | `chunkyard-config/tests/load.rs` | 04 | I |
-| `config_unknown_key_is_rejected` | `chunkyard-config/tests/load.rs` | 04 | I |
-| `config_validate_reports_all_errors` | `chunkyard-config/src/validate.rs` | 04 | U |
-| `config_insecure_public_url_requires_flag` | `chunkyard-config/src/validate.rs` | 04 | U |
-| `config_non_loopback_listen_requires_public_url` | `chunkyard-config/src/validate.rs` | 04 | U |
-| `config_non_config_mcm_env_vars_ignored` (`CHUNKYARD_CONFIG`, `CHUNKYARD_SMOKE`, `CHUNKYARD_TEST_FOO`, `CHUNKYARD_CURSEFORGE_TEST_KEY` set → loads) | `chunkyard-config/tests/load.rs` | 04 | I |
-| `config_unknown_sectioned_env_var_rejected` (`CHUNKYARD_HTTP__BOGUS`) | `chunkyard-config/tests/load.rs` | 04 | I |
-| `startup_creates_data_tree_with_modes` | `chunkyard-server/tests/startup.rs` | 05 | I |
-| `startup_second_instance_fails_on_lock` | `chunkyard-server/tests/startup.rs` | 05 | I |
-| `secret_key_created_0600_and_reused` | `chunkyard-server/tests/startup.rs` | 06 | I |
-| `secret_key_world_readable_refuses_start` | `chunkyard-server/tests/startup.rs` | 06 | I |
-| `secret_box_roundtrip_with_aad` | `chunkyard-core/src/crypto.rs` | 06 | U |
-| `secret_box_wrong_aad_fails` | `chunkyard-core/src/crypto.rs` | 06 | U |
-| `secret_box_ciphertext_swapped_between_rows_fails` (AAD `users.totp_secret_enc:<id>`) | `chunkyard-core/src/crypto.rs` | 06 | U |
-| `aad_format_is_table_column_row_id` | `chunkyard-core/src/crypto.rs` | 06 | U |
-| `secret_box_tampered_ciphertext_fails` | `chunkyard-core/src/crypto.rs` | 06 | P |
-| `secret_debug_is_redacted` | `chunkyard-core/src/secret.rs` | 06 | U |
-| `shutdown_drains_inflight_request` | `chunkyard-server/tests/shutdown.rs` | 07 | I |
-| `migrations_apply_on_empty_db` | `chunkyard-db/tests/migrate.rs` | 08 | I |
-| `db_pragmas_wal_and_foreign_keys_on` | `chunkyard-db/tests/migrate.rs` | 08 | I |
-| `user_repo_username_case_insensitive_unique` | `chunkyard-db/tests/users.rs` | 08 | I |
-| `session_repo_crud_and_expiry_query` | `chunkyard-db/tests/sessions.rs` | 08 | I |
-| `token_repo_lookup_by_hash` | `chunkyard-db/tests/tokens.rs` | 08 | I |
-| `job_repo_state_transitions_persist` | `chunkyard-db/tests/jobs.rs` | 08, 22 | I |
-| `audit_repo_filters_and_cursor_paging` | `chunkyard-db/tests/audit.rs` | 08, 24 | I |
-| `sweeper_removes_expired_sessions_and_old_jobs` | `chunkyard-server/tests/sweeper.rs` (FakeClock) | 09 | I |
-| `setup_mode_blocks_api_routes` | `chunkyard-api-tests/p0_setup.rs` | 10 | A |
-| `setup_token_file_created_0600` | `chunkyard-api-tests/p0_setup.rs` | 10 | A |
-| `setup_with_valid_token_creates_owner_and_session` | `chunkyard-api-tests/p0_setup.rs` | 11 | A |
-| `setup_with_wrong_token_is_401` | `chunkyard-api-tests/p0_setup.rs` | 11 | A |
-| `setup_concurrent_requests_single_owner` | `chunkyard-api-tests/p0_setup.rs` | 11 | A |
-| `setup_after_done_is_409` | `chunkyard-api-tests/p0_setup.rs` | 11 | A |
-| `password_hash_verify_roundtrip` | `chunkyard-auth/src/password.rs` | 12 | U |
-| `password_rehash_when_params_change` | `chunkyard-auth/src/password.rs` | 12 | U |
-| `login_success_sets_cookie_attributes` | `chunkyard-api-tests/p0_auth.rs` | 12 | A |
-| `login_unknown_user_and_bad_password_same_response` | `chunkyard-api-tests/p0_auth.rs` | 12 | A |
-| `login_disabled_user_is_401` | `chunkyard-api-tests/p0_auth.rs` | 12 | A |
-| `throttle_after_five_failures_returns_429_with_retry_after` | `chunkyard-auth/src/throttle.rs` (FakeClock) | 13 | U |
-| `throttle_keyed_by_ip_and_username` | `chunkyard-auth/src/throttle.rs` | 13 | U |
-| `throttle_per_ip_cap_across_usernames` | `chunkyard-auth/src/throttle.rs` | 13 | U |
-| `throttle_failures_from_other_ip_do_not_block_owner` (two IPs via `X-Forwarded-For` from a trusted proxy) | `chunkyard-api-tests/p0_auth.rs` | 13 | A |
-| `throttle_success_resets_counters` | `chunkyard-auth/src/throttle.rs` | 13 | U |
-| `throttle_map_is_bounded` | `chunkyard-auth/src/throttle.rs` | 13 | U |
-| `logout_deletes_session` | `chunkyard-api-tests/p0_auth.rs` | 14 | A |
-| `me_returns_principal_kind_for_token` | `chunkyard-api-tests/p0_auth.rs` | 14, 16 | A |
-| `password_change_revokes_other_sessions` | `chunkyard-api-tests/p0_auth.rs` | 15 | A |
-| `password_change_rejects_common_password` | `chunkyard-auth/src/policy.rs` | 15 | U |
-| `password_change_with_bearer_is_403` | `chunkyard-api-tests/p0_auth.rs` | 15 | A |
-| `password_change_wrong_current_is_403_reauth_failed_and_session_kept` | `chunkyard-api-tests/p0_auth.rs` | 15 | A |
-| `session_idle_expiry_enforced` | `chunkyard-api-tests/p0_auth.rs` (FakeClock) | 16 | A |
-| `session_absolute_expiry_enforced` | `chunkyard-api-tests/p0_auth.rs` | 16 | A |
-| `bearer_expired_token_is_401` | `chunkyard-api-tests/p0_auth.rs` | 16 | A |
-| `csrf_missing_header_is_403` | `chunkyard-api-tests/p0_csrf.rs` | 17 | A |
-| `csrf_foreign_origin_is_403` | `chunkyard-api-tests/p0_csrf.rs` | 17 | A |
-| `csrf_not_required_for_bearer` | `chunkyard-api-tests/p0_csrf.rs` | 17 | A |
-| `setup_csrf_accepts_host_origin_on_loopback_without_public_url` | `chunkyard-api-tests/p0_csrf.rs` | 17, 11 | A |
-| `setup_csrf_rejects_foreign_origin_and_missing_header` | `chunkyard-api-tests/p0_csrf.rs` | 17 | A |
-| `csrf_uses_public_url_origin_when_configured` | `chunkyard-api-tests/p0_csrf.rs` | 17 | A |
-| `authorize_decision_table` (table-driven: role × scopes × perm) | `chunkyard-auth/src/authorize.rs` | 18 | U |
-| `authorize_token_scopes_never_exceed_user` | `chunkyard-auth/src/authorize.rs` | 18 | P |
-| `token_create_returns_secret_once` | `chunkyard-api-tests/p0_tokens.rs` | 19 | A |
-| `token_list_never_contains_secret` | `chunkyard-api-tests/p0_tokens.rs` | 19 | A |
-| `token_revoked_is_401` | `chunkyard-api-tests/p0_tokens.rs` | 19 | A |
-| `token_cannot_create_token` | `chunkyard-api-tests/p0_tokens.rs` | 19 | A |
-| `token_limit_is_409` | `chunkyard-api-tests/p0_tokens.rs` | 19 | A |
-| `token_invalid_scope_is_422` | `chunkyard-api-tests/p0_tokens.rs` | 19 | A |
-| `cli_reset_password_sets_must_change` | `chunkyard-server/tests/cli.rs` | 20 | I |
-| `cli_reset_password_disable_2fa_clears_totp_and_codes` | `chunkyard-server/tests/cli.rs` | 20, 37 | I |
-| `must_change_password_blocks_mutations` | `chunkyard-api-tests/p0_auth.rs` | 20 | A |
-| `job_runner_respects_concurrency_limit` | `chunkyard-core/src/jobs/runner.rs` | 21 | U |
-| `job_runner_per_server_lock_serialises` | `chunkyard-core/src/jobs/runner.rs` | 21 | U |
-| `job_progress_rate_limited_to_4hz` | `chunkyard-core/src/jobs/ctx.rs` (paused time; pure logic) | 21 | U |
-| `job_cancel_sets_cancelled` | `chunkyard-api-tests/p0_jobs.rs` | 21, 22 | A |
-| `job_cancel_finished_is_409` | `chunkyard-api-tests/p0_jobs.rs` | 22 | A |
-| `job_running_at_startup_marked_interrupted` | `chunkyard-server/tests/startup.rs` | 22 | I |
-| `job_handler_panic_marks_failed` | `chunkyard-core/src/jobs/runner.rs` | 22 | U |
-| `router_without_test_hooks_has_no_debug_routes` (compiled `#[cfg(not(feature = "test-hooks"))]`, run by CI step `cargo test -p chunkyard-server --lib --no-default-features --features embed-ui`) | `chunkyard-server/src/routes.rs` | 23 | U |
+| `config_defaults_are_valid` | `config/src/lib.rs` | 04 | U |
+| `config_env_overrides_file` | `config/tests/load.rs` | 04 | I |
+| `config_unknown_key_is_rejected` | `config/tests/load.rs` | 04 | I |
+| `config_validate_reports_all_errors` | `config/src/validate.rs` | 04 | U |
+| `config_insecure_public_url_requires_flag` | `config/src/validate.rs` | 04 | U |
+| `config_non_loopback_listen_requires_public_url` | `config/src/validate.rs` | 04 | U |
+| `config_non_config_mcm_env_vars_ignored` (`CHUNKYARD_CONFIG`, `CHUNKYARD_SMOKE`, `CHUNKYARD_TEST_FOO`, `CHUNKYARD_CURSEFORGE_TEST_KEY` set → loads) | `config/tests/load.rs` | 04 | I |
+| `config_unknown_sectioned_env_var_rejected` (`CHUNKYARD_HTTP__BOGUS`) | `config/tests/load.rs` | 04 | I |
+| `startup_creates_data_tree_with_modes` | `server/tests/startup.rs` | 05 | I |
+| `startup_second_instance_fails_on_lock` | `server/tests/startup.rs` | 05 | I |
+| `secret_key_created_0600_and_reused` | `server/tests/startup.rs` | 06 | I |
+| `secret_key_world_readable_refuses_start` | `server/tests/startup.rs` | 06 | I |
+| `secret_box_roundtrip_with_aad` | `core/src/crypto.rs` | 06 | U |
+| `secret_box_wrong_aad_fails` | `core/src/crypto.rs` | 06 | U |
+| `secret_box_ciphertext_swapped_between_rows_fails` (AAD `users.totp_secret_enc:<id>`) | `core/src/crypto.rs` | 06 | U |
+| `aad_format_is_table_column_row_id` | `core/src/crypto.rs` | 06 | U |
+| `secret_box_tampered_ciphertext_fails` | `core/src/crypto.rs` | 06 | P |
+| `secret_debug_is_redacted` | `core/src/secret.rs` | 06 | U |
+| `shutdown_drains_inflight_request` | `server/tests/shutdown.rs` | 07 | I |
+| `migrations_apply_on_empty_db` | `db/tests/migrate.rs` | 08 | I |
+| `db_pragmas_wal_and_foreign_keys_on` | `db/tests/migrate.rs` | 08 | I |
+| `user_repo_username_case_insensitive_unique` | `db/tests/users.rs` | 08 | I |
+| `session_repo_crud_and_expiry_query` | `db/tests/sessions.rs` | 08 | I |
+| `token_repo_lookup_by_hash` | `db/tests/tokens.rs` | 08 | I |
+| `job_repo_state_transitions_persist` | `db/tests/jobs.rs` | 08, 22 | I |
+| `audit_repo_filters_and_cursor_paging` | `db/tests/audit.rs` | 08, 24 | I |
+| `sweeper_removes_expired_sessions_and_old_jobs` | `server/tests/sweeper.rs` (FakeClock) | 09 | I |
+| `setup_mode_blocks_api_routes` | `api-tests/p0_setup.rs` | 10 | A |
+| `setup_token_file_created_0600` | `api-tests/p0_setup.rs` | 10 | A |
+| `setup_with_valid_token_creates_owner_and_session` | `api-tests/p0_setup.rs` | 11 | A |
+| `setup_with_wrong_token_is_401` | `api-tests/p0_setup.rs` | 11 | A |
+| `setup_concurrent_requests_single_owner` | `api-tests/p0_setup.rs` | 11 | A |
+| `setup_after_done_is_409` | `api-tests/p0_setup.rs` | 11 | A |
+| `password_hash_verify_roundtrip` | `auth/src/password.rs` | 12 | U |
+| `password_rehash_when_params_change` | `auth/src/password.rs` | 12 | U |
+| `login_success_sets_cookie_attributes` | `api-tests/p0_auth.rs` | 12 | A |
+| `login_unknown_user_and_bad_password_same_response` | `api-tests/p0_auth.rs` | 12 | A |
+| `login_disabled_user_is_401` | `api-tests/p0_auth.rs` | 12 | A |
+| `throttle_after_five_failures_returns_429_with_retry_after` | `auth/src/throttle.rs` (FakeClock) | 13 | U |
+| `throttle_keyed_by_ip_and_username` | `auth/src/throttle.rs` | 13 | U |
+| `throttle_per_ip_cap_across_usernames` | `auth/src/throttle.rs` | 13 | U |
+| `throttle_failures_from_other_ip_do_not_block_owner` (two IPs via `X-Forwarded-For` from a trusted proxy) | `api-tests/p0_auth.rs` | 13 | A |
+| `throttle_success_resets_counters` | `auth/src/throttle.rs` | 13 | U |
+| `throttle_map_is_bounded` | `auth/src/throttle.rs` | 13 | U |
+| `logout_deletes_session` | `api-tests/p0_auth.rs` | 14 | A |
+| `me_returns_principal_kind_for_token` | `api-tests/p0_auth.rs` | 14, 16 | A |
+| `password_change_revokes_other_sessions` | `api-tests/p0_auth.rs` | 15 | A |
+| `password_change_rejects_common_password` | `auth/src/policy.rs` | 15 | U |
+| `password_change_with_bearer_is_403` | `api-tests/p0_auth.rs` | 15 | A |
+| `password_change_wrong_current_is_403_reauth_failed_and_session_kept` | `api-tests/p0_auth.rs` | 15 | A |
+| `session_idle_expiry_enforced` | `api-tests/p0_auth.rs` (FakeClock) | 16 | A |
+| `session_absolute_expiry_enforced` | `api-tests/p0_auth.rs` | 16 | A |
+| `bearer_expired_token_is_401` | `api-tests/p0_auth.rs` | 16 | A |
+| `csrf_missing_header_is_403` | `api-tests/p0_csrf.rs` | 17 | A |
+| `csrf_foreign_origin_is_403` | `api-tests/p0_csrf.rs` | 17 | A |
+| `csrf_not_required_for_bearer` | `api-tests/p0_csrf.rs` | 17 | A |
+| `setup_csrf_accepts_host_origin_on_loopback_without_public_url` | `api-tests/p0_csrf.rs` | 17, 11 | A |
+| `setup_csrf_rejects_foreign_origin_and_missing_header` | `api-tests/p0_csrf.rs` | 17 | A |
+| `csrf_uses_public_url_origin_when_configured` | `api-tests/p0_csrf.rs` | 17 | A |
+| `authorize_decision_table` (table-driven: role × scopes × perm) | `auth/src/authorize.rs` | 18 | U |
+| `authorize_token_scopes_never_exceed_user` | `auth/src/authorize.rs` | 18 | P |
+| `token_create_returns_secret_once` | `api-tests/p0_tokens.rs` | 19 | A |
+| `token_list_never_contains_secret` | `api-tests/p0_tokens.rs` | 19 | A |
+| `token_revoked_is_401` | `api-tests/p0_tokens.rs` | 19 | A |
+| `token_cannot_create_token` | `api-tests/p0_tokens.rs` | 19 | A |
+| `token_limit_is_409` | `api-tests/p0_tokens.rs` | 19 | A |
+| `token_invalid_scope_is_422` | `api-tests/p0_tokens.rs` | 19 | A |
+| `cli_reset_password_sets_must_change` | `server/tests/cli.rs` | 20 | I |
+| `cli_reset_password_disable_2fa_clears_totp_and_codes` | `server/tests/cli.rs` | 20, 37 | I |
+| `must_change_password_blocks_mutations` | `api-tests/p0_auth.rs` | 20 | A |
+| `job_runner_respects_concurrency_limit` | `core/src/jobs/runner.rs` | 21 | U |
+| `job_runner_per_server_lock_serialises` | `core/src/jobs/runner.rs` | 21 | U |
+| `job_progress_rate_limited_to_4hz` | `core/src/jobs/ctx.rs` (paused time; pure logic) | 21 | U |
+| `job_cancel_sets_cancelled` | `api-tests/p0_jobs.rs` | 21, 22 | A |
+| `job_cancel_finished_is_409` | `api-tests/p0_jobs.rs` | 22 | A |
+| `job_running_at_startup_marked_interrupted` | `server/tests/startup.rs` | 22 | I |
+| `job_handler_panic_marks_failed` | `core/src/jobs/runner.rs` | 22 | U |
+| `router_without_test_hooks_has_no_debug_routes` (compiled `#[cfg(not(feature = "test-hooks"))]`, run by CI step `cargo test -p chunkyard-server --lib --no-default-features --features embed-ui`) | `server/src/routes.rs` | 23 | U |
 | `release_binary_lacks_test_hooks` (`mcm version --features`) | CI job `release-features` | 23 | X |
-| `debug_job_route_available_with_test_hooks` | `chunkyard-api-tests/p0_jobs.rs` | 23 | A |
-| `audit_records_login_success_and_failure` | `chunkyard-api-tests/p0_audit.rs` | 24, 12 | A |
-| `audit_catalog_names_are_unique_and_well_formed` | `chunkyard-core/src/audit.rs` | 24 | U |
-| `audit_details_only_contain_allow_listed_fields` (fuzzed input maps per action) | `chunkyard-core/src/audit.rs` | 24 | P |
-| `audit_action_enum_in_openapi` | `chunkyard-api-tests/p0_openapi.rs` | 24, 30 | A |
-| `audit_list_admin_only` | `chunkyard-api-tests/p0_audit.rs` | 24 | A |
-| `ws_requires_auth` | `chunkyard-api-tests/p0_ws.rs` | 25 | A |
-| `ws_bad_origin_rejected` | `chunkyard-api-tests/p0_ws.rs` | 25 | A |
-| `ws_subscribe_jobs_receives_updates` | `chunkyard-api-tests/p0_ws.rs` | 25, 22 | A |
-| `ws_unknown_topic_returns_error_and_keeps_connection` | `chunkyard-api-tests/p0_ws.rs` | 25 | A |
-| `ws_ping_pong` | `chunkyard-api-tests/p0_ws.rs` | 25 | A |
-| `ws_subscription_limit_enforced` | `chunkyard-api-tests/p0_ws.rs` | 25 | A |
-| `ws_slow_consumer_closed_1013` | `chunkyard-api-tests/p0_ws.rs` | 25 | A |
-| `ws_closed_on_sessions_revoked` | `chunkyard-api-tests/p0_ws.rs` | 25, 15 | A |
-| `ws_envelope_serde_snapshot` | `chunkyard-api/src/ws/msg.rs` | 25 | S |
-| `healthz_ok_in_setup_mode` | `chunkyard-api-tests/p0_system.rs` | 26 | A |
-| `system_info_hides_path_for_non_admin` | `chunkyard-api-tests/p0_system.rs` | 26 | A |
-| `rate_limit_auth_routes_per_ip` | `chunkyard-api-tests/p0_ratelimit.rs` | 27 | A |
-| `client_ip_from_trusted_proxy_only` | `chunkyard-api/src/client_ip.rs` | 27 | U |
-| `security_headers_present` (exact values from security.md) | `chunkyard-api-tests/p0_headers.rs` | 28 | A |
-| `csp_header_on_html_contains_index_html_hashes` | `chunkyard-server/tests/spa.rs` | 28 | I |
-| `csp_meta_missing_fails_startup` | `chunkyard-server/tests/spa.rs` | 28 | I |
-| `csp_header_absent_on_api_json` | `chunkyard-api-tests/p0_headers.rs` | 28 | A |
-| `tls_listener_serves_with_provided_cert` | `chunkyard-server/tests/tls.rs` (rcgen cert) | 29 | I |
-| `openapi_document_snapshot` | `chunkyard-api-tests/p0_openapi.rs` | 30 | S |
-| `openapi_every_route_documented` | `chunkyard-api-tests/p0_openapi.rs` (compare router paths vs spec) | 30 | A |
-| `spa_fallback_serves_index_for_deep_link` | `chunkyard-server/tests/spa.rs` | 33 | I |
-| `spa_immutable_assets_cached_forever` | `chunkyard-server/tests/spa.rs` | 33 | I |
-| `spa_api_404_is_problem_json` | `chunkyard-server/tests/spa.rs` | 33 | I |
-| `spa_serves_brotli_when_accepted` | `chunkyard-server/tests/spa.rs` | 33 | I |
-| `cli_version_prints_target` | `chunkyard-server/tests/cli.rs` | 34 | I |
-| `cli_config_check_invalid_exits_1` | `chunkyard-server/tests/cli.rs` | 34 | I |
-| `cli_openapi_matches_served_spec` | `chunkyard-server/tests/cli.rs` | 30, 34 | I |
-| `totp_verify_accepts_window_plus_minus_one` | `chunkyard-auth/src/totp.rs` (FakeClock) | 38 | U |
-| `totp_rejects_reused_step` | `chunkyard-auth/src/totp.rs` | 38 | U |
-| `totp_enroll_confirm_enables_and_returns_ten_codes` | `chunkyard-api-tests/p0_totp.rs` | 37 | A |
-| `totp_confirm_wrong_code_does_not_enable` | `chunkyard-api-tests/p0_totp.rs` | 37 | A |
-| `totp_enroll_when_enabled_is_409` | `chunkyard-api-tests/p0_totp.rs` | 37 | A |
-| `totp_disable_wrong_password_is_403_reauth_failed` | `chunkyard-api-tests/p0_totp.rs` | 37 | A |
-| `recovery_codes_regenerate_invalidates_old` | `chunkyard-api-tests/p0_totp.rs` | 37 | A |
-| `totp_secret_encrypted_at_rest` | `chunkyard-db/tests/users.rs` | 37 | I |
-| `login_with_totp_returns_challenge_then_session` | `chunkyard-api-tests/p0_totp.rs` | 38, 12 | A |
-| `login_totp_challenge_single_use` | `chunkyard-api-tests/p0_totp.rs` | 38 | A |
-| `login_totp_challenge_expires_after_5_min` (FakeClock via test-hooks) | `chunkyard-api-tests/p0_totp.rs` | 38 | A |
-| `recovery_code_login_consumes_code` | `chunkyard-api-tests/p0_totp.rs` | 38 | A |
-| `totp_step_throttled_like_password` | `chunkyard-api-tests/p0_totp.rs` | 38, 13 | A |
-| `sessions_list_marks_current_and_hides_hash` | `chunkyard-api-tests/p0_sessions.rs` | 39 | A |
-| `session_revoke_other_session_invalidates_it` | `chunkyard-api-tests/p0_sessions.rs` | 39 | A |
-| `sessions_revoke_others_keeps_current` | `chunkyard-api-tests/p0_sessions.rs` | 39 | A |
-| `sessions_endpoints_reject_bearer` | `chunkyard-api-tests/p0_sessions.rs` | 39 | A |
-| `session_revoke_closes_its_ws_1008` | `chunkyard-api-tests/p0_ws.rs` | 39, 25 | A |
-| `me_reports_totp_enabled` | `chunkyard-api-tests/p0_auth.rs` | 40 | A |
-| `no_secrets_in_logs` (incl. TOTP secrets, recovery codes, challenges) | `chunkyard-api-tests/p0_logging.rs` | sec, 40 | A |
+| `debug_job_route_available_with_test_hooks` | `api-tests/p0_jobs.rs` | 23 | A |
+| `audit_records_login_success_and_failure` | `api-tests/p0_audit.rs` | 24, 12 | A |
+| `audit_catalog_names_are_unique_and_well_formed` | `core/src/audit.rs` | 24 | U |
+| `audit_details_only_contain_allow_listed_fields` (fuzzed input maps per action) | `core/src/audit.rs` | 24 | P |
+| `audit_action_enum_in_openapi` | `api-tests/p0_openapi.rs` | 24, 30 | A |
+| `audit_list_admin_only` | `api-tests/p0_audit.rs` | 24 | A |
+| `ws_requires_auth` | `api-tests/p0_ws.rs` | 25 | A |
+| `ws_bad_origin_rejected` | `api-tests/p0_ws.rs` | 25 | A |
+| `ws_subscribe_jobs_receives_updates` | `api-tests/p0_ws.rs` | 25, 22 | A |
+| `ws_unknown_topic_returns_error_and_keeps_connection` | `api-tests/p0_ws.rs` | 25 | A |
+| `ws_ping_pong` | `api-tests/p0_ws.rs` | 25 | A |
+| `ws_subscription_limit_enforced` | `api-tests/p0_ws.rs` | 25 | A |
+| `ws_slow_consumer_closed_1013` | `api-tests/p0_ws.rs` | 25 | A |
+| `ws_closed_on_sessions_revoked` | `api-tests/p0_ws.rs` | 25, 15 | A |
+| `ws_envelope_serde_snapshot` | `api/src/ws/msg.rs` | 25 | S |
+| `healthz_ok_in_setup_mode` | `api-tests/p0_system.rs` | 26 | A |
+| `system_info_hides_path_for_non_admin` | `api-tests/p0_system.rs` | 26 | A |
+| `rate_limit_auth_routes_per_ip` | `api-tests/p0_ratelimit.rs` | 27 | A |
+| `client_ip_from_trusted_proxy_only` | `api/src/client_ip.rs` | 27 | U |
+| `security_headers_present` (exact values from security.md) | `api-tests/p0_headers.rs` | 28 | A |
+| `csp_header_on_html_contains_index_html_hashes` | `server/tests/spa.rs` | 28 | I |
+| `csp_meta_missing_fails_startup` | `server/tests/spa.rs` | 28 | I |
+| `csp_header_absent_on_api_json` | `api-tests/p0_headers.rs` | 28 | A |
+| `tls_listener_serves_with_provided_cert` | `server/tests/tls.rs` (rcgen cert) | 29 | I |
+| `openapi_document_snapshot` | `api-tests/p0_openapi.rs` | 30 | S |
+| `openapi_every_route_documented` | `api-tests/p0_openapi.rs` (compare router paths vs spec) | 30 | A |
+| `spa_fallback_serves_index_for_deep_link` | `server/tests/spa.rs` | 33 | I |
+| `spa_immutable_assets_cached_forever` | `server/tests/spa.rs` | 33 | I |
+| `spa_api_404_is_problem_json` | `server/tests/spa.rs` | 33 | I |
+| `spa_serves_brotli_when_accepted` | `server/tests/spa.rs` | 33 | I |
+| `cli_version_prints_target` | `server/tests/cli.rs` | 34 | I |
+| `cli_config_check_invalid_exits_1` | `server/tests/cli.rs` | 34 | I |
+| `cli_openapi_matches_served_spec` | `server/tests/cli.rs` | 30, 34 | I |
+| `totp_verify_accepts_window_plus_minus_one` | `auth/src/totp.rs` (FakeClock) | 38 | U |
+| `totp_rejects_reused_step` | `auth/src/totp.rs` | 38 | U |
+| `totp_enroll_confirm_enables_and_returns_ten_codes` | `api-tests/p0_totp.rs` | 37 | A |
+| `totp_confirm_wrong_code_does_not_enable` | `api-tests/p0_totp.rs` | 37 | A |
+| `totp_enroll_when_enabled_is_409` | `api-tests/p0_totp.rs` | 37 | A |
+| `totp_disable_wrong_password_is_403_reauth_failed` | `api-tests/p0_totp.rs` | 37 | A |
+| `recovery_codes_regenerate_invalidates_old` | `api-tests/p0_totp.rs` | 37 | A |
+| `totp_secret_encrypted_at_rest` | `db/tests/users.rs` | 37 | I |
+| `login_with_totp_returns_challenge_then_session` | `api-tests/p0_totp.rs` | 38, 12 | A |
+| `login_totp_challenge_single_use` | `api-tests/p0_totp.rs` | 38 | A |
+| `login_totp_challenge_expires_after_5_min` (FakeClock via test-hooks) | `api-tests/p0_totp.rs` | 38 | A |
+| `recovery_code_login_consumes_code` | `api-tests/p0_totp.rs` | 38 | A |
+| `totp_step_throttled_like_password` | `api-tests/p0_totp.rs` | 38, 13 | A |
+| `sessions_list_marks_current_and_hides_hash` | `api-tests/p0_sessions.rs` | 39 | A |
+| `session_revoke_other_session_invalidates_it` | `api-tests/p0_sessions.rs` | 39 | A |
+| `sessions_revoke_others_keeps_current` | `api-tests/p0_sessions.rs` | 39 | A |
+| `sessions_endpoints_reject_bearer` | `api-tests/p0_sessions.rs` | 39 | A |
+| `session_revoke_closes_its_ws_1008` | `api-tests/p0_ws.rs` | 39, 25 | A |
+| `me_reports_totp_enabled` | `api-tests/p0_auth.rs` | 40 | A |
+| `no_secrets_in_logs` (incl. TOTP secrets, recovery codes, challenges) | `api-tests/p0_logging.rs` | sec, 40 | A |
 
-Note: SPA tests embed a tiny fixture build (`chunkyard-server/tests/fixtures/web-build/`) via a test-only `rust-embed` folder override, so they don't require `pnpm build`.
+Note: SPA tests embed a tiny fixture build (`server/tests/fixtures/web-build/`) via a test-only `rust-embed` folder override, so they don't require `pnpm build`.
 
 ## Frontend (Vitest)
 

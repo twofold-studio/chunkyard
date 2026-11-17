@@ -48,7 +48,7 @@ A user-configured `ready_pattern` replaces only the body regex; prefix/source ch
 
 ## Fixtures
 
-- `crates/chunkyard-protocol/tests/fixtures/logs/<flavour>-<mcversion>.log`: **captured from real servers** by the smoke suite (`smoke_capture_log_fixtures`, see [../testing/e2e.md](../testing/e2e.md#real-server-smoke-suite-opt-in)), committed after review. Each includes startup, a join, chat containing spoof attempts (`<Alice> Done (1s)! For help, type "help"`, `<Bob> Carol joined the game`), save-all, stop.
+- `crates/protocol/tests/fixtures/logs/<flavour>-<mcversion>.log`: **captured from real servers** by the smoke suite (`smoke_capture_log_fixtures`, see [../testing/e2e.md](../testing/e2e.md#real-server-smoke-suite-opt-in)), committed after review. Each includes startup, a join, chat containing spoof attempts (`<Alice> Done (1s)! For help, type "help"`, `<Bob> Carol joined the game`), save-all, stop.
 - Table-driven tests: `log_prefix_<family>_parses_fixture`, `ready_matcher_ignores_chat_spoof_<family>`, `join_matcher_ignores_chat_spoof_<family>`; proptest `log_matchers_never_panic`.
 - `fake-mc-server` emits the exact family format chosen by its `flavor` profile key ([../testing/fake-server.md](../testing/fake-server.md)).
 

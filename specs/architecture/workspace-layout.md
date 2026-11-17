@@ -9,34 +9,34 @@
 ├── deny.toml                  # cargo-deny: licenses, advisories, bans
 ├── .sqlx/                     # sqlx offline query metadata (committed)
 ├── crates/
-│   ├── chunkyard-core/              # domain types, ids, events, jobs, audit catalog, ALL cross-crate + repo traits
-│   ├── chunkyard-config/            # composes per-crate config sub-structs; loading (file + env)
-│   ├── chunkyard-db/                # sqlx pool, migrations/, Sqlite*Repo impls
-│   ├── chunkyard-jobs/              # bounded persistent job execution, restart recovery
-│   ├── chunkyard-auth/              # password hashing, sessions, TOTP, tokens, permission decisions
-│   ├── chunkyard-protocol/          # LEAF: VarInt, SLP, handshake, RCON, Query, PROXY v2, log-line parsers
-│   ├── chunkyard-download/          # SSRF-safe HTTP client, Downloader, content-addressed cache, Mojang profile client
-│   ├── chunkyard-process/           # supervisor, spawner thread, stdio, log ring, platform module
-│   ├── chunkyard-fs/                # sandboxed paths, file ops, archives, properties parser
-│   ├── chunkyard-java/              # JRE discovery, Adoptium download, version → Java mapping
-│   ├── chunkyard-installers/        # vanilla/paper/purpur/fabric/quilt/forge/neoforge/velocity/bungeecord/waterfall
-│   ├── chunkyard-modplatforms/      # curseforge/modrinth/hangar clients + pack importers
-│   ├── chunkyard-metrics/           # sampling, TPS probes, rollups
-│   ├── chunkyard-backup/            # archive create/restore, retention, storage targets
-│   ├── chunkyard-worlds/            # world discovery, upload/download, reset
-│   ├── chunkyard-scheduler/         # cron engine, task step executor
-│   ├── chunkyard-router/            # Minecraft hostname router (P7)
-│   ├── chunkyard-portmap/           # UPnP IGD / NAT-PMP / PCP (P7)
-│   ├── chunkyard-notify/            # Discord/webhook notifier (P8)
-│   ├── chunkyard-tunnel-proto/      # LEAF: agent↔relay wire protocol (P9)
-│   ├── chunkyard-tunnel/            # agent-side tunnel client (P9)
-│   ├── chunkyard-relay/             # BINARY `chunkyard-relay` (P9)
-│   ├── chunkyard-shim/              # BINARY `chunkyard-shim` + lib (shim socket protocol) (P10)
-│   ├── chunkyard-api/               # axum routes, handlers, DTOs, OpenAPI, WS hub
-│   ├── chunkyard-server/            # BINARY `mcm` + lib (`wiring`): composition root, SPA embedding, CLI
-│   ├── chunkyard-node/              # primary↔agent RPC (P11, post-1.0)
-│   ├── chunkyard-testkit/           # test helpers (dev-dependency only)
-│   ├── chunkyard-api-tests/         # HTTP/WS integration tests only (publish = false, no lib code)
+│   ├── core/              # domain types, ids, events, jobs, audit catalog, ALL cross-crate + repo traits
+│   ├── config/            # composes per-crate config sub-structs; loading (file + env)
+│   ├── db/                # sqlx pool, migrations/, Sqlite*Repo impls
+│   ├── jobs/              # bounded persistent job execution, restart recovery
+│   ├── auth/              # password hashing, sessions, TOTP, tokens, permission decisions
+│   ├── protocol/          # LEAF: VarInt, SLP, handshake, RCON, Query, PROXY v2, log-line parsers
+│   ├── download/          # SSRF-safe HTTP client, Downloader, content-addressed cache, Mojang profile client
+│   ├── process/           # supervisor, spawner thread, stdio, log ring, platform module
+│   ├── fs/                # sandboxed paths, file ops, archives, properties parser
+│   ├── java/              # JRE discovery, Adoptium download, version → Java mapping
+│   ├── installers/        # vanilla/paper/purpur/fabric/quilt/forge/neoforge/velocity/bungeecord/waterfall
+│   ├── modplatforms/      # curseforge/modrinth/hangar clients + pack importers
+│   ├── metrics/           # sampling, TPS probes, rollups
+│   ├── backup/            # archive create/restore, retention, storage targets
+│   ├── worlds/            # world discovery, upload/download, reset
+│   ├── scheduler/         # cron engine, task step executor
+│   ├── router/            # Minecraft hostname router (P7)
+│   ├── portmap/           # UPnP IGD / NAT-PMP / PCP (P7)
+│   ├── notify/            # Discord/webhook notifier (P8)
+│   ├── tunnel-proto/      # LEAF: agent↔relay wire protocol (P9)
+│   ├── tunnel/            # agent-side tunnel client (P9)
+│   ├── relay/             # BINARY `chunkyard-relay` (P9)
+│   ├── shim/              # BINARY `chunkyard-shim` + lib (shim socket protocol) (P10)
+│   ├── api/               # axum routes, handlers, DTOs, OpenAPI, WS hub
+│   ├── server/            # BINARY `mcm` + lib (`wiring`): composition root, SPA embedding, CLI
+│   ├── node/              # primary↔agent RPC (P11, post-1.0)
+│   ├── testkit/           # test helpers (dev-dependency only)
+│   ├── api-tests/         # HTTP/WS integration tests only (publish = false, no lib code)
 │   └── fake-mc-server/        # BINARY test fixture (dev/CI only, never shipped)
 ├── web/  e2e/  fuzz/  docker/  packaging/  xtask/  testdata/
 └── specs/

@@ -1,6 +1,6 @@
 # Phase 4 — API, WebSocket, migration
 
-Conventions: [api-conventions.md](../../architecture/api-conventions.md). All paths under `/api/v1`. Handlers in `chunkyard-api/src/routes/{platforms,packs,content,integrations}.rs`.
+Conventions: [api-conventions.md](../../architecture/api-conventions.md). All paths under `/api/v1`. Handlers in `api/src/routes/{platforms,packs,content,integrations}.rs`.
 
 ## Shared DTOs
 
@@ -93,7 +93,7 @@ No new topics. Additional `server:<id>` payloads:
 
 `ContentInstalled { server_id, items }`, `ContentChanged { server_id }`, `PackImportNeedsManual { server_id, pending }`, `PackImportCompleted { server_id }`, `ServerRestartRequired { server_id, reason }`.
 
-## Migration `crates/chunkyard-db/migrations/<NNNN>_p4_content.sql`
+## Migration `crates/db/migrations/<NNNN>_p4_content.sql`
 
 Number assigned at merge time ([patterns.md §3](../../architecture/patterns.md#3-repository-pattern)). Supersedes the phase-4 sketch in [data-model.md](../../architecture/data-model.md) by adding `pack_imports` and linking pending rows to it. Repos: `PackImportRepo`, `ContentRepo`, `PendingDownloadRepo` traits in `chunkyard-core`, impls in `chunkyard-db`.
 

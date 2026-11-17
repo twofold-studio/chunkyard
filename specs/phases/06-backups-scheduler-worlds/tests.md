@@ -76,7 +76,7 @@ Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust
 
 ## chunkyard-scheduler
 
-Engine/steps tests use `FakeClock` + `tokio::time::pause()` with in-memory fakes (`RecordingCommandSink`, `FakeServerService`, `FakeBackupService`, `FakePlayerCountSource`) — no real processes. Fake-mc coverage of steps is in `chunkyard-api-tests/p6_schedules.rs` with real time.
+Engine/steps tests use `FakeClock` + `tokio::time::pause()` with in-memory fakes (`RecordingCommandSink`, `FakeServerService`, `FakeBackupService`, `FakePlayerCountSource`) — no real processes. Fake-mc coverage of steps is in `api-tests/p6_schedules.rs` with real time.
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
@@ -113,7 +113,7 @@ Engine/steps tests use `FakeClock` + `tokio::time::pause()` with in-memory fakes
 | `history_retention_keeps_last_50` | `tests/runs.rs` | 30 | I |
 | `server_delete_cancels_runs_and_removes_schedules` | `tests/runs.rs` | 32 | I |
 
-## chunkyard-api-tests (`crates/chunkyard-api-tests/tests/p6_*.rs`)
+## chunkyard-api-tests (`crates/api-tests/tests/p6_*.rs`)
 
 | Test | File | FR | Kind |
 |---|---|---|---|

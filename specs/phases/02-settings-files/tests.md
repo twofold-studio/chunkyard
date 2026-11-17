@@ -2,7 +2,7 @@
 
 Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust) and [testing/strategy.md](../../testing/strategy.md). Kinds: **U** unit, **P** proptest, **F** fuzz, **I** crate integration, **A** API integration (`chunkyard-api-tests`, `TestApp` + fake-mc, real time), **C** frontend component/unit, **E** Playwright. `FakeClock` is used only in pure-logic tests (GC policies, caches).
 
-## chunkyard-fs — sandbox (`crates/chunkyard-fs/src/sandbox.rs`, `tests/sandbox.rs`)
+## chunkyard-fs — sandbox (`crates/fs/src/sandbox.rs`, `tests/sandbox.rs`)
 
 | Test | Kind | FR |
 |---|---|---|
@@ -84,7 +84,7 @@ Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust
 | Test | Kind | FR |
 |---|---|---|
 | `offline_uuid_matches_java_nameuuidfrombytes` (vectors: `Notch` → known value computed by Java, stored in fixture) | U | 17 |
-| `mojang_lookup_parses_undashed_id` / `mojang_lookup_204_and_404_are_unknown` / `mojang_lookup_429_is_upstream_error` (`crates/chunkyard-download/tests/mojang.rs`, wiremock via `test-hooks` base URL) | I | 17 |
+| `mojang_lookup_parses_undashed_id` / `mojang_lookup_204_and_404_are_unknown` / `mojang_lookup_429_is_upstream_error` (`crates/download/tests/mojang.rs`, wiremock via `test-hooks` base URL) | I | 17 |
 | `mojang_lookup_uses_safe_http_and_rejects_private_target` (`chunkyard-download`) | I | 17 |
 | `lookup_cache_hits_and_negative_cache_expires` (FakeClock) | U | 17 |
 | `ban_entry_serialises_vanilla_date_format` | U | 15 |
@@ -104,9 +104,9 @@ Layout per [patterns.md §10](../../architecture/patterns.md#10-test-layout-rust
 
 | Test | Kind | FR |
 |---|---|---|
-| `restart_required_set_on_settings_change_while_running_cleared_on_start` (`crates/chunkyard-process/tests/supervisor.rs`) | I | 09 |
+| `restart_required_set_on_settings_change_while_running_cleared_on_start` (`crates/process/tests/supervisor.rs`) | I | 09 |
 
-## chunkyard-api-tests (`crates/chunkyard-api-tests/tests/p2_*.rs`, fake-mc)
+## chunkyard-api-tests (`crates/api-tests/tests/p2_*.rs`, fake-mc)
 
 | Test | Kind | FR |
 |---|---|---|

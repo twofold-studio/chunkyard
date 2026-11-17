@@ -96,7 +96,7 @@ Close codes: `1008` auth expired/revoked, `1013` outbound queue overflow, `1001`
 
 ## DB migration
 
-File: `crates/chunkyard-db/migrations/<NNNN>_p0_foundation.sql`
+File: `crates/db/migrations/<NNNN>_p0_foundation.sql`
 
 ```sql
 CREATE TABLE users (

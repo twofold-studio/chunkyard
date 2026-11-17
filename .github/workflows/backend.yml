@@ -62,4 +62,4 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install openapi-spec-validator==0.7.2
-      - run: openapi-spec-validator crates/chunkyard-api/src/openapi.json
+      - run: openapi-spec-validator crates/api/src/openapi.json

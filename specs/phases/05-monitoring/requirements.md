@@ -7,7 +7,7 @@ Conventions: [patterns.md](../../architecture/patterns.md). Sampling algorithms:
 `chunkyard-metrics` depends on `chunkyard-core` and `chunkyard-protocol` only ([workspace-layout.md](../../architecture/workspace-layout.md)). It never depends on `chunkyard-process` or `chunkyard-db`: server pid/pgid/start time and status come from core `ServerLookup` + `EventBus`; persistence goes through core repo traits (`MetricRepo`, `PlayerSessionRepo`, `StateHistoryRepo`; impls in `chunkyard-db`); properties through core `PropertiesEditor` (impl in `chunkyard-fs`, registry from P2-FR-12).
 
 ```
-crates/chunkyard-metrics/src/
+crates/metrics/src/
 ├── lib.rs, error.rs      # MetricsError + Classify (wraps chunkyard-protocol errors)
 ├── collector.rs          # MetricsCollector actor (ticks every sample_interval_s)
 ├── sample.rs             # ServerSample, HostSample, Snapshot

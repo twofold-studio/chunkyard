@@ -32,7 +32,7 @@ No new topics. `server:<id>` status carries `state: "unknown"`, `adopted`, `exit
 
 ## DB migration
 
-File: `crates/chunkyard-db/migrations/<NNNN>_p10_isolation_limits.sql` (number assigned at merge).
+File: `crates/db/migrations/<NNNN>_p10_isolation_limits.sql` (number assigned at merge).
 
 ```sql
 ALTER TABLE servers ADD COLUMN runtime TEXT NOT NULL DEFAULT 'native'

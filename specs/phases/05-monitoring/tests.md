@@ -1,6 +1,6 @@
 # Phase 5 — Test plan
 
-`FakeClock` / `tokio::time::pause()` are used **only** in pure-logic unit tests (rollups, retention, probe back-off, availability). Every test that runs `fake-mc-server` uses real time with short intervals (`sample_interval_s = 1` via `test-hooks`, minimum 5 s otherwise) and `wait_until`. Fake-server profiles: `memory_mb`, `tps`, `players`, `flavor`, `spawn_child`, `rcon_fragment_bytes`, `fakejoin`/`fakeleave`/`fakechat`, management protocol ([testing/fake-server.md](../../testing/fake-server.md)). `/proc` parsing is tested with fixture trees under `crates/chunkyard-metrics/tests/fixtures/proc/` (sampler takes a configurable proc root).
+`FakeClock` / `tokio::time::pause()` are used **only** in pure-logic unit tests (rollups, retention, probe back-off, availability). Every test that runs `fake-mc-server` uses real time with short intervals (`sample_interval_s = 1` via `test-hooks`, minimum 5 s otherwise) and `wait_until`. Fake-server profiles: `memory_mb`, `tps`, `players`, `flavor`, `spawn_child`, `rcon_fragment_bytes`, `fakejoin`/`fakeleave`/`fakechat`, management protocol ([testing/fake-server.md](../../testing/fake-server.md)). `/proc` parsing is tested with fixture trees under `crates/metrics/tests/fixtures/proc/` (sampler takes a configurable proc root).
 
 ## `chunkyard-protocol` unit (pure text parsers, `src/text/*.rs`)
 
@@ -25,9 +25,9 @@
 | `mgmt_join_left_notifications_deserialize` | mgmt.rs | 07, 20 | unit (fixture) |
 | `prop_text_parsers_never_panic` | text/mod.rs | 06–08 | property |
 
-Chat-spoof tests use the per-family fixtures in `crates/chunkyard-protocol/tests/fixtures/logs/` ([log-formats.md](../../architecture/log-formats.md#fixtures)); e.g. `<Mallory> Bob left the game` must not close Bob's session.
+Chat-spoof tests use the per-family fixtures in `crates/protocol/tests/fixtures/logs/` ([log-formats.md](../../architecture/log-formats.md#fixtures)); e.g. `<Mallory> Bob left the game` must not close Bob's session.
 
-## `chunkyard-protocol` integration (RCON client, `crates/chunkyard-protocol/tests/`)
+## `chunkyard-protocol` integration (RCON client, `crates/protocol/tests/`)
 
 | Test | File | FR | Kind |
 |---|---|---|---|
@@ -67,7 +67,7 @@ Chat-spoof tests use the per-family fixtures in `crates/chunkyard-protocol/tests
 | `prometheus_render_escapes_labels_and_types` | prometheus.rs | 16 | unit + insta |
 | `prop_downsample_preserves_time_order_and_bounds` | rollup.rs | 12 | property |
 
-## `chunkyard-metrics` integration (`crates/chunkyard-metrics/tests/`)
+## `chunkyard-metrics` integration (`crates/metrics/tests/`)
 
 | Test | File | FR | Kind |
 |---|---|---|---|
@@ -93,7 +93,7 @@ Chat-spoof tests use the per-family fixtures in `crates/chunkyard-protocol/tests
 | `rollup_and_retention_with_fake_clock_over_401_days` | retention.rs | 11 | in-memory `MetricRepo` + FakeClock (pure logic) |
 | `state_history_recorded_from_status_events` | availability.rs | 14 | event bus + fake repo |
 
-## `chunkyard-db` (`crates/chunkyard-db/tests/`)
+## `chunkyard-db` (`crates/db/tests/`)
 
 | Test | File | FR | Kind |
 |---|---|---|---|
@@ -101,7 +101,7 @@ Chat-spoof tests use the per-family fixtures in `crates/chunkyard-protocol/tests
 | `metric_repo_delete_server_removes_samples_sessions_history` | p5_metrics_repo.rs | 18 | SQLite |
 | `p5_migration_adds_rcon_disabled_and_management_columns` | p5_migration.rs | 19, 20 | SQLite |
 
-## API (`crates/chunkyard-api-tests/tests/`)
+## API (`crates/api-tests/tests/`)
 
 | Test | File | FR | Kind |
 |---|---|---|---|
@@ -128,7 +128,7 @@ Chat-spoof tests use the per-family fixtures in `crates/chunkyard-protocol/tests
 | `allowlist_add_uses_management_protocol_when_connected` | p5_mgmt.rs | 20 | API + fake-mc control channel (no stdin `whitelist` command) |
 | `deleting_server_job_removes_metrics` | p5_metrics.rs | 18 | API |
 
-## Smoke (nightly, real Java) — `crates/chunkyard-server/tests/smoke_metrics.rs`
+## Smoke (nightly, real Java) — `crates/server/tests/smoke_metrics.rs`
 
 | Test | FR |
 |---|---|

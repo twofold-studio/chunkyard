@@ -21,7 +21,7 @@ chunkyard-config.workspace = true
 chunkyard-core.workspace = true
 chunkyard-db.workspace = true
 chunkyard-jobs.workspace = true
-chunkyard-server = { path = "../chunkyard-server" }
+chunkyard-server = { path = "../server" }
 reqwest = { workspace = true, features = ["cookies"] }
 serde_json.workspace = true
 tempfile.workspace = true

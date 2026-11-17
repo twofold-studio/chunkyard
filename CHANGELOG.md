@@ -4,6 +4,12 @@ Implemented project changes are recorded here. Work in progress stays under Unre
 
 Generated from `.changes/` using [Changie](https://changie.dev/). Edit change fragments rather than this file.
 
+## Unreleased
+
+
+### Changed
+
+- Use short Rust crate directories under crates/ while preserving chunkyard-prefixed Cargo package and binary names.
 ## 0.15.1 - 2026-11-16
 
 

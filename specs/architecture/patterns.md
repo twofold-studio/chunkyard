@@ -15,7 +15,7 @@ Every phase spec assumes these. Reviewers reject code that deviates without upda
 ## 2. IDs and newtypes
 
 ```rust
-// chunkyard-core/src/ids.rs
+// core/src/ids.rs
 macro_rules! id_type { ($name:ident, $prefix:literal) => { ... } }
 id_type!(ServerId, "srv");   // stored as TEXT uuid v7; displayed raw
 id_type!(UserId, "usr");
@@ -31,7 +31,7 @@ id_type!(JobId, "job");
 - Repos return **domain types** from `chunkyard-core`, not row structs. Row ↔ domain conversion is private to `chunkyard-db`.
 - Transactions: `Db::tx(|tx| async { ... })` helper; repos expose `*_tx` variants that take `&mut Tx` only where a service needs atomic multi-repo writes.
 - Queries use `sqlx::query_as!` (compile-time checked, offline data committed in `.sqlx/`).
-- One migration file per change: `crates/chunkyard-db/migrations/<NNNN>_<desc>.sql`. **Numbers are not pre-allocated per phase**: `NNNN` is the next monotonic number, assigned when the change merges (a CI check rejects gaps and duplicates). Phase specs name migrations by description only (e.g. `p1_servers.sql` means `<NNNN>_p1_servers.sql`). Migrations are forward-only and never edited after release; each is tested by `migrations_apply_cleanly_from_previous_release`.
+- One migration file per change: `crates/db/migrations/<NNNN>_<desc>.sql`. **Numbers are not pre-allocated per phase**: `NNNN` is the next monotonic number, assigned when the change merges (a CI check rejects gaps and duplicates). Phase specs name migrations by description only (e.g. `p1_servers.sql` means `<NNNN>_p1_servers.sql`). Migrations are forward-only and never edited after release; each is tested by `migrations_apply_cleanly_from_previous_release`.
 
 ## 4. Services and dependency injection
 
@@ -102,7 +102,7 @@ ServerHandle (Clone)             Supervisor task (owns state)
 
 - Unit tests inline: `#[cfg(test)] mod tests` at the bottom of each file.
 - Integration tests per crate in `crates/<crate>/tests/<area>.rs`; shared helpers in `tests/common/mod.rs`.
-- HTTP/WS-level tests live in **`crates/chunkyard-api-tests/tests/`**, grouped under `contracts`, `instances`, `streams` and `storage` entry points with shared `tests/common::TestApp` fixtures. Real Docker checks remain separate targets. The older phase plans describe proposed filenames and a testkit crate; that crate is not part of the implemented workspace.
+- HTTP/WS-level tests live in **`crates/api-tests/tests/`**, grouped under `contracts`, `instances`, `streams` and `storage` entry points with shared `tests/common::TestApp` fixtures. Real Docker checks remain separate targets. The older phase plans describe proposed filenames and a testkit crate; that crate is not part of the implemented workspace.
 - **Time in tests**: `tokio::time::pause()` / `FakeClock` only for pure-logic tests (backoff calculation, cron, retention, rollups, actor logic with a fake spawner). Tests that run real processes (fake-mc-server) use real time with short configured timeouts (e.g. `stop_timeout_s = 2`) and `wait_until` polling — never paused time.
 - Test names: `<unit>_<condition>_<expected>`, e.g. `resolve_dotdot_outside_root_is_rejected`. Phase test plans use these exact names.
 - Recorded fixtures: `crates/<crate>/tests/fixtures/<vendor>/<endpoint>.json`.

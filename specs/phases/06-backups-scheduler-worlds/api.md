@@ -121,7 +121,7 @@ No new topics. Uses existing:
 
 ## Migration
 
-File: `crates/chunkyard-db/migrations/<NNNN>_p6_backups_schedules.sql` (number assigned at merge time). Repos: `BackupRepo`, `StorageTargetRepo`, `BackupPolicyRepo`, `ScheduleRepo`, `ScheduleRunRepo` — traits in `chunkyard-core`, impls in `chunkyard-db`. **Overrides** the phase-6 sketch in [data-model.md](../../architecture/data-model.md#phase-6--backups--schedules): `backups.server_id` is nullable with `ON DELETE SET NULL` (P6-FR-22) and several columns are added.
+File: `crates/db/migrations/<NNNN>_p6_backups_schedules.sql` (number assigned at merge time). Repos: `BackupRepo`, `StorageTargetRepo`, `BackupPolicyRepo`, `ScheduleRepo`, `ScheduleRunRepo` — traits in `chunkyard-core`, impls in `chunkyard-db`. **Overrides** the phase-6 sketch in [data-model.md](../../architecture/data-model.md#phase-6--backups--schedules): `backups.server_id` is nullable with `ON DELETE SET NULL` (P6-FR-22) and several columns are added.
 
 ```sql
 CREATE TABLE storage_targets (

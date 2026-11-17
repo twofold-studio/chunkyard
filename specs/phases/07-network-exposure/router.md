@@ -3,7 +3,7 @@
 ## Structure
 
 ```
-crates/chunkyard-router/src/
+crates/router/src/
 ├── lib.rs
 ├── router.rs            # McRouter actor: listener, accept loop, limits, route table (watch::Receiver<RouteTable>)
 ├── conn.rs              # per-connection state machine (transport-agnostic: IncomingConn) — public ConnectionHandler
@@ -13,7 +13,7 @@ crates/chunkyard-router/src/
 ├── validate.rs          # route validation incl. PROXY ⇒ router_only (pure)
 ├── exposure.rs          # exposure summary + warnings; impl of core ServerNetworkInfo
 └── config.rs            # RouterConfig ([router] section)
-crates/chunkyard-protocol/src/
+crates/protocol/src/
 ├── handshake.rs         # parse + normalize_host (shared with chunkyard-relay)
 ├── legacy.rs            # 0xFE / 0xFF legacy ping
 └── proxy_v2.rs          # PROXY v2 encode/decode incl. LOCAL (pure)

@@ -126,7 +126,7 @@ Generic webhook body (P8-FR-31):
 
 ## DB migration
 
-File: `crates/chunkyard-db/migrations/<NNNN>_p8_users_permissions_notifications.sql` (number assigned at merge). TOTP columns and `totp_recovery_codes` already exist from phase 0.
+File: `crates/db/migrations/<NNNN>_p8_users_permissions_notifications.sql` (number assigned at merge). TOTP columns and `totp_recovery_codes` already exist from phase 0.
 
 ```sql
 ALTER TABLE users ADD COLUMN can_create_servers INTEGER NOT NULL DEFAULT 0;

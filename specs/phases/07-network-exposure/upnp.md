@@ -3,7 +3,7 @@
 ## Structure
 
 ```
-crates/chunkyard-portmap/src/
+crates/portmap/src/
 ├── mapper.rs            # PortMapper actor: owns mappings, renewal timers (Clock injected)
 ├── schedule.rs          # renewal/backoff schedule (pure)
 ├── gateway.rs           # trait Gateway { external_ip, add_mapping, remove_mapping }

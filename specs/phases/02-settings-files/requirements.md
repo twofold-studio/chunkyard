@@ -29,7 +29,7 @@ Service placement: trait declarations in `chunkyard-core::services` (`SettingsSe
 | Field | P2-specific behaviour |
 |---|---|
 | `memoryMaxMb` | Host RAM from `sysinfo`: `> total − 512` → 422; `> available` → warning `memory_exceeds_host_free`; Σ `memoryMaxMb` of `autoStart` servers > total → warning `memory_overcommitted_autostart` |
-| `jvmArgs` | **Non-admins: allow-list** from [security.md § JVM arguments](../../architecture/security.md#jvm-arguments) (`crates/chunkyard-core/data/jvm_allowlist.toml`, each entry a full-token regex); any other token → `settings.jvm_arg_not_allowed` (field error names the token). `-Xms`/`-Xmx` → `settings.memory_in_jvm_args` for everyone. **Admins**: free-form (still ≤ 64 × 512 chars, no control chars) and the response carries warning `jvm_args_admin_freeform`. Shared vectors: `testdata/validation/jvm_args.json` (Rust + Vitest) |
+| `jvmArgs` | **Non-admins: allow-list** from [security.md § JVM arguments](../../architecture/security.md#jvm-arguments) (`crates/core/data/jvm_allowlist.toml`, each entry a full-token regex); any other token → `settings.jvm_arg_not_allowed` (field error names the token). `-Xms`/`-Xmx` → `settings.memory_in_jvm_args` for everyone. **Admins**: free-form (still ≤ 64 × 512 chars, no control chars) and the response carries warning `jvm_args_admin_freeform`. Shared vectors: `testdata/validation/jvm_args.json` (Rust + Vitest) |
 | `env`, `launch` (custom), `javaPath` | admin only (`auth.forbidden`); `javaPath` absolute + executable (P1 form; P3 adds `java`) |
 | `port` | uniqueness `server.port_in_use`; bind probe; must be stopped; also written to `server-port` via P2-FR-12 |
 | any launch-affecting field while running | warning `restart_required` + P2-FR-09 |

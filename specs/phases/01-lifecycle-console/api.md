@@ -131,7 +131,7 @@ allow_private_targets = false   # SafeHttp SSRF guard for every outbound fetch (
 
 ## DB migration
 
-File: `crates/chunkyard-db/migrations/<NNNN>_p1_servers.sql`
+File: `crates/db/migrations/<NNNN>_p1_servers.sql`
 
 ```sql
 CREATE TABLE servers (

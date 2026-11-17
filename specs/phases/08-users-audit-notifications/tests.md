@@ -1,60 +1,60 @@
 # Phase 8 — Test plan
 
-Kinds: U unit, P property, I integration (crate), A API integration (`crates/chunkyard-api-tests/tests/p8_*.rs` via `TestApp`), C component (Vitest), E E2E (Playwright), F fuzz. Time: `FakeClock` only for pure logic (expiry, retention, backoff schedule); tests with fake-mc or wiremock use real time with short configured timeouts ([patterns.md §10](../../architecture/patterns.md#10-test-layout-rust)). Deferred 8b SFTP has no tests in this phase.
+Kinds: U unit, P property, I integration (crate), A API integration (`crates/api-tests/tests/p8_*.rs` via `TestApp`), C component (Vitest), E E2E (Playwright), F fuzz. Time: `FakeClock` only for pure logic (expiry, retention, backoff schedule); tests with fake-mc or wiremock use real time with short configured timeouts ([patterns.md §10](../../architecture/patterns.md#10-test-layout-rust)). Deferred 8b SFTP has no tests in this phase.
 
 ## chunkyard-auth
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
-| `authorize_table_role_grants_scopes_servers_runtime` (≥ 80 rows: owner/admin/user × grants × token scopes × serverIds × runtime × perm) | `chunkyard-auth/src/authorize.rs` | 09, 10, 16, 17 | U |
-| `authorize_token_scope_never_exceeds_user` | `chunkyard-auth/src/authorize.rs` | 17 | P |
-| `requires_admin_trust_table` (each perm × native/shim/docker) | `chunkyard-auth/src/trust.rs` | 10 | U |
-| `authorize_denies_stale_admin_trust_grant_on_native` | `chunkyard-auth/src/authorize.rs` | 10 | U |
-| `normalize_permissions_adds_implied` | `chunkyard-auth/src/permissions.rs` | 12 | U |
-| `normalize_permissions_is_idempotent` | `chunkyard-auth/src/permissions.rs` | 12 | P |
-| `trust_check_applies_after_normalization` (e.g. none of the implied perms bypass) | `chunkyard-auth/src/trust.rs` | 10, 12 | P |
-| `presets_match_documented_sets` | `chunkyard-auth/src/presets.rs` | 11 | U |
-| `manager_preset_grantable_only_on_docker_for_users` | `chunkyard-auth/src/presets.rs` | 11 | U |
-| `hierarchy_admin_cannot_modify_owner` | `chunkyard-auth/src/hierarchy.rs` | 04, 08 | U |
-| `invite_token_hash_roundtrip_and_constant_time_compare` | `chunkyard-auth/src/invite.rs` | 02 | U |
-| `last_owner_guard_transactional_under_concurrency` | `chunkyard-auth/tests/last_owner.rs` | 05 | I |
+| `authorize_table_role_grants_scopes_servers_runtime` (≥ 80 rows: owner/admin/user × grants × token scopes × serverIds × runtime × perm) | `auth/src/authorize.rs` | 09, 10, 16, 17 | U |
+| `authorize_token_scope_never_exceeds_user` | `auth/src/authorize.rs` | 17 | P |
+| `requires_admin_trust_table` (each perm × native/shim/docker) | `auth/src/trust.rs` | 10 | U |
+| `authorize_denies_stale_admin_trust_grant_on_native` | `auth/src/authorize.rs` | 10 | U |
+| `normalize_permissions_adds_implied` | `auth/src/permissions.rs` | 12 | U |
+| `normalize_permissions_is_idempotent` | `auth/src/permissions.rs` | 12 | P |
+| `trust_check_applies_after_normalization` (e.g. none of the implied perms bypass) | `auth/src/trust.rs` | 10, 12 | P |
+| `presets_match_documented_sets` | `auth/src/presets.rs` | 11 | U |
+| `manager_preset_grantable_only_on_docker_for_users` | `auth/src/presets.rs` | 11 | U |
+| `hierarchy_admin_cannot_modify_owner` | `auth/src/hierarchy.rs` | 04, 08 | U |
+| `invite_token_hash_roundtrip_and_constant_time_compare` | `auth/src/invite.rs` | 02 | U |
+| `last_owner_guard_transactional_under_concurrency` | `auth/tests/last_owner.rs` | 05 | I |
 
 ## chunkyard-db
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
-| `migration_p8_applies_on_previous_release_snapshot` | `chunkyard-db/tests/migrate.rs` | all | I |
-| `p8_migration_star_tokens_keep_admin_access` (snapshot with owner/admin `["*"]` tokens → `["*","admin"]`) | `chunkyard-db/tests/migrate.rs` | 19 | I |
-| `p8_migration_star_tokens_non_admin_owner_not_upgraded` (`user` token stays `["*"]`; scoped tokens untouched) | `chunkyard-db/tests/migrate.rs` | 19 | I |
-| `server_permissions_cascade_on_server_delete` | `chunkyard-db/tests/permissions_repo.rs` | 09 | I |
-| `audit_filter_outcome_target_actor_prefix` | `chunkyard-db/tests/audit_repo.rs` | 22 | I |
-| `audit_server_view_excludes_console_command_without_console_read` | `chunkyard-db/tests/audit_repo.rs` | 22 | I |
-| `audit_retention_deletes_in_batches` (FakeClock, 12 000 rows) | `chunkyard-db/tests/audit_repo.rs` | 24 | I |
-| `invite_consume_is_atomic` | `chunkyard-db/tests/invite_repo.rs` | 02 | I |
+| `migration_p8_applies_on_previous_release_snapshot` | `db/tests/migrate.rs` | all | I |
+| `p8_migration_star_tokens_keep_admin_access` (snapshot with owner/admin `["*"]` tokens → `["*","admin"]`) | `db/tests/migrate.rs` | 19 | I |
+| `p8_migration_star_tokens_non_admin_owner_not_upgraded` (`user` token stays `["*"]`; scoped tokens untouched) | `db/tests/migrate.rs` | 19 | I |
+| `server_permissions_cascade_on_server_delete` | `db/tests/permissions_repo.rs` | 09 | I |
+| `audit_filter_outcome_target_actor_prefix` | `db/tests/audit_repo.rs` | 22 | I |
+| `audit_server_view_excludes_console_command_without_console_read` | `db/tests/audit_repo.rs` | 22 | I |
+| `audit_retention_deletes_in_batches` (FakeClock, 12 000 rows) | `db/tests/audit_repo.rs` | 24 | I |
+| `invite_consume_is_atomic` | `db/tests/invite_repo.rs` | 02 | I |
 
 ## chunkyard-notify
 
 | Test | Location | FR | Kind |
 |---|---|---|---|
-| `event_mapping_covers_catalog` | `chunkyard-notify/src/mapping.rs` | 27 | U |
-| `channel_filter_by_event_and_server` | `chunkyard-notify/src/dispatcher.rs` | 26, 28 | U |
-| `queue_overflow_drops_player_events_first` | `chunkyard-notify/src/dispatcher.rs` | 28 | U |
-| `coalesce_same_event_server_within_30s` (FakeClock) | `chunkyard-notify/src/dispatcher.rs` | 28 | U |
-| `discord_embed_truncates_to_limits` | `chunkyard-notify/src/discord.rs` | 29 | U |
-| `discord_embed_limits_never_exceeded` | `chunkyard-notify/src/discord.rs` | 29 | P |
-| `discord_embed_escapes_mentions` | `chunkyard-notify/src/discord.rs` | 29 | U |
-| `discord_429_waits_retry_after_without_consuming_attempt` (wiremock, `retry_after` 0.2 s) | `chunkyard-notify/tests/discord.rs` | 30 | I |
-| `discord_404_is_permanent_failure` | `chunkyard-notify/tests/discord.rs` | 32 | I |
-| `webhook_signature_matches_reference_hmac` | `chunkyard-notify/src/webhook.rs` | 31 | U |
-| `webhook_headers_present` | `chunkyard-notify/tests/webhook.rs` | 31 | I |
-| `retry_schedule_is_10s_then_60s` (pure, FakeClock) | `chunkyard-notify/src/retry.rs` | 32 | U |
-| `webhook_retries_three_times` (real time, `retry_backoff = [50ms, 50ms]`) | `chunkyard-notify/tests/webhook.rs` | 32 | I |
-| `webhook_4xx_not_retried` | `chunkyard-notify/tests/webhook.rs` | 32 | I |
-| `webhook_redirect_not_followed` | `chunkyard-notify/tests/webhook.rs` | 34 | I |
-| `notify_uses_safe_http_rejects_private_target` (SafeHttp with fake resolver → 10.0.0.5) | `chunkyard-notify/tests/ssrf.rs` | 34 | I |
-| `notify_allows_private_when_configured` | `chunkyard-notify/tests/ssrf.rs` | 34 | I |
-| `discord_url_pattern_enforced` | `chunkyard-notify/src/discord.rs` | 34 | U |
-| `channel_auto_disables_after_50_permanent_failures` | `chunkyard-notify/tests/autodisable.rs` | 35 | I |
+| `event_mapping_covers_catalog` | `notify/src/mapping.rs` | 27 | U |
+| `channel_filter_by_event_and_server` | `notify/src/dispatcher.rs` | 26, 28 | U |
+| `queue_overflow_drops_player_events_first` | `notify/src/dispatcher.rs` | 28 | U |
+| `coalesce_same_event_server_within_30s` (FakeClock) | `notify/src/dispatcher.rs` | 28 | U |
+| `discord_embed_truncates_to_limits` | `notify/src/discord.rs` | 29 | U |
+| `discord_embed_limits_never_exceeded` | `notify/src/discord.rs` | 29 | P |
+| `discord_embed_escapes_mentions` | `notify/src/discord.rs` | 29 | U |
+| `discord_429_waits_retry_after_without_consuming_attempt` (wiremock, `retry_after` 0.2 s) | `notify/tests/discord.rs` | 30 | I |
+| `discord_404_is_permanent_failure` | `notify/tests/discord.rs` | 32 | I |
+| `webhook_signature_matches_reference_hmac` | `notify/src/webhook.rs` | 31 | U |
+| `webhook_headers_present` | `notify/tests/webhook.rs` | 31 | I |
+| `retry_schedule_is_10s_then_60s` (pure, FakeClock) | `notify/src/retry.rs` | 32 | U |
+| `webhook_retries_three_times` (real time, `retry_backoff = [50ms, 50ms]`) | `notify/tests/webhook.rs` | 32 | I |
+| `webhook_4xx_not_retried` | `notify/tests/webhook.rs` | 32 | I |
+| `webhook_redirect_not_followed` | `notify/tests/webhook.rs` | 34 | I |
+| `notify_uses_safe_http_rejects_private_target` (SafeHttp with fake resolver → 10.0.0.5) | `notify/tests/ssrf.rs` | 34 | I |
+| `notify_allows_private_when_configured` | `notify/tests/ssrf.rs` | 34 | I |
+| `discord_url_pattern_enforced` | `notify/src/discord.rs` | 34 | U |
+| `channel_auto_disables_after_50_permanent_failures` | `notify/tests/autodisable.rs` | 35 | I |
 
 `SafeHttp` itself (resolver, pinning, redirect re-validation) is tested in `chunkyard-download` (phase 1).
 
@@ -94,7 +94,7 @@ Kinds: U unit, P property, I integration (crate), A API integration (`crates/chu
 | `admin_area_requires_admin_scope_on_token` | `p8_tokens.rs` | 17 | A |
 | `user_cannot_create_token_with_admin_scope` | `p8_tokens.rs` | 17 | A |
 | `require_2fa_for_admins_blocks_until_enrolled` (incl. tokens; enrol routes still reachable) | `p8_twofa_policy.rs` | 20 | A |
-| `cli_reset_2fa_clears_secret_and_recovery_codes` | `chunkyard-server/tests/cli.rs` | 20 | I |
+| `cli_reset_2fa_clears_secret_and_recovery_codes` | `server/tests/cli.rs` | 20 | I |
 | `admin_revokes_user_sessions` / `admin_cannot_revoke_owner_sessions` | `p8_sessions.rs` | 21 | A |
 | `audit_filters_combined` | `p8_audit.rs` | 22 | A |
 | `server_audit_hides_console_command_without_console_read` | `p8_audit.rs` | 22 | A |
@@ -109,7 +109,7 @@ Kinds: U unit, P property, I integration (crate), A API integration (`crates/chu
 | `in_app_notification_pushed_over_ws_and_listed` / `in_app_notification_respects_server_view` | `p8_notifications.rs` | 36 | A |
 | `account_security_event_on_password_change` | `p8_notifications.rs` | 37 | A |
 | `rate_limits_match_table` (invite accept, test-send, export concurrency) | `p8_hardening.rs` | 38 | A |
-| `no_secrets_in_logs` (auto on `TestApp` drop, every suite) | `chunkyard-testkit/src/logs.rs` | 39 | A |
+| `no_secrets_in_logs` (auto on `TestApp` drop, every suite) | `testkit/src/logs.rs` | 39 | A |
 
 ## Frontend (Vitest)
 

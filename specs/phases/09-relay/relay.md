@@ -60,7 +60,7 @@ conn_rate_per_ip_per_min = 30
 max_agents = 100
 ```
 
-### State: SQLite `relay.db` (own sqlx migrations in `crates/chunkyard-relay/migrations/`)
+### State: SQLite `relay.db` (own sqlx migrations in `crates/relay/migrations/`)
 
 ```sql
 CREATE TABLE agents (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, token_hash BLOB NOT NULL UNIQUE,

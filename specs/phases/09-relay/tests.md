@@ -72,7 +72,7 @@ Kinds: U unit, P property, I crate integration, A API integration (`chunkyard-ap
 | `exposure_includes_relay_entry_with_health` | `src/exposure.rs` | 15 | U |
 | `router_only_route_valid_with_relay_and_no_listener` | `src/validate.rs` | 13 | U |
 
-## chunkyard-api-tests (`crates/chunkyard-api-tests/tests/p9_relays.rs`)
+## chunkyard-api-tests (`crates/api-tests/tests/p9_relays.rs`)
 
 | Test | FR | Kind |
 |---|---|---|

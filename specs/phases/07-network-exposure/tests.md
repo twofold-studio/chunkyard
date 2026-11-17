@@ -77,8 +77,8 @@ Time: pure-logic tests (route table, renewal schedule, backoff math) may use `Fa
 
 | Test | Crate / location | FR | Kind |
 |---|---|---|---|
-| `ready_slp_fallback_sends_proxy_local_when_backend_expects_proxy` (fake-mc with PROXY and no ready line) | `chunkyard-process/tests/ready.rs` | 17 | I |
-| `slp_fallback_sends_proxy_local_when_backend_expects_proxy` | `chunkyard-metrics/tests/players.rs` | 17 | I |
+| `ready_slp_fallback_sends_proxy_local_when_backend_expects_proxy` (fake-mc with PROXY and no ready line) | `process/tests/ready.rs` | 17 | I |
+| `slp_fallback_sends_proxy_local_when_backend_expects_proxy` | `metrics/tests/players.rs` | 17 | I |
 
 ## chunkyard-portmap
 
@@ -101,7 +101,7 @@ Fake gateways: `tests/support/fake_igd.rs` (SSDP responder + SOAP HTTP server wi
 | `shutdown_removes_mappings_within_3s` | `tests/portmap.rs` | 23 | I |
 | `startup_readds_enabled_mappings` | `tests/portmap.rs` | 23 | I |
 
-## chunkyard-api-tests (`crates/chunkyard-api-tests/tests/`)
+## chunkyard-api-tests (`crates/api-tests/tests/`)
 
 | Test | File | FR | Kind |
 |---|---|---|---|

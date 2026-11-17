@@ -7,7 +7,7 @@ Conventions: [patterns.md](../../architecture/patterns.md). Every FR lists crate
 ## Crate structure (`chunkyard-modplatforms`)
 
 ```
-crates/chunkyard-modplatforms/src/
+crates/modplatforms/src/
 ├── lib.rs
 ├── platform.rs            # ModPlatform trait, Platform enum, ProjectKind, common models
 ├── error.rs               # ModPlatformError (thiserror) + Classify

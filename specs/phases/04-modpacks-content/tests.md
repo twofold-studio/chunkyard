@@ -1,6 +1,6 @@
 # Phase 4 — Test plan
 
-Fixtures per [testing/fixtures.md](../../testing/fixtures.md) under `crates/chunkyard-modplatforms/tests/fixtures/{curseforge,modrinth,hangar}/`. Synthetic packs built by helpers in `chunkyard-testkit::packs` (`CfClientPackBuilder`, `CfServerPackBuilder` incl. `::server_starter()` (ServerStarter-style zip, see [import-pipeline.md](import-pipeline.md#starter-detection)), `MrpackBuilder`, `JarBuilder` that writes `fabric.mod.json` / `mods.toml` / `plugin.yml`). Loader installs use the phase-3 fake installers (fake-mc installer shim).
+Fixtures per [testing/fixtures.md](../../testing/fixtures.md) under `crates/modplatforms/tests/fixtures/{curseforge,modrinth,hangar}/`. Synthetic packs built by helpers in `chunkyard-testkit::packs` (`CfClientPackBuilder`, `CfServerPackBuilder` incl. `::server_starter()` (ServerStarter-style zip, see [import-pipeline.md](import-pipeline.md#starter-detection)), `MrpackBuilder`, `JarBuilder` that writes `fabric.mod.json` / `mods.toml` / `plugin.yml`). Loader installs use the phase-3 fake installers (fake-mc installer shim).
 
 ## Rust — `chunkyard-modplatforms` unit (inline)
 
@@ -58,7 +58,7 @@ Fixtures per [testing/fixtures.md](../../testing/fixtures.md) under `crates/chun
 | `prop_manifest_parse_never_panics` | pack/cf_client_pack.rs | 11 | property |
 | `prop_mrpack_paths_never_escape` | pack/mrpack.rs | 12 | property |
 
-## Rust — `chunkyard-modplatforms` integration (`crates/chunkyard-modplatforms/tests/`)
+## Rust — `chunkyard-modplatforms` integration (`crates/modplatforms/tests/`)
 
 | Test | File | FR | Kind |
 |---|---|---|---|
@@ -94,14 +94,14 @@ Fixtures per [testing/fixtures.md](../../testing/fixtures.md) under `crates/chun
 | `content_update_failure_restores_old_file` | content.rs | 27 | wiremock |
 | `update_check_modrinth_batch_and_cf_files` | content.rs | 26 | wiremock |
 
-## Rust — `chunkyard-db` (`crates/chunkyard-db/tests/`)
+## Rust — `chunkyard-db` (`crates/db/tests/`)
 
 | Test | File | FR | Kind |
 |---|---|---|---|
 | `content_repo_rejects_modpack_kind` | p4_content_repo.rs | 21 | integration (SQLite) |
 | `pending_repo_filters_by_server_and_state` | p4_content_repo.rs | 15, 17 | integration (SQLite) |
 
-## Rust — API (`crates/chunkyard-api-tests/tests/`)
+## Rust — API (`crates/api-tests/tests/`)
 
 | Test | File | FR | Kind |
 |---|---|---|---|

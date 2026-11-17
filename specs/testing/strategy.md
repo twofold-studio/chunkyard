@@ -9,14 +9,14 @@ Everything is tested. A feature is not done until its tests in the phase `tests.
 | Rust unit | `cargo nextest` | inline `#[cfg(test)]` | every push | no |
 | Rust property | `proptest` | inline or `tests/prop_*.rs` | every push (256 cases), nightly (10k) | no |
 | Rust integration (crate) | `cargo nextest` | `crates/<c>/tests/*.rs` | every push | no |
-| API integration | `chunkyard-testkit::TestApp` + reqwest/tungstenite | `crates/chunkyard-api-tests/tests/*.rs` | every push | no (fake-mc + wiremock) |
+| API integration | `chunkyard-testkit::TestApp` + reqwest/tungstenite | `crates/api-tests/tests/*.rs` | every push | no (fake-mc + wiremock) |
 | Snapshot | `insta` | alongside tests | every push | no |
 | Fuzz | `cargo-fuzz` (libFuzzer) | `fuzz/fuzz_targets/*.rs` | PR: 60 s/target smoke; nightly: 15 min/target | no |
 | Frontend unit | Vitest | `web/src/**/*.test.ts` | every push | no |
 | Frontend component | Vitest + `@testing-library/svelte` + jsdom | co-located | every push | no |
 | E2E | Playwright against the real `mcm` binary + fake-mc | `e2e/tests/*.spec.ts` | every push (Chromium), nightly (Chromium+Firefox+WebKit) | no |
-| Real-server smoke | `cargo nextest -p chunkyard-server --features smoke` | `crates/chunkyard-server/tests/smoke_*.rs` | nightly + manual; opt-in locally `CHUNKYARD_SMOKE=1` | **yes** (downloads JRE + real jars) |
-| Relay soak | custom bin | `crates/chunkyard-relay/benches/` | nightly (phase 7+) | no |
+| Real-server smoke | `cargo nextest -p chunkyard-server --features smoke` | `crates/server/tests/smoke_*.rs` | nightly + manual; opt-in locally `CHUNKYARD_SMOKE=1` | **yes** (downloads JRE + real jars) |
+| Relay soak | custom bin | `crates/relay/benches/` | nightly (phase 7+) | no |
 
 ## Principles
 

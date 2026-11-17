@@ -1,6 +1,6 @@
 # Phase 7 — API, WebSocket, migrations
 
-Conventions: [api-conventions.md](../../architecture/api-conventions.md). Paths under `/api/v1`. Handlers in `chunkyard-api/src/routes/{routes,network}.rs`; DTOs in `chunkyard-api::dto::network`.
+Conventions: [api-conventions.md](../../architecture/api-conventions.md). Paths under `/api/v1`. Handlers in `api/src/routes/{routes,network}.rs`; DTOs in `chunkyard-api::dto::network`.
 
 ## DTOs
 
@@ -102,7 +102,7 @@ Warning codes (not errors): `real_ip_hidden`, `proxy.backend_unsupported`, `prox
 
 Numbers assigned at merge ([patterns.md §3](../../architecture/patterns.md#3-repository-pattern)).
 
-`crates/chunkyard-db/migrations/<NNNN>_p7_proxy_routes.sql`:
+`crates/db/migrations/<NNNN>_p7_proxy_routes.sql`:
 
 ```sql
 CREATE TABLE proxy_routes (
@@ -124,7 +124,7 @@ CREATE TABLE proxy_route_stats (
 );                                      -- flushed from memory every 60 s
 ```
 
-`crates/chunkyard-db/migrations/<NNNN>_p7_port_mappings.sql`:
+`crates/db/migrations/<NNNN>_p7_port_mappings.sql`:
 
 ```sql
 CREATE TABLE port_mappings (

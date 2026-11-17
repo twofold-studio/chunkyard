@@ -70,7 +70,7 @@ Envelope identical to the browser WS ([api-conventions.md](../../architecture/ap
 
 ## DB migrations
 
-Primary: `crates/chunkyard-db/migrations/<NNNN>_p11_nodes.sql`
+Primary: `crates/db/migrations/<NNNN>_p11_nodes.sql`
 
 ```sql
 CREATE TABLE nodes (
@@ -87,7 +87,7 @@ ALTER TABLE jobs ADD COLUMN node_id TEXT;
 ALTER TABLE storage_targets ADD COLUMN node_id TEXT;   -- NULL = primary-local or remote-capable (s3)
 ```
 
-Agent: `crates/chunkyard-db/migrations-agent/<NNNN>_agent_init.sql` (separate migrator, `sqlx::migrate!("migrations-agent")`)
+Agent: `crates/db/migrations-agent/<NNNN>_agent_init.sql` (separate migrator, `sqlx::migrate!("migrations-agent")`)
 
 ```sql
 CREATE TABLE agent_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);   -- primary_instance_id, node_token_hash

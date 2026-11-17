@@ -1,0 +1,3 @@
+kind: Changed
+body: 'Use short Rust crate directories under crates/ while preserving chunkyard-prefixed Cargo package and binary names.'
+time: 2026-11-17T00:36:00Z

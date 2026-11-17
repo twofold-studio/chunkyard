@@ -44,7 +44,7 @@ Consequences (enforced from P8, documented from P1):
 
 ## JVM arguments
 
-- **Non-admins** (any runtime): every arg must match the vetted allow-list in `crates/chunkyard-core/data/jvm_allowlist.toml`, each entry a regex for the full token:
+- **Non-admins** (any runtime): every arg must match the vetted allow-list in `crates/core/data/jvm_allowlist.toml`, each entry a regex for the full token:
   - GC/tuning: `-XX:[+-](UseG1GC|UseZGC|ZGenerational|UseShenandoahGC|UseParallelGC|ParallelRefProcEnabled|DisableExplicitGC|AlwaysPreTouch|PerfDisableSharedMem|UnlockExperimentalVMOptions|UseStringDeduplication|UseCompactObjectHeaders)`; `-XX:(MaxGCPauseMillis|G1NewSizePercent|G1MaxNewSizePercent|G1HeapRegionSize|G1ReservePercent|G1HeapWastePercent|G1MixedGCCountTarget|G1MixedGCLiveThresholdPercent|G1RSetUpdatingPauseTimePercent|InitiatingHeapOccupancyPercent|SurvivorRatio|MaxTenuringThreshold|ActiveProcessorCount|MaxMetaspaceSize|ReservedCodeCacheSize)=[0-9]+[kKmMgG]?`; `-Xss[0-9]+[kKmM]`.
   - `-D` only for vetted keys with value regexes: `file.encoding`, `user.timezone`, `java.net.preferIPv4Stack`, `log4j2.formatMsgNoLookups`, `using.aikars.flags`, `aikars.new.flags`, `terminal.jline`, `terminal.ansi`, `IReallyKnowWhatIAmDoingISwear`, `paper.disableChannelLimit`.
   - `-Xms`/`-Xmx` are rejected in `jvmArgs` (use memory fields: `settings.memory_in_jvm_args`); everything else → `422 settings.jvm_arg_not_allowed` naming the token.

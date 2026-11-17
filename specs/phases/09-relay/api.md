@@ -1,6 +1,6 @@
 # Phase 9 — API, WebSocket, config, migration
 
-Conventions: [api-conventions.md](../../architecture/api-conventions.md). Paths under `/api/v1`. Handlers in `chunkyard-api/src/routes/relays.rs`; DTOs in `chunkyard-api::dto::relay`. All relay endpoints are admin-only (bearer tokens need the `admin` scope, [auth.md](../../architecture/auth.md#api-tokens)).
+Conventions: [api-conventions.md](../../architecture/api-conventions.md). Paths under `/api/v1`. Handlers in `api/src/routes/relays.rs`; DTOs in `chunkyard-api::dto::relay`. All relay endpoints are admin-only (bearer tokens need the `admin` scope, [auth.md](../../architecture/auth.md#api-tokens)).
 
 ## DTOs
 
@@ -76,7 +76,7 @@ The relay binary's own config is `relay.toml` ([relay.md](relay.md#relaytoml)).
 
 ## Migration
 
-`crates/chunkyard-db/migrations/<NNNN>_p9_relay_connections.sql` (number assigned at merge):
+`crates/db/migrations/<NNNN>_p9_relay_connections.sql` (number assigned at merge):
 
 ```sql
 CREATE TABLE relay_connections (
@@ -94,4 +94,4 @@ CREATE INDEX proxy_routes_relay ON proxy_routes(relay_id);
 
 `relayState`/`relayReason` are runtime state held by the tunnel actor (not persisted).
 
-Relay-side schema (separate DB, own migrations in `crates/chunkyard-relay/migrations/`): [relay.md § State](relay.md#state-sqlite-relaydb-own-sqlx-migrations-in-cratesmcm-relaymigrations).
+Relay-side schema (separate DB, own migrations in `crates/relay/migrations/`): [relay.md § State](relay.md#state-sqlite-relaydb-own-sqlx-migrations-in-cratesmcm-relaymigrations).

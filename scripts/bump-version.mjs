@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const files = ['Cargo.toml', 'web/package.json', 'crates/chunkyard-api/src/openapi.json', 'docs/http-api.md'];
+const files = ['Cargo.toml', 'web/package.json', 'crates/api/src/openapi.json', 'docs/http-api.md'];
 
 export function updateMetadata(contents, version) {
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) throw new Error('Expected a numeric semantic version, e.g. 0.9.1');
@@ -16,10 +16,10 @@ export function updateMetadata(contents, version) {
   if (typeof pkg.version !== 'string') throw new Error('Missing frontend project version');
   pkg.version = version;
   next['web/package.json'] = JSON.stringify(pkg, null, '\t') + '\n';
-  const schema = JSON.parse(contents['crates/chunkyard-api/src/openapi.json']);
+  const schema = JSON.parse(contents['crates/api/src/openapi.json']);
   if (typeof schema.info?.version !== 'string') throw new Error('Missing OpenAPI version');
   schema.info.version = version;
-  next['crates/chunkyard-api/src/openapi.json'] = JSON.stringify(schema, null, 2) + '\n';
+  next['crates/api/src/openapi.json'] = JSON.stringify(schema, null, 2) + '\n';
   const example = /(^`GET \/api\/v1\/system\/version`[^\n]*?version:")[^"]+("[^\n]*)/m;
   if (!example.test(contents['docs/http-api.md'])) throw new Error('Missing version response example');
   next['docs/http-api.md'] = contents['docs/http-api.md'].replace(example, (_, before, after) => before + version + after);

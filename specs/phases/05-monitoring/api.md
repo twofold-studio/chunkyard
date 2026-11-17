@@ -1,6 +1,6 @@
 # Phase 5 — API, WebSocket, migration
 
-Conventions: [api-conventions.md](../../architecture/api-conventions.md). Handlers in `chunkyard-api/src/routes/{metrics,players,host,prometheus}.rs`.
+Conventions: [api-conventions.md](../../architecture/api-conventions.md). Handlers in `api/src/routes/{metrics,players,host,prometheus}.rs`.
 
 ## DTOs
 
@@ -75,7 +75,7 @@ max_concurrent_probes = 16
 
 Uses the global token scope `metrics.read` defined in [auth.md](../../architecture/auth.md#permission-catalog-per-server) (allows only `GET /metrics`). Before P8, an admin's `["*"]` token is also accepted; from P8, `*` must be combined with `admin`.
 
-## Migration `crates/chunkyard-db/migrations/<NNNN>_p5_metrics.sql`
+## Migration `crates/db/migrations/<NNNN>_p5_metrics.sql`
 
 Number assigned at merge time. Extends the [data-model.md](../../architecture/data-model.md#phase-5--metrics) sketch with max columns, state history and management-protocol columns. Repos: `MetricRepo`, `PlayerSessionRepo`, `StateHistoryRepo` (traits in `chunkyard-core`, impls in `chunkyard-db`).
 

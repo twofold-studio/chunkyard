@@ -2,7 +2,7 @@
 
 Kinds: **U** unit, **P** proptest, **F** fuzz, **I** crate integration (wiremock / FakeJre / fake shims), **A** API integration (`chunkyard-api-tests`, `TestApp` built with `test-hooks` + `Upstreams` + fake-mc; real time, short timeouts), **C** frontend, **E** Playwright, **S** real-server smoke (nightly, `CHUNKYARD_SMOKE=1`). Fixtures per [fixtures.md](../../testing/fixtures.md); shims per [fake-server.md](../../testing/fake-server.md).
 
-## chunkyard-java (`crates/chunkyard-java/src/**`, `tests/*.rs`)
+## chunkyard-java (`crates/java/src/**`, `tests/*.rs`)
 
 | Test | Kind | FR |
 |---|---|---|
@@ -31,7 +31,7 @@ Kinds: **U** unit, **P** proptest, **F** fuzz, **I** crate integration (wiremock
 | `ensure_prefers_managed_exact_then_system_then_higher_nonstrict` | U | 06 |
 | `ensure_strict_mismatch_manual_requires_override` | U | 06 |
 
-## chunkyard-download (`crates/chunkyard-download/tests/downloader.rs`)
+## chunkyard-download (`crates/download/tests/downloader.rs`)
 
 | Test | Kind | FR |
 |---|---|---|
@@ -46,7 +46,7 @@ Kinds: **U** unit, **P** proptest, **F** fuzz, **I** crate integration (wiremock
 | `downloader_sends_user_agent_with_contact` | I | 11 |
 | `downloader_rejects_private_ip_target_via_safe_http` | I | 11 |
 
-## chunkyard-installers (`crates/chunkyard-installers/tests/*.rs`)
+## chunkyard-installers (`crates/installers/tests/*.rs`)
 
 | Test | Kind | FR |
 |---|---|---|
@@ -91,7 +91,7 @@ Kinds: **U** unit, **P** proptest, **F** fuzz, **I** crate integration (wiremock
 | `installer_cancel_kills_group_and_removes_staging` | I | 19 |
 | `owned_paths_per_flavor_table` | U | 25 |
 
-## chunkyard-api-tests (`crates/chunkyard-api-tests/tests/p3_*.rs`)
+## chunkyard-api-tests (`crates/api-tests/tests/p3_*.rs`)
 
 | Test | Kind | FR |
 |---|---|---|
@@ -130,7 +130,7 @@ Kinds: **U** unit, **P** proptest, **F** fuzz, **I** crate integration (wiremock
 
 | Test | Kind | FR |
 |---|---|---|
-| `migration_p3_applies_on_phase2_snapshot` (`crates/chunkyard-db/tests/migrations.rs`) | I | all |
+| `migration_p3_applies_on_phase2_snapshot` (`crates/db/tests/migrations.rs`) | I | all |
 | `java_runtime_repo_crud_and_unique_path` | I | 01, 03 |
 
 ## chunkyard-core
@@ -164,6 +164,6 @@ Kinds: **U** unit, **P** proptest, **F** fuzz, **I** crate integration (wiremock
 | `p3-create › velocity proxy via wizard starts, console shows Done` | 26 |
 | axe scan of wizard and `/admin/java` | — |
 
-## Real-server smoke (`crates/chunkyard-server/tests/smoke_*.rs`)
+## Real-server smoke (`crates/server/tests/smoke_*.rs`)
 
 `smoke_vanilla_latest`, `smoke_paper_latest`, `smoke_fabric_1_20_1`, `smoke_forge_1_20_1`, `smoke_forge_1_21` (launch parsed from real `run.sh`; captures run-script fixtures), `smoke_neoforge_latest`, `smoke_legacy_1_12_2_java8` — see [e2e.md](../../testing/e2e.md#real-server-smoke-suite-opt-in). Also `smoke_quilt_latest`, `smoke_velocity_latest` (added by this phase) and `smoke_paper_v3_contract` (asserts fill v3 response shape matches our model; resolves the open question).

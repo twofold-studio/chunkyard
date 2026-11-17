@@ -5,7 +5,7 @@ Leaf crate (no `mcm-*` dependencies): types + codec + pairing-string parser, use
 ## Layers
 
 ```
-TCP ─ TLS 1.3 (rustls, ALPN "chunkyard-tunnel/1") ─ yamux
+TCP ─ TLS 1.3 (rustls, ALPN "tunnel/1") ─ yamux
    ├── stream opened by agent first  = CONTROL stream (exactly one)
    └── streams opened by relay       = DATA streams (one per player connection)
 ```
@@ -84,4 +84,4 @@ Stream close: FIN on yamux stream = half-close (mirrors TCP); RST = abort.
 
 ## Test vectors
 
-`crates/chunkyard-tunnel-proto/tests/vectors/*.bin` with JSON descriptions: one per message variant, plus invalid cases (len 0, len > 65 536, trailing bytes, unknown variant, truncated). Snapshot-tested with `insta` (hex dump) so any accidental wire change fails CI.
+`crates/tunnel-proto/tests/vectors/*.bin` with JSON descriptions: one per message variant, plus invalid cases (len 0, len > 65 536, trailing bytes, unknown variant, truncated). Snapshot-tested with `insta` (hex dump) so any accidental wire change fails CI.
